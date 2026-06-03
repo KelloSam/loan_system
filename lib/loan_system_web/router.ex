@@ -46,6 +46,9 @@ defmodule LoanSystemWeb.Router do
     get "/dashboard", AdminDashboardController, :index
     resources "/clients", ClientController
     resources "/loans", LoanController
+    patch "/loans/:id/approve", LoanController, :approve
+    patch "/loans/:id/reject", LoanController, :reject
+    post "/loans/:id/payments", LoanController, :create_payment
   end
 
   # Client routes

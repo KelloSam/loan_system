@@ -1,7 +1,7 @@
 defmodule LoanSystem.Loans do
   import Ecto.Query
   alias LoanSystem.Repo
-  alias LoanSystem.Loans.{Loan, Payment}
+  alias LoanSystem.Loans.{Loan, Payment, InterestCalculator}
   alias LoanSystem.Clients.Client
 
   # ---------------------------------------------------------------------------
@@ -36,6 +36,14 @@ defmodule LoanSystem.Loans do
 
   def get_loan!(id), do: Repo.get!(Loan, id)
 
+  @doc """
+  Returns compound interest details for a loan.
+  See `LoanSystem.Loans.InterestCalculator.calculate/1` for the returned map keys.
+  """
+  def compound_interest_details(%Loan{} = loan) do
+    InterestCalculator.calculate(loan)
+  end
+
   # ---------------------------------------------------------------------------
   # Loan mutations
   # ---------------------------------------------------------------------------
@@ -65,15 +73,16 @@ defmodule LoanSystem.Loans do
   end
 
   def delete_loan(%Loan{} = loan) do
-    client_id = loan.client_id
-
-    case Repo.delete(loan) do
-      {:ok, deleted} ->
-        recalculate_client_stats(Repo, client_id)
-        {:ok, deleted}
-
-      error ->
-        error
+    Ecto.Multi.new()
+    |> Ecto.Multi.delete(:loan, loan)
+    |> Ecto.Multi.run(:update_client_stats, fn repo, _ ->
+      recalculate_client_stats(repo, loan.client_id)
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{loan: deleted}}        -> {:ok, deleted}
+      {:error, :loan, changeset, _}  -> {:error, changeset}
+      {:error, _, reason, _}         -> {:error, reason}
     end
   end
 
@@ -179,6 +188,21 @@ defmodule LoanSystem.Loans do
     payment
     |> Payment.changeset(attrs)
     |> Repo.update()
+  end
+
+  def count_loans, do: Repo.aggregate(Loan, :count)
+
+  def count_active_loans do
+    from(l in Loan, where: l.status in ["pending", "approved"])
+    |> Repo.aggregate(:count)
+  end
+
+  def total_outstanding_balance do
+    from(l in Loan,
+      where: l.status in ["pending", "approved"],
+      select: coalesce(sum(l.remaining_balance), ^Decimal.new("0.00"))
+    )
+    |> Repo.one()
   end
 
   # ---------------------------------------------------------------------------

@@ -1,36 +1,47 @@
-<div class="px-4 sm:px-6 lg:px-8">
-  <div class="sm:flex sm:items-center">
-    <div class="sm:flex-auto">
-      <h1 class="text-2xl font-semibold text-gray-900">My Loans</h1>
-      <p class="mt-2 text-sm text-gray-700">A list of all your loans and their status.</p>
+<div class="mb-6">
+  <h1 class="text-2xl font-bold text-navy-900">My Loans</h1>
+  <p class="mt-0.5 text-sm text-gray-500">Your loan history and current status</p>
+</div>
+
+<div class="card overflow-hidden">
+  <%= if Enum.empty?(@loans) do %>
+    <div class="py-16 text-center">
+      <svg class="mx-auto h-12 w-12 text-gray-200" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75"/>
+      </svg>
+      <h3 class="mt-3 text-sm font-medium text-gray-700">No loans yet</h3>
+      <p class="mt-1 text-sm text-gray-400">Contact your branch to apply for a loan.</p>
     </div>
-    <div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
-      <button type="button" class="inline-flex items-center justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:w-auto">
-        Apply for Loan
-      </button>
+  <% else %>
+    <div class="overflow-x-auto">
+      <table class="min-w-full">
+        <thead>
+          <tr class="bg-gray-50 border-b border-gray-100">
+            <th class="th">Amount</th>
+            <th class="th">Balance</th>
+            <th class="th">Status</th>
+            <th class="th hidden sm:table-cell">Date</th>
+            <th class="th text-right">Details</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-50">
+          <%= for loan <- @loans do %>
+            <tr class="hover:bg-gray-50 transition-colors">
+              <td class="td font-medium text-navy-900">ZMW <%= loan.amount %></td>
+              <td class="td">ZMW <%= loan.remaining_balance %></td>
+              <td class="td">
+                <span class={"badge badge-#{loan.status}"}><%= String.capitalize(loan.status) %></span>
+              </td>
+              <td class="td text-gray-400 hidden sm:table-cell">
+                <%= Calendar.strftime(loan.inserted_at, "%d %b %Y") %>
+              </td>
+              <td class="td text-right">
+                <%= link "View →", to: ~p"/client/loans/#{loan}", class: "text-sm font-medium text-navy-600 hover:text-navy-900" %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
     </div>
-  </div>
-  <div class="mt-8 flex flex-col">
-    <div class="-my-2 -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
-      <div class="inline-block min-w-full py-2 align-middle md:px-6 lg:px-8">
-        <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
-          <table class="min-w-full divide-y divide-gray-300">
-            <thead class="bg-gray-50">
-              <tr>
-                <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Amount</th>
-                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Status</th>
-                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Date</th>
-                <th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
-                  <span class="sr-only">View</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-200 bg-white">
-              <!-- Add loan items here -->
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>
+  <% end %>
 </div>

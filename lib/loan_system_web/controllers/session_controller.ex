@@ -4,13 +4,16 @@ defmodule LoanSystemWeb.SessionController do
   alias LoanSystem.Accounts
 
   def new(conn, _params) do
-    render(conn, :new)
+    conn
+    |> put_layout(html: false)
+    |> render(:new)
   end
 
   def create(conn, %{"session" => %{"email" => email, "password" => password}}) do
     case Accounts.authenticate_user(email, password) do
       {:ok, user} ->
         conn
+        |> configure_session(renew: true)  # prevents session fixation
         |> put_session(:user_id, user.id)
         |> put_session(:user_role, user.role)
         |> put_session(:user_email, user.email)
@@ -26,7 +29,8 @@ defmodule LoanSystemWeb.SessionController do
 
   def delete(conn, _params) do
     conn
-    |> delete_session(:user_id)
+    |> clear_session()  # clears all session keys, not just user_id
+    |> configure_session(drop: true)
     |> put_flash(:info, "Logged out successfully.")
     |> redirect(to: ~p"/")
   end

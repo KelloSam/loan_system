@@ -7,7 +7,7 @@ defmodule LoanSystem.Clients do
   Returns a paginated list of clients ordered by name.
   Accepts `page:` and `per_page:` opts (defaults: 1, 50).
   """
-  def list_clients(opts \ []) do
+  def list_clients(opts \\ []) do
     page     = Keyword.get(opts, :page, 1)
     per_page = Keyword.get(opts, :per_page, 50)
     offset   = (page - 1) * per_page
@@ -50,4 +50,6 @@ defmodule LoanSystem.Clients do
   def get_client_by_id_number(id_number) do
     Repo.get_by(Client, id_number: id_number)
   end
+
+  def count_clients, do: Repo.aggregate(Client, :count)
 end

@@ -1,56 +1,99 @@
-<div class="px-4 sm:px-6 lg:px-8">
-  <div class="sm:flex sm:items-center">
-    <div class="sm:flex-auto">
-      <h1 class="text-2xl font-semibold text-gray-900">Loan Details</h1>
-      <p class="mt-2 text-sm text-gray-700">Detailed information about your loan.</p>
+<div class="mb-6 flex items-center justify-between">
+  <div>
+    <div class="flex items-center gap-2 text-sm text-gray-400 mb-1">
+      <%= link "My Loans", to: ~p"/client/loans", class: "hover:text-navy-600" %>
+      <span>›</span>
+      <span class="text-navy-900 font-medium">Loan Details</span>
     </div>
+    <h1 class="text-2xl font-bold text-navy-900">Loan Details</h1>
+  </div>
+</div>
+
+<%# Summary cards %>
+<div class="grid grid-cols-2 gap-4 mb-6">
+  <div class="card p-5">
+    <p class="text-xs text-gray-400 uppercase tracking-wide font-medium">Principal</p>
+    <p class="mt-1 text-xl font-bold text-navy-900">ZMW <%= @loan.amount %></p>
+  </div>
+  <div class="card p-5">
+    <p class="text-xs text-gray-400 uppercase tracking-wide font-medium">Remaining Balance</p>
+    <p class="mt-1 text-xl font-bold text-red-600">ZMW <%= @loan.remaining_balance %></p>
+  </div>
+</div>
+
+<%# Loan info + interest breakdown %>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+
+  <div class="card p-6">
+    <h2 class="section-title mb-4">Loan Summary</h2>
+    <dl class="space-y-3">
+      <div class="flex justify-between text-sm">
+        <dt class="text-gray-500">Status</dt>
+        <dd><span class={"badge badge-#{@loan.status}"}><%= String.capitalize(@loan.status) %></span></dd>
+      </div>
+      <div class="flex justify-between text-sm">
+        <dt class="text-gray-500">Annual Rate</dt>
+        <dd class="font-medium text-navy-900"><%= @loan.interest_rate %>%</dd>
+      </div>
+      <div class="flex justify-between text-sm">
+        <dt class="text-gray-500">Term</dt>
+        <dd class="font-medium text-navy-900"><%= @loan.term_months %> months</dd>
+      </div>
+      <div class="flex justify-between text-sm">
+        <dt class="text-gray-500">Next Payment</dt>
+        <dd class="font-medium text-navy-900"><%= @loan.next_payment_date || "—" %></dd>
+      </div>
+    </dl>
   </div>
 
-  <div class="mt-8 bg-white shadow overflow-hidden sm:rounded-lg">
-    <div class="px-4 py-5 sm:px-6">
-      <dl class="grid grid-cols-1 gap-x-4 gap-y-8 sm:grid-cols-2">
-        <div class="sm:col-span-1">
-          <dt class="text-sm font-medium text-gray-500">Loan Amount</dt>
-          <dd class="mt-1 text-sm text-gray-900">$5,000</dd>
-        </div>
-
-        <div class="sm:col-span-1">
-          <dt class="text-sm font-medium text-gray-500">Status</dt>
-          <dd class="mt-1 text-sm text-gray-900">
-            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-              Active
-            </span>
-          </dd>
-        </div>
-
-        <div class="sm:col-span-1">
-          <dt class="text-sm font-medium text-gray-500">Application Date</dt>
-          <dd class="mt-1 text-sm text-gray-900">January 1, 2025</dd>
-        </div>
-
-        <div class="sm:col-span-1">
-          <dt class="text-sm font-medium text-gray-500">Next Payment Due</dt>
-          <dd class="mt-1 text-sm text-gray-900">February 1, 2025</dd>
-        </div>
-
-        <div class="sm:col-span-2">
-          <dt class="text-sm font-medium text-gray-500">Payment Schedule</dt>
-          <dd class="mt-1 text-sm text-gray-900">
-            <table class="min-w-full divide-y divide-gray-300">
-              <thead class="bg-gray-50">
-                <tr>
-                  <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900">Due Date</th>
-                  <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Amount</th>
-                  <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Status</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-gray-200 bg-white">
-                <!-- Add payment schedule items here -->
-              </tbody>
-            </table>
-          </dd>
-        </div>
-      </dl>
-    </div>
+  <div class="rounded-xl border-2 border-gold-200 bg-gold-50 p-6">
+    <h2 class="section-title mb-1">Repayment Breakdown</h2>
+    <p class="text-xs text-gray-500 mb-4">Monthly compounding</p>
+    <dl class="space-y-3">
+      <div class="flex justify-between items-center">
+        <dt class="text-sm text-gray-600">Monthly Payment</dt>
+        <dd class="font-bold text-navy-900">ZMW <%= @interest.monthly_payment %></dd>
+      </div>
+      <div class="flex justify-between items-center">
+        <dt class="text-sm text-gray-600">Total to Repay</dt>
+        <dd class="font-bold text-navy-900">ZMW <%= @interest.total_repayment %></dd>
+      </div>
+      <div class="flex justify-between items-center border-t border-gold-200 pt-3">
+        <dt class="text-sm text-gray-600">Total Interest</dt>
+        <dd class="font-bold text-gold-700">ZMW <%= @interest.total_interest %></dd>
+      </div>
+    </dl>
   </div>
+
+</div>
+
+<%# Payment history %>
+<div class="card overflow-hidden">
+  <div class="px-5 py-4 border-b border-gray-100">
+    <h2 class="section-title">Payment History</h2>
+  </div>
+  <%= if Enum.empty?(@loan.payments) do %>
+    <div class="py-10 text-center text-sm text-gray-400">No payments recorded yet.</div>
+  <% else %>
+    <table class="min-w-full">
+      <thead>
+        <tr class="bg-gray-50 border-b border-gray-100">
+          <th class="th">Date</th>
+          <th class="th">Amount</th>
+          <th class="th">Status</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        <%= for payment <- @loan.payments do %>
+          <tr class="hover:bg-gray-50">
+            <td class="td"><%= payment.payment_date %></td>
+            <td class="td font-medium">ZMW <%= payment.amount %></td>
+            <td class="td">
+              <span class={"badge badge-#{payment.status}"}><%= String.capitalize(payment.status) %></span>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
 </div>

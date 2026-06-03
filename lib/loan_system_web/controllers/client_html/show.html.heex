@@ -1,0 +1,110 @@
+<%# Breadcrumb + header %>
+<div class="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+  <div>
+    <div class="flex items-center gap-2 text-sm text-gray-400 mb-1">
+      <%= link "Clients", to: ~p"/admin/clients", class: "hover:text-navy-600" %>
+      <span>›</span>
+      <span class="text-navy-900 font-medium"><%= @client.name %></span>
+    </div>
+    <h1 class="text-2xl font-bold text-navy-900"><%= @client.name %></h1>
+    <p class="text-sm text-gray-400 mt-0.5">
+      Member since <%= Calendar.strftime(@client.inserted_at, "%B %Y") %>
+    </p>
+  </div>
+  <div class="flex gap-2 flex-wrap">
+    <%= link "Edit Client", to: ~p"/admin/clients/#{@client}/edit", class: "btn-outline" %>
+    <%= link "New Loan", to: ~p"/admin/loans/new", class: "btn-gold" %>
+  </div>
+</div>
+
+<%# Stat cards %>
+<div class="grid grid-cols-2 gap-4 mb-6">
+  <div class="card p-5">
+    <p class="text-sm text-gray-500">Total Loans</p>
+    <p class="stat-value"><%= @client.total_loans %></p>
+  </div>
+  <div class="card p-5">
+    <p class="text-sm text-gray-500">Outstanding Balance</p>
+    <p class="stat-value text-xl text-red-600">ZMW <%= @client.current_balance %></p>
+  </div>
+</div>
+
+<%# Client details %>
+<div class="card p-6 mb-6">
+  <h2 class="section-title mb-4">Client Details</h2>
+  <dl class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
+    <div>
+      <dt class="text-xs font-medium text-gray-400 uppercase tracking-wide">Phone</dt>
+      <dd class="mt-1 text-sm font-medium text-navy-900"><%= @client.phone %></dd>
+    </div>
+    <div>
+      <dt class="text-xs font-medium text-gray-400 uppercase tracking-wide">National ID</dt>
+      <dd class="mt-1 text-sm font-medium text-navy-900"><%= @client.id_number %></dd>
+    </div>
+    <div>
+      <dt class="text-xs font-medium text-gray-400 uppercase tracking-wide">Email</dt>
+      <dd class="mt-1 text-sm font-medium text-navy-900"><%= @client.email || "—" %></dd>
+    </div>
+    <div>
+      <dt class="text-xs font-medium text-gray-400 uppercase tracking-wide">Address</dt>
+      <dd class="mt-1 text-sm font-medium text-navy-900"><%= @client.address || "—" %></dd>
+    </div>
+    <div>
+      <dt class="text-xs font-medium text-gray-400 uppercase tracking-wide">Status</dt>
+      <dd class="mt-1">
+        <%= if @client.active do %>
+          <span class="badge badge-active">Active</span>
+        <% else %>
+          <span class="badge badge-inactive">Inactive</span>
+        <% end %>
+      </dd>
+    </div>
+  </dl>
+</div>
+
+<%# Loan history %>
+<div class="card overflow-hidden">
+  <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+    <h2 class="section-title">Loan History <span class="ml-1.5 text-sm font-normal text-gray-400">(<%= length(@loans) %>)</span></h2>
+    <%= link "+ New Loan", to: ~p"/admin/loans/new", class: "text-sm font-medium text-gold-600 hover:text-gold-700" %>
+  </div>
+
+  <%= if Enum.empty?(@loans) do %>
+    <div class="py-12 text-center">
+      <p class="text-sm text-gray-400">No loans recorded for this client.</p>
+    </div>
+  <% else %>
+    <div class="overflow-x-auto">
+      <table class="min-w-full">
+        <thead>
+          <tr class="bg-gray-50 border-b border-gray-100">
+            <th class="th">Amount</th>
+            <th class="th">Balance</th>
+            <th class="th hidden sm:table-cell">Rate / Term</th>
+            <th class="th">Status</th>
+            <th class="th hidden md:table-cell">Date</th>
+            <th class="th text-right">Action</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-50">
+          <%= for loan <- @loans do %>
+            <tr class="hover:bg-gray-50 transition-colors">
+              <td class="td font-medium text-navy-900">ZMW <%= loan.amount %></td>
+              <td class="td">ZMW <%= loan.remaining_balance %></td>
+              <td class="td text-gray-500 hidden sm:table-cell"><%= loan.interest_rate %>% / <%= loan.term_months %>mo</td>
+              <td class="td">
+                <span class={"badge badge-#{loan.status}"}><%= String.capitalize(loan.status) %></span>
+              </td>
+              <td class="td text-gray-400 hidden md:table-cell">
+                <%= Calendar.strftime(loan.inserted_at, "%d %b %Y") %>
+              </td>
+              <td class="td text-right">
+                <%= link "View →", to: ~p"/admin/loans/#{loan}", class: "text-sm font-medium text-navy-600 hover:text-navy-900" %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+</div>

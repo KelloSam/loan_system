@@ -1,37 +1,65 @@
-<div class="px-4 sm:px-6 lg:px-8">
-  <div class="sm:flex sm:items-center">
-    <div class="sm:flex-auto">
-      <h1 class="text-2xl font-semibold text-gray-900">Clients</h1>
-      <p class="mt-2 text-sm text-gray-700">A list of all clients in the system.</p>
-    </div>
-    <div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
-      <button type="button" class="inline-flex items-center justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:w-auto">
-        Add Client
-      </button>
-    </div>
+<%# Page header %>
+<div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+  <div>
+    <h1 class="text-2xl font-bold text-navy-900">Clients</h1>
+    <p class="mt-0.5 text-sm text-gray-500">Manage all registered clients</p>
   </div>
-  <div class="mt-8 flex flex-col">
-    <div class="-my-2 -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
-      <div class="inline-block min-w-full py-2 align-middle md:px-6 lg:px-8">
-        <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
-          <table class="min-w-full divide-y divide-gray-300">
-            <thead class="bg-gray-50">
-              <tr>
-                <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Name</th>
-                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Email</th>
-                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Phone</th>
-                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">ID Number</th>
-                <th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
-                  <span class="sr-only">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-200 bg-white">
-              <!-- Add client items here -->
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+  <%= link "New Client", to: ~p"/admin/clients/new", class: "btn-primary self-start" %>
+</div>
+
+<div class="card overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="min-w-full">
+      <thead>
+        <tr class="bg-gray-50 border-b border-gray-100">
+          <th class="th">Name</th>
+          <th class="th hidden md:table-cell">Phone</th>
+          <th class="th hidden lg:table-cell">National ID</th>
+          <th class="th hidden sm:table-cell">Loans</th>
+          <th class="th hidden sm:table-cell">Balance</th>
+          <th class="th">Status</th>
+          <th class="th text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        <%= for client <- @clients do %>
+          <tr class="hover:bg-gray-50 transition-colors">
+            <td class="td">
+              <div class="flex items-center gap-3">
+                <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-navy-900 text-xs font-bold text-gold-400">
+                  <%= String.at(client.name, 0) |> String.upcase() %>
+                </div>
+                <div>
+                  <p class="font-medium text-navy-900"><%= client.name %></p>
+                  <%= if client.email do %>
+                    <p class="text-xs text-gray-400"><%= client.email %></p>
+                  <% end %>
+                </div>
+              </div>
+            </td>
+            <td class="td text-gray-500 hidden md:table-cell"><%= client.phone %></td>
+            <td class="td text-gray-500 hidden lg:table-cell"><%= client.id_number %></td>
+            <td class="td hidden sm:table-cell"><%= client.total_loans %></td>
+            <td class="td hidden sm:table-cell">ZMW <%= client.current_balance %></td>
+            <td class="td">
+              <%= if client.active do %>
+                <span class="badge badge-active">Active</span>
+              <% else %>
+                <span class="badge badge-inactive">Inactive</span>
+              <% end %>
+            </td>
+            <td class="td text-right space-x-3">
+              <%= link "View", to: ~p"/admin/clients/#{client}", class: "text-sm font-medium text-navy-600 hover:text-navy-900" %>
+              <%= link "Edit", to: ~p"/admin/clients/#{client}/edit", class: "text-sm font-medium text-gray-400 hover:text-gray-700" %>
+            </td>
+          </tr>
+        <% end %>
+        <%= if Enum.empty?(@clients) do %>
+          <tr>
+            <td colspan="7" class="py-12 text-center text-sm text-gray-400">No clients registered yet.</td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
   </div>
 </div>

@@ -1,0 +1,90 @@
+<div class="mb-6">
+  <div class="flex items-center gap-2 text-sm text-gray-400 mb-1">
+    <%= link "Loans", to: ~p"/admin/loans", class: "hover:text-navy-600" %>
+    <span>›</span>
+    <%= link @loan.client.name, to: ~p"/admin/loans/#{@loan}", class: "hover:text-navy-600" %>
+    <span>›</span>
+    <span class="text-navy-900 font-medium">Edit</span>
+  </div>
+  <h1 class="text-2xl font-bold text-navy-900">Edit Loan</h1>
+</div>
+
+<div class="max-w-2xl">
+  <.form :let={f} for={@changeset} action={~p"/admin/loans/#{@loan}"} method="put" class="card p-6 space-y-5">
+
+    <%= if @changeset.action do %>
+      <div class="flex items-center gap-2.5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <svg class="h-4 w-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd"/>
+        </svg>
+        Please correct the errors below.
+      </div>
+    <% end %>
+
+    <%= if @loan.status == "pending" do %>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="form-label">Principal Amount (ZMW)</label>
+          <%= number_input f, :amount, step: "0.01", min: "0",
+                class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+          <%= error_tag f, :amount %>
+        </div>
+        <div>
+          <label class="form-label">Annual Interest Rate (%)</label>
+          <%= number_input f, :interest_rate, step: "0.01", min: "0",
+                class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+          <%= error_tag f, :interest_rate %>
+        </div>
+        <div>
+          <label class="form-label">Term (months)</label>
+          <%= number_input f, :term_months, min: "1",
+                class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+          <%= error_tag f, :term_months %>
+        </div>
+        <div>
+          <label class="form-label">First Payment Date</label>
+          <%= date_input f, :next_payment_date,
+                class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+          <%= error_tag f, :next_payment_date %>
+        </div>
+      </div>
+    <% else %>
+      <div class="flex items-center gap-2.5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <svg class="h-4 w-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+        </svg>
+        Loan is <strong class="mx-1"><%= @loan.status %></strong> — only purpose and next payment date can be changed.
+      </div>
+      <div>
+        <label class="form-label">Next Payment Date</label>
+        <%= date_input f, :next_payment_date,
+              class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+        <%= error_tag f, :next_payment_date %>
+      </div>
+    <% end %>
+
+    <div>
+      <label class="form-label">Purpose</label>
+      <%= textarea f, :purpose, rows: 3,
+            class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+      <%= error_tag f, :purpose %>
+    </div>
+
+    <div class="flex justify-between pt-2 border-t border-gray-100">
+      <div>
+        <%= if @loan.status == "pending" do %>
+          <%= link "Delete Loan",
+                to: ~p"/admin/loans/#{@loan}",
+                method: :delete,
+                data: [confirm: "Delete this loan? This cannot be undone."],
+                class: "btn-danger" %>
+        <% end %>
+      </div>
+      <div class="flex gap-3">
+        <%= link "Cancel", to: ~p"/admin/loans/#{@loan}", class: "btn-outline" %>
+        <%= submit "Save Changes", class: "btn-primary" %>
+      </div>
+    </div>
+
+  </.form>
+</div>
