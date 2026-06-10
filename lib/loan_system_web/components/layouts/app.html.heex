@@ -1,99 +1,95 @@
-<div class="flex h-screen overflow-hidden bg-gray-50">
-
-  <%# ── Mobile overlay ── %>
-  <div id="sidebar-overlay"
-       class="fixed inset-0 z-20 bg-black/50 hidden lg:hidden"
-       onclick="toggleSidebar()">
-  </div>
+<%# Shell: sidebar + main — all styles inline, no Tailwind dependency %>
+<div style="display:flex; height:100vh; overflow:hidden; background:#F0F2F7; font-family:'Inter',system-ui,sans-serif;">
 
   <%# ── Sidebar ── %>
-  <aside id="sidebar"
-         class="fixed inset-y-0 left-0 z-30 flex w-64 flex-col bg-navy-900
-                transform -translate-x-full transition-transform duration-200 ease-in-out
-                lg:relative lg:translate-x-0 lg:z-auto">
+  <aside id="sidebar" style="width:240px; min-width:240px; background:#0B1A2E; display:flex; flex-direction:column; height:100vh; flex-shrink:0; z-index:30;">
 
-    <%# Logo %>
-    <div class="flex items-center gap-3 px-5 py-5 border-b border-navy-800">
-      <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-gold-500 shadow-inner flex-shrink-0">
-        <svg class="h-5 w-5 text-navy-900" fill="currentColor" viewBox="0 0 24 24">
+    <%# Logo area %>
+    <div style="padding:18px 16px; border-bottom:1px solid #162B55; display:flex; align-items:center; gap:12px;">
+      <div style="width:36px; height:36px; background:#C8970A; border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow:0 2px 8px rgba(200,151,10,0.3);">
+        <svg style="width:20px; height:20px; fill:#0B1A2E;" viewBox="0 0 24 24">
           <path d="M11.47 3.84a.75.75 0 011.06 0l8.69 8.69a.75.75 0 101.06-1.06l-8.689-8.69a2.25 2.25 0 00-3.182 0l-8.69 8.69a.75.75 0 001.061 1.06l8.69-8.69z"/>
           <path d="M12 5.432l8.159 8.159c.03.03.06.058.091.086v6.198c0 1.035-.84 1.875-1.875 1.875H15a.75.75 0 01-.75-.75v-4.5a.75.75 0 00-.75-.75h-3a.75.75 0 00-.75.75V21a.75.75 0 01-.75.75H5.625a1.875 1.875 0 01-1.875-1.875v-6.198a2.29 2.29 0 00.091-.086L12 5.432z"/>
         </svg>
       </div>
-      <div class="min-w-0">
-        <p class="text-sm font-bold text-gold-400 leading-tight truncate">Loan Management</p>
-        <p class="text-xs text-gray-500 leading-tight">System</p>
+      <div style="min-width:0;">
+        <div style="color:#C8970A; font-size:12px; font-weight:700; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Loan Management</div>
+        <div style="color:#4B6080; font-size:10px; line-height:1.3;">System</div>
       </div>
     </div>
 
     <%# Navigation %>
-    <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
+    <nav style="flex:1; padding:12px 10px; overflow-y:auto;">
       <%= if @current_user.role == "admin" do %>
-        <p class="px-4 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-gray-500">Main</p>
 
-        <%= link to: ~p"/admin/dashboard",
-              class: "nav-link #{if String.starts_with?(@conn.request_path, "/admin/dashboard"), do: "active", else: ""}" do %>
-          <svg class="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+        <div style="font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.12em; color:#3D5270; padding:10px 10px 4px;">Main</div>
+
+        <a href={~p"/admin/dashboard"}
+           style={"display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:6px; font-size:13px; font-weight:500; text-decoration:none; margin-bottom:2px; #{if String.starts_with?(@conn.request_path, "/admin/dashboard"), do: "background:#162B55; color:#C8970A; border-left:3px solid #C8970A; padding-left:7px;", else: "color:#94A3B8;"}"}>
+          <svg style="width:15px;height:15px;flex-shrink:0;" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z"/>
           </svg>
           Dashboard
-        <% end %>
+        </a>
 
-        <p class="px-4 pt-4 pb-1 text-[10px] font-semibold uppercase tracking-widest text-gray-500">Manage</p>
+        <div style="font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.12em; color:#3D5270; padding:14px 10px 4px;">Manage</div>
 
-        <%= link to: ~p"/admin/clients",
-              class: "nav-link #{if String.starts_with?(@conn.request_path, "/admin/clients"), do: "active", else: ""}" do %>
-          <svg class="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+        <a href={~p"/admin/clients"}
+           style={"display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:6px; font-size:13px; font-weight:500; text-decoration:none; margin-bottom:2px; #{if String.starts_with?(@conn.request_path, "/admin/clients"), do: "background:#162B55; color:#C8970A; border-left:3px solid #C8970A; padding-left:7px;", else: "color:#94A3B8;"}"}>
+          <svg style="width:15px;height:15px;flex-shrink:0;" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/>
           </svg>
           Clients
-        <% end %>
+        </a>
 
-        <%= link to: ~p"/admin/loans",
-              class: "nav-link #{if String.starts_with?(@conn.request_path, "/admin/loans"), do: "active", else: ""}" do %>
-          <svg class="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+        <a href={~p"/admin/loans"}
+           style={"display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:6px; font-size:13px; font-weight:500; text-decoration:none; margin-bottom:2px; #{if String.starts_with?(@conn.request_path, "/admin/loans"), do: "background:#162B55; color:#C8970A; border-left:3px solid #C8970A; padding-left:7px;", else: "color:#94A3B8;"}"}>
+          <svg style="width:15px;height:15px;flex-shrink:0;" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75"/>
           </svg>
           Loans
-        <% end %>
+        </a>
 
       <% else %>
-        <p class="px-4 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-gray-500">My Account</p>
 
-        <%= link to: ~p"/client/dashboard",
-              class: "nav-link #{if String.starts_with?(@conn.request_path, "/client/dashboard"), do: "active", else: ""}" do %>
-          <svg class="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+        <div style="font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.12em; color:#3D5270; padding:10px 10px 4px;">My Account</div>
+
+        <a href={~p"/client/dashboard"}
+           style={"display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:6px; font-size:13px; font-weight:500; text-decoration:none; margin-bottom:2px; #{if String.starts_with?(@conn.request_path, "/client/dashboard"), do: "background:#162B55; color:#C8970A; border-left:3px solid #C8970A; padding-left:7px;", else: "color:#94A3B8;"}"}>
+          <svg style="width:15px;height:15px;flex-shrink:0;" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z"/>
           </svg>
           Dashboard
-        <% end %>
+        </a>
 
-        <%= link to: ~p"/client/loans",
-              class: "nav-link #{if String.starts_with?(@conn.request_path, "/client/loans"), do: "active", else: ""}" do %>
-          <svg class="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+        <a href={~p"/client/loans"}
+           style={"display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:6px; font-size:13px; font-weight:500; text-decoration:none; margin-bottom:2px; #{if String.starts_with?(@conn.request_path, "/client/loans"), do: "background:#162B55; color:#C8970A; border-left:3px solid #C8970A; padding-left:7px;", else: "color:#94A3B8;"}"}>
+          <svg style="width:15px;height:15px;flex-shrink:0;" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75"/>
           </svg>
           My Loans
-        <% end %>
+        </a>
+
       <% end %>
     </nav>
 
-    <%# User info at bottom %>
-    <div class="border-t border-navy-800 px-4 py-4">
-      <div class="flex items-center gap-3 mb-3">
-        <div class="flex h-8 w-8 items-center justify-center rounded-full bg-navy-700 flex-shrink-0">
-          <span class="text-xs font-bold text-gold-400">
+    <%# User info + logout %>
+    <div style="border-top:1px solid #162B55; padding:14px 16px;">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+        <div style="width:32px; height:32px; background:#162B55; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; border:1px solid #C8970A;">
+          <span style="font-size:12px; font-weight:700; color:#C8970A;">
             <%= String.at(@current_user.email, 0) |> String.upcase() %>
           </span>
         </div>
-        <div class="min-w-0 flex-1">
-          <p class="text-xs font-medium text-white truncate"><%= @current_user.email %></p>
-          <p class="text-[10px] text-gray-500 capitalize"><%= @current_user.role %></p>
+        <div style="min-width:0; flex:1;">
+          <div style="font-size:12px; font-weight:500; color:#E2E8F0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"><%= @current_user.email %></div>
+          <div style="font-size:10px; color:#4B6080; text-transform:capitalize;"><%= @current_user.role %></div>
         </div>
       </div>
       <%= link to: ~p"/logout", method: :delete,
-            class: "flex items-center gap-2 w-full px-3 py-2 rounded-lg text-xs text-gray-400 hover:text-red-400 hover:bg-navy-800 transition-colors" do %>
-        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            style: "display:flex; align-items:center; gap:8px; width:100%; padding:7px 8px; border-radius:6px; font-size:12px; color:#6B7280; text-decoration:none; background:transparent; border:none; cursor:pointer; font-family:inherit;",
+            "data-confirm": false do %>
+        <svg style="width:13px;height:13px;flex-shrink:0;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"/>
         </svg>
         Sign Out
@@ -101,62 +97,42 @@
     </div>
   </aside>
 
-  <%# ── Main content area ── %>
-  <div class="flex flex-1 flex-col overflow-hidden min-w-0">
+  <%# ── Main content column ── %>
+  <div style="flex:1; display:flex; flex-direction:column; overflow:hidden; min-width:0;">
 
     <%# Top bar %>
-    <header class="flex h-14 flex-shrink-0 items-center gap-4 border-b border-gray-200 bg-white px-4 shadow-sm">
-      <%# Mobile hamburger %>
-      <button onclick="toggleSidebar()"
-              class="lg:hidden rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700 focus:outline-none">
-        <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/>
-        </svg>
-      </button>
-
-      <div class="flex flex-1 items-center justify-between">
-        <div class="text-sm font-semibold text-navy-900 hidden sm:block">
-          <%= if @current_user.role == "admin", do: "Administration Portal", else: "Client Portal" %>
-        </div>
-        <div class="flex items-center gap-2">
-          <span class="inline-flex items-center rounded-full bg-navy-900 px-2.5 py-0.5 text-xs font-medium text-gold-400">
-            <%= String.upcase(@current_user.role) %>
-          </span>
-        </div>
+    <header style="height:54px; background:#ffffff; border-bottom:1px solid #E5E7EB; display:flex; align-items:center; padding:0 20px; flex-shrink:0; box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+      <div style="flex:1; font-size:13px; font-weight:600; color:#0B1A2E;">
+        <%= if @current_user.role == "admin", do: "Administration Portal", else: "Client Portal" %>
       </div>
+      <span style="background:#0B1A2E; color:#C8970A; font-size:10px; font-weight:700; padding:3px 10px; border-radius:999px; letter-spacing:0.05em;">
+        <%= String.upcase(@current_user.role) %>
+      </span>
     </header>
 
-    <%# Flash messages %>
+    <%# Flash: info %>
     <%= if flash_msg = Phoenix.Flash.get(@flash, :info) do %>
-      <div class="mx-4 mt-4 flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 shadow-sm" role="alert">
-        <svg class="h-4 w-4 flex-shrink-0 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
+      <div style="margin:12px 16px 0; display:flex; align-items:center; gap:10px; background:#F0FDF4; border:1px solid #BBF7D0; border-radius:8px; padding:11px 14px;">
+        <svg style="width:15px;height:15px;fill:#16A34A;flex-shrink:0;" viewBox="0 0 20 20">
           <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"/>
         </svg>
-        <%= flash_msg %>
+        <span style="font-size:13px; color:#166534;"><%= flash_msg %></span>
       </div>
     <% end %>
 
+    <%# Flash: error %>
     <%= if flash_msg = Phoenix.Flash.get(@flash, :error) do %>
-      <div class="mx-4 mt-4 flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 shadow-sm" role="alert">
-        <svg class="h-4 w-4 flex-shrink-0 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+      <div style="margin:12px 16px 0; display:flex; align-items:center; gap:10px; background:#FEF2F2; border:1px solid #FECACA; border-radius:8px; padding:11px 14px;">
+        <svg style="width:15px;height:15px;fill:#DC2626;flex-shrink:0;" viewBox="0 0 20 20">
           <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd"/>
         </svg>
-        <%= flash_msg %>
+        <span style="font-size:13px; color:#991B1B;"><%= flash_msg %></span>
       </div>
     <% end %>
 
     <%# Page content %>
-    <main class="flex-1 overflow-y-auto p-4 sm:p-6">
+    <main style="flex:1; overflow-y:auto; padding:24px;">
       <%= @inner_content %>
     </main>
   </div>
 </div>
-
-<script>
-  function toggleSidebar() {
-    var sidebar = document.getElementById('sidebar');
-    var overlay = document.getElementById('sidebar-overlay');
-    sidebar.classList.toggle('-translate-x-full');
-    overlay.classList.toggle('hidden');
-  }
-</script>

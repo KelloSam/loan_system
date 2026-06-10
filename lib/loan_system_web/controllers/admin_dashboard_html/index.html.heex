@@ -108,53 +108,53 @@
   <div class="card p-5">
     <h2 class="section-title mb-4">Quick Actions</h2>
     <div class="space-y-3">
-      <%= link to: ~p"/admin/clients/new", class: "flex items-center gap-3 rounded-lg border border-gray-200 p-3.5 hover:border-navy-300 hover:bg-navy-50 transition-colors group" do %>
-        <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-navy-900 group-hover:bg-navy-800">
-          <svg class="h-4 w-4 text-gold-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <a href={~p"/admin/clients/new"} class="quick-action">
+        <div style="width:32px;height:32px;background:#0B1A2E;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <svg style="width:14px;height:14px;stroke:#C8970A;fill:none;" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
           </svg>
         </div>
         <div>
-          <p class="text-sm font-medium text-navy-900">New Client</p>
+          <p class="text-sm font-medium" style="color:#0B1A2E;">New Client</p>
           <p class="text-xs text-gray-400">Register a client</p>
         </div>
-      <% end %>
+      </a>
 
-      <%= link to: ~p"/admin/loans/new", class: "flex items-center gap-3 rounded-lg border border-gray-200 p-3.5 hover:border-gold-300 hover:bg-gold-50 transition-colors group" do %>
-        <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-gold-500 group-hover:bg-gold-600">
-          <svg class="h-4 w-4 text-navy-900" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <a href={~p"/admin/loans/new"} class="quick-action">
+        <div style="width:32px;height:32px;background:#C8970A;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <svg style="width:14px;height:14px;stroke:#0B1A2E;fill:none;" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
           </svg>
         </div>
         <div>
-          <p class="text-sm font-medium text-navy-900">New Loan</p>
+          <p class="text-sm font-medium" style="color:#0B1A2E;">New Loan</p>
           <p class="text-xs text-gray-400">Originate a loan</p>
         </div>
-      <% end %>
+      </a>
 
-      <%= link to: ~p"/admin/clients", class: "flex items-center gap-3 rounded-lg border border-gray-200 p-3.5 hover:border-gray-300 hover:bg-gray-50 transition-colors group" do %>
-        <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100 group-hover:bg-gray-200">
-          <svg class="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <a href={~p"/admin/clients"} class="quick-action">
+        <div style="width:32px;height:32px;background:#F3F4F6;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <svg style="width:14px;height:14px;stroke:#6B7280;fill:none;" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/>
           </svg>
         </div>
         <div>
-          <p class="text-sm font-medium text-navy-900">All Clients</p>
+          <p class="text-sm font-medium" style="color:#0B1A2E;">All Clients</p>
           <p class="text-xs text-gray-400">Browse & manage</p>
         </div>
-      <% end %>
+      </a>
 
-      <%= link to: ~p"/admin/loans", class: "flex items-center gap-3 rounded-lg border border-gray-200 p-3.5 hover:border-gray-300 hover:bg-gray-50 transition-colors group" do %>
-        <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100 group-hover:bg-gray-200">
-          <svg class="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <a href={~p"/admin/loans"} class="quick-action">
+        <div style="width:32px;height:32px;background:#F3F4F6;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <svg style="width:14px;height:14px;stroke:#6B7280;fill:none;" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V19.5a2.25 2.25 0 002.25 2.25h.75"/>
           </svg>
         </div>
         <div>
-          <p class="text-sm font-medium text-navy-900">All Loans</p>
+          <p class="text-sm font-medium" style="color:#0B1A2E;">All Loans</p>
           <p class="text-xs text-gray-400">Review & process</p>
         </div>
-      <% end %>
+      </a>
     </div>
   </div>
 
