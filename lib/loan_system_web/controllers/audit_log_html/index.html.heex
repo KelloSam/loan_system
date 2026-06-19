@@ -1,0 +1,54 @@
+<%# Header %>
+<div class="mb-6 flex items-center justify-between">
+  <div>
+    <h1 class="text-2xl font-bold text-navy-900">Audit Log</h1>
+    <p class="mt-0.5 text-sm text-gray-500">Last 100 system events — newest first.</p>
+  </div>
+  <%= link "Dashboard", to: ~p"/admin/dashboard", class: "text-sm font-medium text-gray-400 hover:text-navy-600" %>
+</div>
+
+<div class="card overflow-hidden">
+  <%= if Enum.empty?(@logs) do %>
+    <div class="py-16 text-center text-sm text-gray-400">No events recorded yet.</div>
+  <% else %>
+    <table class="min-w-full">
+      <thead>
+        <tr class="bg-gray-50 border-b border-gray-100">
+          <th class="th">Time</th>
+          <th class="th">Event</th>
+          <th class="th">Actor</th>
+          <th class="th hidden md:table-cell">Target</th>
+          <th class="th hidden lg:table-cell">IP Address</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        <%= for log <- @logs do %>
+          <tr class="hover:bg-gray-50 transition-colors">
+            <td class="td text-xs text-gray-400 whitespace-nowrap font-mono">
+              <%= Calendar.strftime(log.inserted_at, "%d %b %Y %H:%M:%S") %>
+            </td>
+            <td class="td">
+              <span class={"text-xs font-medium px-2 py-0.5 rounded-full #{event_color(log.event)}"}>
+                <%= format_event(log.event) %>
+              </span>
+            </td>
+            <td class="td text-sm text-navy-900">
+              <%= log.actor_email || "—" %>
+            </td>
+            <td class="td text-sm text-gray-500 hidden md:table-cell">
+              <%= if log.target_type && log.target_id do %>
+                <span class="capitalize"><%= log.target_type %></span>
+                <span class="font-mono text-xs text-gray-400 ml-1">#<%= String.slice(log.target_id, 0, 8) %></span>
+              <% else %>
+                —
+              <% end %>
+            </td>
+            <td class="td text-xs font-mono text-gray-400 hidden lg:table-cell">
+              <%= log.ip_address || "—" %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+</div>

@@ -3,6 +3,7 @@ defmodule LoanSystem.Loans do
   alias LoanSystem.Repo
   alias LoanSystem.Loans.{Loan, Payment, InterestCalculator}
   alias LoanSystem.Clients.Client
+  alias LoanSystem.FraudDetector
 
   # ---------------------------------------------------------------------------
   # Loan queries
@@ -53,17 +54,34 @@ defmodule LoanSystem.Loans do
   (total_loans, current_balance).
   """
   def create_loan(attrs \\ %{}) do
-    Ecto.Multi.new()
-    |> Ecto.Multi.insert(:loan, Loan.changeset(%Loan{}, attrs))
-    |> Ecto.Multi.run(:update_client_stats, fn repo, %{loan: loan} ->
-      recalculate_client_stats(repo, loan.client_id)
-    end)
-    |> Repo.transaction()
-    |> case do
-      {:ok, %{loan: loan}}              -> {:ok, loan}
-      {:error, :loan, changeset, _}     -> {:error, changeset}
-      {:error, _, reason, _}            -> {:error, reason}
+    with :ok <- check_pending_loan(attrs),
+         :ok <- check_rejection_cooldown(attrs) do
+      client_id = Map.get(attrs, :client_id) || Map.get(attrs, "client_id")
+      amount    = Map.get(attrs, :amount)    || Map.get(attrs, "amount")
+      {risk_level, _score, _signals} = FraudDetector.evaluate(client_id, amount)
+      attrs = Map.put(attrs, "risk_level", risk_level)
+
+      Ecto.Multi.new()
+      |> Ecto.Multi.insert(:loan, Loan.changeset(%Loan{}, attrs))
+      |> Ecto.Multi.run(:update_client_stats, fn repo, %{loan: loan} ->
+        recalculate_client_stats(repo, loan.client_id)
+      end)
+      |> Repo.transaction()
+      |> case do
+        {:ok, %{loan: loan}}              -> {:ok, loan}
+        {:error, :loan, changeset, _}     -> {:error, changeset}
+        {:error, _, reason, _}            -> {:error, reason}
+      end
     end
+  end
+
+  @doc """
+  Returns a list of fraud signal strings for an existing loan.
+  Delegates to FraudDetector so all scoring logic lives in one place.
+  """
+  def fraud_signals(%Loan{id: loan_id, client_id: client_id, amount: amount}) do
+    {_level, _score, signals} = FraudDetector.evaluate(client_id, amount, loan_id)
+    signals
   end
 
   def update_loan(%Loan{} = loan, attrs) do
@@ -228,6 +246,54 @@ defmodule LoanSystem.Loans do
     else
       false -> :ok  # missing attrs; let changeset handle required fields
       nil   -> :ok  # missing loan; FK constraint will catch this
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Phase 1 fraud guards — called before create_loan persists anything
+  # ---------------------------------------------------------------------------
+
+  # Hard block: client already has a loan waiting for a decision.
+  defp check_pending_loan(attrs) do
+    client_id = Map.get(attrs, :client_id) || Map.get(attrs, "client_id")
+
+    if is_nil(client_id) do
+      :ok
+    else
+      count =
+        from(l in Loan,
+          where: l.client_id == ^client_id and l.status == "pending",
+          select: count(l.id)
+        )
+        |> Repo.one()
+
+      if count > 0, do: {:error, :pending_loan_exists}, else: :ok
+    end
+  end
+
+  # Hard block: client had a loan rejected within the last 30 days.
+  defp check_rejection_cooldown(attrs) do
+    client_id = Map.get(attrs, :client_id) || Map.get(attrs, "client_id")
+
+    if is_nil(client_id) do
+      :ok
+    else
+      cutoff =
+        NaiveDateTime.utc_now()
+        |> NaiveDateTime.add(-30 * 24 * 60 * 60, :second)
+        |> NaiveDateTime.truncate(:second)
+
+      count =
+        from(l in Loan,
+          where:
+            l.client_id == ^client_id and
+              l.status == "rejected" and
+              l.updated_at >= ^cutoff,
+          select: count(l.id)
+        )
+        |> Repo.one()
+
+      if count > 0, do: {:error, :rejection_cooldown}, else: :ok
     end
   end
 

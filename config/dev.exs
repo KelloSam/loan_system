@@ -13,7 +13,7 @@ config :loan_system, LoanSystem.Repo,
 
 # Phoenix configuration for later use
 config :loan_system, LoanSystemWeb.Endpoint,
-  http: [ip: {127, 0, 0, 1}, port: 4000],
+  http: [ip: {127, 0, 0, 1}, port: 4001],
   check_origin: false,
   code_reloader: true,
   debug_errors: true,

@@ -16,6 +16,7 @@
           <th class="th hidden sm:table-cell">Balance</th>
           <th class="th hidden md:table-cell">Rate / Term</th>
           <th class="th">Status</th>
+          <th class="th hidden sm:table-cell">Risk</th>
           <th class="th hidden lg:table-cell">Created</th>
           <th class="th text-right">Actions</th>
         </tr>
@@ -31,6 +32,11 @@
             <td class="td text-gray-500 hidden md:table-cell"><%= loan.interest_rate %>% / <%= loan.term_months %>mo</td>
             <td class="td">
               <span class={"badge badge-#{loan.status}"}><%= String.capitalize(loan.status) %></span>
+            </td>
+            <td class="td hidden sm:table-cell">
+              <span class={"text-xs font-semibold px-2 py-0.5 rounded-full #{risk_badge_class(loan.risk_level)}"}>
+                <%= String.capitalize(loan.risk_level || "low") %>
+              </span>
             </td>
             <td class="td text-gray-400 hidden lg:table-cell">
               <%= Calendar.strftime(loan.inserted_at, "%d %b %Y") %>

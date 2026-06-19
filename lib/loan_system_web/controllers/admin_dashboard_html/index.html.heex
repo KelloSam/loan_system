@@ -104,7 +104,9 @@
     </div>
   </div>
 
-  <%# Quick actions %>
+  <%# Quick actions + Recent activity %>
+  <div class="space-y-6">
+
   <div class="card p-5">
     <h2 class="section-title mb-4">Quick Actions</h2>
     <div class="space-y-3">
@@ -156,6 +158,38 @@
         </div>
       </a>
     </div>
+  </div>
+
+  <%# Recent activity feed %>
+  <div class="card p-5">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="section-title">Recent Activity</h2>
+      <%= link "View all →", to: ~p"/admin/audit-logs", class: "text-xs font-medium text-navy-600 hover:text-navy-900" %>
+    </div>
+    <%= if Enum.empty?(@recent_events) do %>
+      <p class="text-xs text-gray-400 py-4 text-center">No activity recorded yet.</p>
+    <% else %>
+      <ul class="space-y-2">
+        <%= for event <- @recent_events do %>
+          <li class="flex items-start gap-2 text-xs">
+            <span class="mt-0.5 inline-block w-1.5 h-1.5 rounded-full bg-navy-400 flex-shrink-0"></span>
+            <div class="min-w-0">
+              <span class="font-medium text-navy-800 capitalize">
+                <%= String.replace(event.event, "_", " ") %>
+              </span>
+              <%= if event.actor_email do %>
+                <span class="text-gray-400"> · <%= event.actor_email %></span>
+              <% end %>
+              <div class="text-gray-400 font-mono mt-0.5">
+                <%= Calendar.strftime(event.inserted_at, "%d %b %H:%M") %>
+              </div>
+            </div>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+  </div>
+
   </div>
 
 </div>

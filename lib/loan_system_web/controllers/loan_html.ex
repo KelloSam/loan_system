@@ -3,6 +3,10 @@ defmodule LoanSystemWeb.LoanHTML do
 
   embed_templates "loan_html/*"
 
+  def risk_badge_class("high"),   do: "bg-red-100 text-red-700 border border-red-200"
+  def risk_badge_class("medium"), do: "bg-amber-100 text-amber-700 border border-amber-200"
+  def risk_badge_class(_),        do: "bg-green-50 text-green-700 border border-green-200"
+
   def status_class("approved"),  do: "bg-green-100 text-green-800"
   def status_class("pending"),   do: "bg-yellow-100 text-yellow-800"
   def status_class("rejected"),  do: "bg-red-100 text-red-800"

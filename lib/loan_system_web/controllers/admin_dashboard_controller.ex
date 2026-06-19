@@ -1,7 +1,7 @@
 defmodule LoanSystemWeb.AdminDashboardController do
   use LoanSystemWeb, :controller
 
-  alias LoanSystem.{Clients, Loans}
+  alias LoanSystem.{Clients, Loans, AuditLogs}
 
   def index(conn, _params) do
     stats = %{
@@ -12,7 +12,8 @@ defmodule LoanSystemWeb.AdminDashboardController do
     }
 
     recent_loans = Loans.list_loans(per_page: 6)
+    recent_events = AuditLogs.list_recent(5)
 
-    render(conn, :index, stats: stats, recent_loans: recent_loans)
+    render(conn, :index, stats: stats, recent_loans: recent_loans, recent_events: recent_events)
   end
 end

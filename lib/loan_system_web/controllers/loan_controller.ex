@@ -1,7 +1,7 @@
 defmodule LoanSystemWeb.LoanController do
   use LoanSystemWeb, :controller
 
-  alias LoanSystem.{Loans, Clients, Repo}
+  alias LoanSystem.{Loans, Clients, Repo, AuditLogs}
   alias LoanSystem.Loans.{Loan, Payment}
 
   def index(conn, _params) do
@@ -13,7 +13,8 @@ defmodule LoanSystemWeb.LoanController do
     loan = Loans.get_loan!(id) |> Repo.preload([:client, :payments])
     interest = Loans.compound_interest_details(loan)
     payment_changeset = Payment.changeset(%Payment{}, %{})
-    render(conn, :show, loan: loan, interest: interest, payment_changeset: payment_changeset)
+    fraud_signals = Loans.fraud_signals(loan)
+    render(conn, :show, loan: loan, interest: interest, payment_changeset: payment_changeset, fraud_signals: fraud_signals)
   end
 
   def new(conn, _params) do
@@ -28,9 +29,28 @@ defmodule LoanSystemWeb.LoanController do
 
     case Loans.create_loan(params) do
       {:ok, loan} ->
+        AuditLogs.log("loan_created",
+          actor_id: conn.assigns.current_user.id,
+          actor_email: conn.assigns.current_user.email,
+          target_type: "loan",
+          target_id: loan.id,
+          ip_address: get_ip(conn),
+          metadata: %{amount: loan.amount, client_id: loan.client_id}
+        )
+
         conn
         |> put_flash(:info, "Loan created successfully.")
         |> redirect(to: ~p"/admin/loans/#{loan}")
+
+      {:error, :pending_loan_exists} ->
+        conn
+        |> put_flash(:error, "Blocked: this client already has a pending loan. Resolve the existing application before creating a new one.")
+        |> redirect(to: ~p"/admin/loans/new")
+
+      {:error, :rejection_cooldown} ->
+        conn
+        |> put_flash(:error, "Blocked: this client was rejected within the last 30 days. New applications are frozen during the cooling-off period.")
+        |> redirect(to: ~p"/admin/loans/new")
 
       {:error, changeset} ->
         clients = Clients.list_clients()
@@ -80,6 +100,15 @@ defmodule LoanSystemWeb.LoanController do
 
     case Loans.approve_loan(loan) do
       {:ok, loan} ->
+        AuditLogs.log("loan_approved",
+          actor_id: conn.assigns.current_user.id,
+          actor_email: conn.assigns.current_user.email,
+          target_type: "loan",
+          target_id: loan.id,
+          ip_address: get_ip(conn),
+          metadata: %{amount: loan.amount, client_id: loan.client_id}
+        )
+
         conn
         |> put_flash(:info, "Loan approved.")
         |> redirect(to: ~p"/admin/loans/#{loan}")
@@ -96,6 +125,15 @@ defmodule LoanSystemWeb.LoanController do
 
     case Loans.reject_loan(loan) do
       {:ok, loan} ->
+        AuditLogs.log("loan_rejected",
+          actor_id: conn.assigns.current_user.id,
+          actor_email: conn.assigns.current_user.email,
+          target_type: "loan",
+          target_id: loan.id,
+          ip_address: get_ip(conn),
+          metadata: %{amount: loan.amount, client_id: loan.client_id}
+        )
+
         conn
         |> put_flash(:info, "Loan rejected.")
         |> redirect(to: ~p"/admin/loans/#{loan}")
@@ -112,7 +150,16 @@ defmodule LoanSystemWeb.LoanController do
     params = payment_params |> Map.put("loan_id", loan.id) |> Map.put("status", "paid")
 
     case Loans.create_payment(params) do
-      {:ok, _payment} ->
+      {:ok, payment} ->
+        AuditLogs.log("payment_recorded",
+          actor_id: conn.assigns.current_user.id,
+          actor_email: conn.assigns.current_user.email,
+          target_type: "payment",
+          target_id: payment.id,
+          ip_address: get_ip(conn),
+          metadata: %{amount: payment.amount, loan_id: loan.id}
+        )
+
         conn
         |> put_flash(:info, "Payment recorded successfully.")
         |> redirect(to: ~p"/admin/loans/#{loan}")
@@ -128,4 +175,6 @@ defmodule LoanSystemWeb.LoanController do
         render(conn, :show, loan: loan, interest: interest, payment_changeset: changeset)
     end
   end
+
+  defp get_ip(conn), do: conn.remote_ip |> :inet.ntoa() |> to_string()
 end

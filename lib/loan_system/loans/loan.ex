@@ -12,7 +12,8 @@ defmodule LoanSystem.Loans.Loan do
     field :next_payment_date, :date
     field :remaining_balance, :decimal
     field :purpose, :string
-    
+    field :risk_level, :string, default: "low"
+
     belongs_to :client, LoanSystem.Clients.Client, type: :binary_id
     has_many :payments, LoanSystem.Loans.Payment
 
@@ -42,10 +43,11 @@ defmodule LoanSystem.Loans.Loan do
   """
   def changeset(loan, attrs) do
     loan
-    |> cast(attrs, [:amount, :interest_rate, :term_months, :status, :approved_at, 
-                   :next_payment_date, :remaining_balance, :client_id, :purpose])
+    |> cast(attrs, [:amount, :interest_rate, :term_months, :status, :approved_at,
+                   :next_payment_date, :remaining_balance, :client_id, :purpose, :risk_level])
     |> validate_required([:amount, :interest_rate, :term_months, :status, :remaining_balance, :client_id])
     |> validate_inclusion(:status, ["pending", "approved", "rejected", "completed"])
+    |> validate_inclusion(:risk_level, ["low", "medium", "high"])
     |> validate_number(:amount, greater_than: 0)
     |> validate_number(:term_months, greater_than: 0)
     |> validate_number(:interest_rate, greater_than: 0)

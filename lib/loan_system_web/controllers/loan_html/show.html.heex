@@ -29,6 +29,29 @@
   </div>
 </div>
 
+<%# Fraud risk warning — shown only when signals are detected on a pending loan %>
+<%= if @fraud_signals != [] and @loan.status == "pending" do %>
+  <div class="mb-6 rounded-xl border border-amber-300 bg-amber-50 p-4">
+    <div class="flex items-start gap-3">
+      <svg class="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+      </svg>
+      <div>
+        <h3 class="text-sm font-semibold text-amber-800">Fraud Risk Signals Detected</h3>
+        <p class="mt-0.5 text-xs text-amber-700">Review the following carefully before approving this loan.</p>
+        <ul class="mt-2 space-y-1">
+          <%= for signal <- @fraud_signals do %>
+            <li class="flex items-start gap-1.5 text-xs text-amber-700">
+              <span class="mt-0.5 font-bold">•</span>
+              <span><%= signal %></span>
+            </li>
+          <% end %>
+        </ul>
+      </div>
+    </div>
+  </div>
+<% end %>
+
 <%# Summary cards %>
 <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
   <div class="card p-5">
@@ -41,8 +64,11 @@
   </div>
   <div class="card p-5 col-span-2 sm:col-span-1">
     <p class="text-xs text-gray-400 uppercase tracking-wide font-medium">Status</p>
-    <div class="mt-2">
+    <div class="mt-2 flex items-center gap-2 flex-wrap">
       <span class={"badge badge-#{@loan.status} text-sm px-3 py-1"}><%= String.capitalize(@loan.status) %></span>
+      <span class={"text-xs font-semibold px-2.5 py-1 rounded-full #{risk_badge_class(@loan.risk_level)}"}>
+        <%= String.capitalize(@loan.risk_level || "low") %> Risk
+      </span>
     </div>
   </div>
 </div>

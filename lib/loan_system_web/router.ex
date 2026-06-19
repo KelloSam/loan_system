@@ -44,6 +44,7 @@ defmodule LoanSystemWeb.Router do
     pipe_through [:browser, :auth, :ensure_admin]
 
     get "/dashboard", AdminDashboardController, :index
+    get "/audit-logs", AuditLogController, :index
     resources "/clients", ClientController
     resources "/loans", LoanController
     patch "/loans/:id/approve", LoanController, :approve
