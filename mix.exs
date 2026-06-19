@@ -33,6 +33,8 @@ defmodule LoanSystem.MixProject do
       {:jason, "~> 1.4"},          # JSON parsing
       {:plug_cowboy, "~> 2.6"},      # HTTP server for Phoenix
       {:bcrypt_elixir, "~> 3.0"},  # Password hashing
+      {:nimble_totp, "~> 1.0"},   # TOTP 2FA (Google Authenticator compatible)
+      {:eqrcode, "~> 0.2"},       # QR code SVG generation for 2FA setup
       {:tzdata, "~> 1.1"},             # Timezone database (required by Tzdata.TimeZoneDatabase)
       {:phoenix_live_reload, "~> 1.4", only: :dev},  # Live code reloading in development
       {:ex_doc, "~> 0.29", only: :dev, runtime: false}  # For documentation

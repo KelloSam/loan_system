@@ -1,4 +1,4 @@
-defmodule LoanSystemWeb.AuditLogHtml do
+defmodule LoanSystemWeb.AuditLogHTML do
   use LoanSystemWeb, :html
   embed_templates "audit_log_html/*"
 

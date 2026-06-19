@@ -37,6 +37,8 @@ defmodule LoanSystemWeb.Router do
     get "/login", SessionController, :new
     post "/login", SessionController, :create
     delete "/logout", SessionController, :delete
+    get "/login/verify", TwoFactorController, :verify
+    post "/login/verify", TwoFactorController, :confirm
   end
 
   # Admin routes
@@ -45,6 +47,9 @@ defmodule LoanSystemWeb.Router do
 
     get "/dashboard", AdminDashboardController, :index
     get "/audit-logs", AuditLogController, :index
+    get "/settings/2fa", TwoFactorController, :setup
+    post "/settings/2fa/enable", TwoFactorController, :enable
+    delete "/settings/2fa/disable", TwoFactorController, :disable
     resources "/clients", ClientController
     resources "/loans", LoanController
     patch "/loans/:id/approve", LoanController, :approve

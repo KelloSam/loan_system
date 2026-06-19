@@ -1,0 +1,64 @@
+<%# Styled to match the login page — same dark background, centered card %>
+<div style="min-height:100vh; background:#0B1A2E; display:flex; align-items:center; justify-content:center; padding:24px; font-family:'Inter',system-ui,-apple-system,sans-serif; position:relative; overflow:hidden; box-sizing:border-box;">
+
+  <div style="position:absolute; top:-140px; right:-140px; width:360px; height:360px; border-radius:50%; background:#0F2040; opacity:0.7; pointer-events:none;"></div>
+  <div style="position:absolute; bottom:-160px; left:-160px; width:400px; height:400px; border-radius:50%; background:#0F2040; opacity:0.5; pointer-events:none;"></div>
+
+  <div style="position:relative; width:100%; max-width:420px;">
+
+    <%# Logo %>
+    <div style="text-align:center; margin-bottom:32px;">
+      <div style="display:inline-flex; align-items:center; justify-content:center; width:68px; height:68px; background:#C8970A; border-radius:16px; margin-bottom:18px; box-shadow:0 8px 28px rgba(200,151,10,0.35);">
+        <svg style="width:32px;height:32px;fill:#0B1A2E;" viewBox="0 0 24 24">
+          <path fill-rule="evenodd" d="M12 1.5a5.25 5.25 0 00-5.25 5.25v3a3 3 0 00-3 3v6.75a3 3 0 003 3h10.5a3 3 0 003-3v-6.75a3 3 0 00-3-3v-3c0-2.9-2.35-5.25-5.25-5.25zm3.75 8.25v-3a3.75 3.75 0 10-7.5 0v3h7.5z" clip-rule="evenodd"/>
+        </svg>
+      </div>
+      <h1 style="color:#FFFFFF; font-size:22px; font-weight:700; margin:0; letter-spacing:-0.3px;">Two-Factor Verification</h1>
+      <p style="color:#7F93B0; font-size:13px; margin:8px 0 0 0;">Enter the 6-digit code from your authenticator app</p>
+    </div>
+
+    <div style="background:#FFFFFF; border-radius:16px; overflow:hidden; box-shadow:0 24px 64px rgba(0,0,0,0.55);">
+      <div style="height:4px; background:linear-gradient(90deg, #8A6520 0%, #C8970A 50%, #D4B040 100%);"></div>
+
+      <div style="padding:36px;">
+        <%= if msg = Phoenix.Flash.get(@flash, :error) do %>
+          <div style="display:flex; align-items:center; gap:10px; background:#FEF2F2; border:1px solid #FECACA; border-radius:8px; padding:12px 14px; margin-bottom:20px;">
+            <svg style="width:16px;height:16px;fill:#DC2626;flex-shrink:0;" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd"/>
+            </svg>
+            <span style="color:#991B1B; font-size:13px;"><%= msg %></span>
+          </div>
+        <% end %>
+
+        <.form :let={f} for={%{}} action={~p"/login/verify"} as={:totp} style="margin:0;">
+          <div style="margin-bottom:28px;">
+            <label style="display:block; font-size:13px; font-weight:500; color:#374151; margin-bottom:6px;">
+              Authenticator Code
+            </label>
+            <%= text_input f, :code,
+                  required: true,
+                  maxlength: "6",
+                  placeholder: "000000",
+                  autocomplete: "one-time-code",
+                  inputmode: "numeric",
+                  style: "display:block; width:100%; padding:14px; border:1.5px solid #D1D5DB; border-radius:8px; font-size:22px; font-weight:600; color:#111827; background:#FFFFFF; box-sizing:border-box; outline:none; font-family:'Inter',monospace; letter-spacing:0.25em; text-align:center;" %>
+          </div>
+
+          <%= submit "Verify →",
+                style: "display:block; width:100%; padding:13px 20px; background:#C8970A; color:#0B1A2E; border:none; border-radius:8px; font-size:14px; font-weight:700; cursor:pointer; letter-spacing:0.3px; font-family:inherit; box-sizing:border-box;" %>
+        </.form>
+
+        <div style="margin-top:20px; text-align:center;">
+          <%= link "← Back to login", to: ~p"/login", style: "font-size:12px; color:#94A3B8; text-decoration:none;" %>
+        </div>
+      </div>
+
+      <div style="background:#F8FAFC; border-top:1px solid #F1F5F9; padding:14px 36px; display:flex; align-items:center; gap:8px;">
+        <svg style="width:14px;height:14px;fill:#94A3B8;flex-shrink:0;" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clip-rule="evenodd"/>
+        </svg>
+        <span style="color:#94A3B8; font-size:12px;">Code refreshes every 30 seconds</span>
+      </div>
+    </div>
+  </div>
+</div>
