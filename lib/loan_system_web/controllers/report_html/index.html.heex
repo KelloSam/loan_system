@@ -1,0 +1,101 @@
+<%# Page header %>
+<div class="mb-6 flex items-center justify-between">
+  <div>
+    <h1 class="text-2xl font-bold text-navy-900">Reports</h1>
+    <p class="mt-0.5 text-sm text-gray-500">Portfolio overview, arrears, and upcoming payments.</p>
+  </div>
+  <%= link "Export Loans (CSV)", to: ~p"/admin/reports/export.csv", class: "btn-outline" %>
+</div>
+
+<%# Stat cards %>
+<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-8">
+  <div class="card p-5">
+    <p class="text-sm font-medium text-gray-500">Outstanding Balance</p>
+    <p class="stat-value">ZMW <%= @summary.outstanding_balance %></p>
+    <p class="mt-1 text-xs text-gray-400"><%= @summary.active_loans %> active loans</p>
+  </div>
+
+  <div class="card p-5">
+    <p class="text-sm font-medium text-gray-500">Overdue</p>
+    <p class="stat-value text-red-600">ZMW <%= @summary.overdue_amount %></p>
+    <p class="mt-1 text-xs text-gray-400"><%= @summary.overdue_count %> installment(s) past due</p>
+  </div>
+
+  <div class="card p-5">
+    <p class="text-sm font-medium text-gray-500">Portfolio</p>
+    <p class="stat-value"><%= @summary.total_loans %></p>
+    <p class="mt-1 text-xs text-gray-400"><%= @summary.total_clients %> clients on record</p>
+  </div>
+</div>
+
+<%# Overdue payments %>
+<div class="card overflow-hidden mb-8">
+  <div class="px-5 py-4 border-b border-gray-100">
+    <h2 class="section-title">
+      Overdue Installments
+      <span class="ml-1.5 text-sm font-normal text-gray-400">(<%= length(@overdue_payments) %>)</span>
+    </h2>
+  </div>
+  <%= if Enum.empty?(@overdue_payments) do %>
+    <div class="py-10 text-center text-sm text-gray-400">Nothing overdue right now.</div>
+  <% else %>
+    <table class="min-w-full">
+      <thead>
+        <tr class="bg-gray-50 border-b border-gray-100">
+          <th class="th">Client</th>
+          <th class="th">Loan</th>
+          <th class="th">Due Date</th>
+          <th class="th">Amount</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        <%= for payment <- @overdue_payments do %>
+          <tr class="hover:bg-gray-50">
+            <td class="td"><%= payment.loan.client.name %></td>
+            <td class="td">
+              <%= link "View", to: ~p"/admin/loans/#{payment.loan_id}", class: "text-navy-600 hover:underline" %>
+            </td>
+            <td class="td text-red-600 font-medium"><%= payment.due_date %></td>
+            <td class="td font-medium">ZMW <%= payment.amount %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+</div>
+
+<%# Payments due soon %>
+<div class="card overflow-hidden">
+  <div class="px-5 py-4 border-b border-gray-100">
+    <h2 class="section-title">
+      Due in the Next 7 Days
+      <span class="ml-1.5 text-sm font-normal text-gray-400">(<%= length(@payments_due_soon) %>)</span>
+    </h2>
+  </div>
+  <%= if Enum.empty?(@payments_due_soon) do %>
+    <div class="py-10 text-center text-sm text-gray-400">Nothing due in the next 7 days.</div>
+  <% else %>
+    <table class="min-w-full">
+      <thead>
+        <tr class="bg-gray-50 border-b border-gray-100">
+          <th class="th">Client</th>
+          <th class="th">Loan</th>
+          <th class="th">Due Date</th>
+          <th class="th">Amount</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        <%= for payment <- @payments_due_soon do %>
+          <tr class="hover:bg-gray-50">
+            <td class="td"><%= payment.loan.client.name %></td>
+            <td class="td">
+              <%= link "View", to: ~p"/admin/loans/#{payment.loan_id}", class: "text-navy-600 hover:underline" %>
+            </td>
+            <td class="td"><%= payment.due_date %></td>
+            <td class="td font-medium">ZMW <%= payment.amount %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+</div>

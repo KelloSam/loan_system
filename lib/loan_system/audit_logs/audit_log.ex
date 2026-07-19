@@ -12,7 +12,7 @@ defmodule LoanSystem.AuditLogs.AuditLog do
     field :metadata, :map, default: %{}
     field :ip_address, :string
 
-    timestamps(updated_at: false)
+    timestamps(updated_at: false, type: :naive_datetime_usec)
   end
 
   def changeset(log, attrs) do

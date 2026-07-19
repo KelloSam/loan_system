@@ -2,7 +2,7 @@ defmodule LoanSystemWeb.LoanController do
   use LoanSystemWeb, :controller
 
   alias LoanSystem.{Loans, Clients, Repo, AuditLogs}
-  alias LoanSystem.Loans.{Loan, Payment}
+  alias LoanSystem.Loans.{Loan, Payment, Collateral}
 
   def index(conn, _params) do
     loans = Loans.list_loans()
@@ -13,8 +13,18 @@ defmodule LoanSystemWeb.LoanController do
     loan = Loans.get_loan!(id) |> Repo.preload([:client, :payments])
     interest = Loans.compound_interest_details(loan)
     payment_changeset = Payment.changeset(%Payment{}, %{})
+    collateral_changeset = Collateral.changeset(%Collateral{}, %{})
+    collaterals = Loans.list_collaterals_for_loan(loan.id)
     fraud_signals = Loans.fraud_signals(loan)
-    render(conn, :show, loan: loan, interest: interest, payment_changeset: payment_changeset, fraud_signals: fraud_signals)
+
+    render(conn, :show,
+      loan: loan,
+      interest: interest,
+      payment_changeset: payment_changeset,
+      collateral_changeset: collateral_changeset,
+      collaterals: collaterals,
+      fraud_signals: fraud_signals
+    )
   end
 
   def new(conn, _params) do
@@ -170,10 +180,76 @@ defmodule LoanSystemWeb.LoanController do
         |> redirect(to: ~p"/admin/loans/#{loan}")
 
       {:error, changeset} ->
-        loan = Repo.preload(loan, [:client, :payments])
-        interest = Loans.compound_interest_details(loan)
-        render(conn, :show, loan: loan, interest: interest, payment_changeset: changeset)
+        render_show_with_errors(conn, loan, payment_changeset: changeset)
     end
+  end
+
+  def create_collateral(conn, %{"id" => id, "collateral" => collateral_params}) do
+    loan = Loans.get_loan!(id)
+    params = Map.put(collateral_params, "loan_id", loan.id)
+
+    case Loans.create_collateral(params) do
+      {:ok, collateral} ->
+        AuditLogs.log("collateral_added",
+          actor_id: conn.assigns.current_user.id,
+          actor_email: conn.assigns.current_user.email,
+          target_type: "collateral",
+          target_id: collateral.id,
+          ip_address: get_ip(conn),
+          metadata: %{type: collateral.type, estimated_value: collateral.estimated_value, loan_id: loan.id}
+        )
+
+        conn
+        |> put_flash(:info, "Collateral recorded.")
+        |> redirect(to: ~p"/admin/loans/#{loan}")
+
+      {:error, changeset} ->
+        render_show_with_errors(conn, loan, collateral_changeset: changeset)
+    end
+  end
+
+  def delete_collateral(conn, %{"id" => id, "collateral_id" => collateral_id}) do
+    loan = Loans.get_loan!(id)
+    collateral = Loans.get_collateral!(collateral_id)
+
+    {:ok, _} = Loans.delete_collateral(collateral)
+
+    AuditLogs.log("collateral_removed",
+      actor_id: conn.assigns.current_user.id,
+      actor_email: conn.assigns.current_user.email,
+      target_type: "collateral",
+      target_id: collateral.id,
+      ip_address: get_ip(conn),
+      metadata: %{type: collateral.type, estimated_value: collateral.estimated_value, loan_id: loan.id}
+    )
+
+    conn
+    |> put_flash(:info, "Collateral removed.")
+    |> redirect(to: ~p"/admin/loans/#{loan}")
+  end
+
+  # Re-renders the loan show page with every assign it needs, overriding
+  # just the one changeset that failed validation — used by both
+  # create_payment and create_collateral's error branches so a bad
+  # submission never crashes on a missing assign.
+  defp render_show_with_errors(conn, loan, overrides) do
+    loan = Loans.get_loan!(loan.id) |> Repo.preload([:client, :payments])
+    interest = Loans.compound_interest_details(loan)
+    fraud_signals = Loans.fraud_signals(loan)
+    collaterals = Loans.list_collaterals_for_loan(loan.id)
+
+    assigns =
+      [
+        loan: loan,
+        interest: interest,
+        payment_changeset: Payment.changeset(%Payment{}, %{}),
+        collateral_changeset: Collateral.changeset(%Collateral{}, %{}),
+        collaterals: collaterals,
+        fraud_signals: fraud_signals
+      ]
+      |> Keyword.merge(overrides)
+
+    render(conn, :show, assigns)
   end
 
   defp get_ip(conn), do: conn.remote_ip |> :inet.ntoa() |> to_string()

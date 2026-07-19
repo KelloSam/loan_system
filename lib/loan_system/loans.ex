@@ -1,7 +1,7 @@
 defmodule LoanSystem.Loans do
   import Ecto.Query
   alias LoanSystem.Repo
-  alias LoanSystem.Loans.{Loan, Payment, InterestCalculator}
+  alias LoanSystem.Loans.{Loan, Payment, Collateral, InterestCalculator}
   alias LoanSystem.Clients.Client
   alias LoanSystem.FraudDetector
 
@@ -116,8 +116,43 @@ defmodule LoanSystem.Loans do
 
     with {:ok, updated} <- result do
       recalculate_client_stats(Repo, updated.client_id)
+      generate_repayment_schedule(updated)
       {:ok, updated}
     end
+  end
+
+  @doc """
+  Generates the loan's installment schedule as one "pending" Payment row
+  per month, due monthly from the approval date, using the fixed
+  monthly payment InterestCalculator computes. These are planning/arrears
+  records only — they never touch remaining_balance; only create_payment/1
+  (an admin recording money actually received) does that. Called
+  automatically by approve_loan/1; safe to call again (no-ops if a
+  schedule already exists for this loan).
+  """
+  def generate_repayment_schedule(%Loan{status: "approved", approved_at: approved_at} = loan) do
+    if list_payments_for_loan(loan.id) == [] do
+      %{monthly_payment: monthly_payment} = InterestCalculator.calculate(loan)
+      approved_date = NaiveDateTime.to_date(approved_at)
+      now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+
+      installments =
+        for n <- 1..loan.term_months do
+          %{
+            id: Ecto.UUID.generate(),
+            amount: monthly_payment,
+            due_date: Timex.shift(approved_date, months: n),
+            status: "pending",
+            loan_id: loan.id,
+            inserted_at: now,
+            updated_at: now
+          }
+        end
+
+      Repo.insert_all(Payment, installments)
+    end
+
+    :ok
   end
 
   # Loan rejection — removes loan from active balance sum
@@ -153,11 +188,15 @@ defmodule LoanSystem.Loans do
   def get_upcoming_payments(client_id) do
     today = Date.utc_today()
 
+    # Pending (unpaid) installments are tracked by due_date — payment_date
+    # is only set once a payment is actually recorded, so a pending
+    # installment normally has payment_date: nil and would never match a
+    # payment_date filter.
     Payment
     |> join(:inner, [p], l in assoc(p, :loan))
     |> where([p, l], l.client_id == ^client_id)
-    |> where([p], p.status == "pending" and p.payment_date >= ^today)
-    |> order_by([p], p.payment_date)
+    |> where([p], p.status == "pending" and p.due_date >= ^today)
+    |> order_by([p], p.due_date)
     |> preload(:loan)
     |> Repo.all()
   end
@@ -208,6 +247,35 @@ defmodule LoanSystem.Loans do
     |> Repo.update()
   end
 
+  # ---------------------------------------------------------------------------
+  # Collateral
+  # ---------------------------------------------------------------------------
+
+  def list_collaterals_for_loan(loan_id) do
+    Collateral
+    |> where([c], c.loan_id == ^loan_id)
+    |> order_by([c], asc: c.inserted_at)
+    |> Repo.all()
+  end
+
+  def get_collateral!(id), do: Repo.get!(Collateral, id)
+
+  def create_collateral(attrs \\ %{}) do
+    %Collateral{}
+    |> Collateral.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  def delete_collateral(%Collateral{} = collateral), do: Repo.delete(collateral)
+
+  def total_collateral_value(loan_id) do
+    from(c in Collateral,
+      where: c.loan_id == ^loan_id,
+      select: coalesce(sum(c.estimated_value), ^Decimal.new("0.00"))
+    )
+    |> Repo.one()
+  end
+
   def count_loans, do: Repo.aggregate(Loan, :count)
 
   def count_active_loans do
@@ -221,6 +289,51 @@ defmodule LoanSystem.Loans do
       select: coalesce(sum(l.remaining_balance), ^Decimal.new("0.00"))
     )
     |> Repo.one()
+  end
+
+  # ---------------------------------------------------------------------------
+  # Arrears
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Flips every "pending" installment whose due_date has passed to
+  "overdue". Called periodically by LoanSystem.ArrearsScheduler; also
+  safe to call directly (e.g. from an admin action or a test). Returns
+  the number of payments flipped.
+  """
+  def mark_overdue_payments do
+    today = Date.utc_today()
+
+    {count, _} =
+      from(p in Payment, where: p.status == "pending" and p.due_date < ^today)
+      |> Repo.update_all(set: [status: "overdue"])
+
+    count
+  end
+
+  @doc "Count of overdue installments, optionally scoped to one client."
+  def count_overdue_payments(client_id \\ nil) do
+    Payment
+    |> maybe_join_client(client_id)
+    |> where([p], p.status == "overdue")
+    |> Repo.aggregate(:count)
+  end
+
+  @doc "Total ZMW value of all overdue installments, optionally scoped to one client."
+  def total_overdue_amount(client_id \\ nil) do
+    Payment
+    |> maybe_join_client(client_id)
+    |> where([p], p.status == "overdue")
+    |> select([p], coalesce(sum(p.amount), ^Decimal.new("0.00")))
+    |> Repo.one()
+  end
+
+  defp maybe_join_client(query, nil), do: query
+
+  defp maybe_join_client(query, client_id) do
+    query
+    |> join(:inner, [p], l in assoc(p, :loan))
+    |> where([p, l], l.client_id == ^client_id)
   end
 
   # ---------------------------------------------------------------------------

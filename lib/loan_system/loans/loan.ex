@@ -15,7 +15,8 @@ defmodule LoanSystem.Loans.Loan do
     field :risk_level, :string, default: "low"
 
     belongs_to :client, LoanSystem.Clients.Client, type: :binary_id
-    has_many :payments, LoanSystem.Loans.Payment
+    has_many :payments, LoanSystem.Loans.Payment, preload_order: [asc: :due_date]
+    has_many :collaterals, LoanSystem.Loans.Collateral
 
     timestamps()
   end

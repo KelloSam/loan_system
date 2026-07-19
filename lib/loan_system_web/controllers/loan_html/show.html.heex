@@ -142,6 +142,76 @@
 
 </div>
 
+<%# Collateral %>
+<div class="card p-6 mb-6">
+  <h2 class="section-title mb-4">
+    Collateral
+    <span class="ml-1.5 text-sm font-normal text-gray-400">(<%= length(@collaterals) %>)</span>
+  </h2>
+
+  <%= if @loan.status == "pending" do %>
+    <.form :let={f} for={@collateral_changeset} action={~p"/admin/loans/#{@loan}/collateral"}
+           class="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end mb-5 pb-5 border-b border-gray-100">
+      <div>
+        <label class="form-label">Type</label>
+        <%= select f, :type, [{"Vehicle", "vehicle"}, {"Land", "land"}, {"Electronics", "electronics"}, {"Other", "other"}],
+              class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+        <%= error_tag f, :type %>
+      </div>
+      <div>
+        <label class="form-label">Description</label>
+        <%= text_input f, :description, placeholder: "e.g. Toyota Hilux 2018, plate ABC 1234",
+              class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+        <%= error_tag f, :description %>
+      </div>
+      <div>
+        <label class="form-label">Estimated Value (ZMW)</label>
+        <%= number_input f, :estimated_value, step: "0.01", min: "0.01", placeholder: "0.00",
+              class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+        <%= error_tag f, :estimated_value %>
+      </div>
+      <div>
+        <%= submit "Add Collateral", class: "btn-outline w-full" %>
+      </div>
+    </.form>
+  <% end %>
+
+  <%= if Enum.empty?(@collaterals) do %>
+    <div class="py-6 text-center text-sm text-gray-400">No collateral recorded for this loan.</div>
+  <% else %>
+    <table class="min-w-full">
+      <thead>
+        <tr class="bg-gray-50 border-b border-gray-100">
+          <th class="th">Type</th>
+          <th class="th">Description</th>
+          <th class="th">Estimated Value</th>
+          <%= if @loan.status == "pending" do %>
+            <th class="th"></th>
+          <% end %>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        <%= for collateral <- @collaterals do %>
+          <tr class="hover:bg-gray-50">
+            <td class="td"><%= String.capitalize(collateral.type) %></td>
+            <td class="td"><%= collateral.description %></td>
+            <td class="td font-medium">ZMW <%= collateral.estimated_value %></td>
+            <%= if @loan.status == "pending" do %>
+              <td class="td text-right">
+                <%= link "Remove",
+                      to: ~p"/admin/loans/#{@loan}/collateral/#{collateral}",
+                      method: :delete,
+                      data: [confirm: "Remove this collateral record?"],
+                      class: "text-xs font-medium text-red-600 hover:text-red-700" %>
+              </td>
+            <% end %>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+</div>
+
 <%# Record payment — only for approved loans with balance %>
 <%= if @loan.status == "approved" and Decimal.compare(@loan.remaining_balance, Decimal.new("0")) == :gt do %>
   <div class="card p-6 mb-6">
@@ -172,17 +242,20 @@
 <div class="card overflow-hidden">
   <div class="px-5 py-4 border-b border-gray-100">
     <h2 class="section-title">
-      Payment History
+      Repayment Schedule
       <span class="ml-1.5 text-sm font-normal text-gray-400">(<%= length(@loan.payments) %>)</span>
     </h2>
   </div>
   <%= if Enum.empty?(@loan.payments) do %>
-    <div class="py-10 text-center text-sm text-gray-400">No payments recorded yet.</div>
+    <div class="py-10 text-center text-sm text-gray-400">
+      No payments or scheduled installments yet — the schedule is generated automatically once the loan is approved.
+    </div>
   <% else %>
     <table class="min-w-full">
       <thead>
         <tr class="bg-gray-50 border-b border-gray-100">
-          <th class="th">Date</th>
+          <th class="th">Due Date</th>
+          <th class="th">Paid Date</th>
           <th class="th">Amount</th>
           <th class="th">Status</th>
         </tr>
@@ -190,7 +263,8 @@
       <tbody class="divide-y divide-gray-50">
         <%= for payment <- @loan.payments do %>
           <tr class="hover:bg-gray-50">
-            <td class="td"><%= payment.payment_date %></td>
+            <td class="td"><%= payment.due_date || "—" %></td>
+            <td class="td"><%= payment.payment_date || "—" %></td>
             <td class="td font-medium">ZMW <%= payment.amount %></td>
             <td class="td">
               <span class={"badge badge-#{payment.status}"}><%= String.capitalize(payment.status) %></span>

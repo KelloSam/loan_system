@@ -7,9 +7,13 @@ defmodule LoanSystem.MixProject do
       version: "0.1.0",
       elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
+      elixirc_paths: elixirc_paths(Mix.env()),
       deps: deps()
     ]
   end
+
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_), do: ["lib"]
 
   # Run "mix help compile.app" to learn about applications
   def application do
@@ -33,6 +37,7 @@ defmodule LoanSystem.MixProject do
       {:jason, "~> 1.4"},          # JSON parsing
       {:plug_cowboy, "~> 2.6"},      # HTTP server for Phoenix
       {:bcrypt_elixir, "~> 3.0"},  # Password hashing
+      {:plug_attack, "~> 0.4"},   # Rate limiting on login
       {:nimble_totp, "~> 1.0"},   # TOTP 2FA (Google Authenticator compatible)
       {:eqrcode, "~> 0.2"},       # QR code SVG generation for 2FA setup
       {:tzdata, "~> 1.1"},             # Timezone database (required by Tzdata.TimeZoneDatabase)

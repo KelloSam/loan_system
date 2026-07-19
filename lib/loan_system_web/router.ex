@@ -40,13 +40,24 @@ defmodule LoanSystemWeb.Router do
     plug LoanSystemWeb.Plugs.EnsureRolePlug, "client"
   end
 
+  pipeline :rate_limited do
+    plug LoanSystemWeb.Plugs.RateLimitPlug
+  end
+
+  # Rate-limited (login POST only) — guards against credential-stuffing
+  # across many accounts from a single IP.
+  scope "/", LoanSystemWeb do
+    pipe_through [:browser, :rate_limited]
+
+    post "/login", SessionController, :create
+  end
+
   # Public routes
   scope "/", LoanSystemWeb do
     pipe_through :browser
 
     get "/", SessionController, :new
     get "/login", SessionController, :new
-    post "/login", SessionController, :create
     delete "/logout", SessionController, :delete
     get "/login/verify", TwoFactorController, :verify
     post "/login/verify", TwoFactorController, :confirm
@@ -57,6 +68,8 @@ defmodule LoanSystemWeb.Router do
     pipe_through [:browser, :auth, :ensure_admin]
 
     get "/dashboard", AdminDashboardController, :index
+    get "/reports", ReportController, :index
+    get "/reports/export.csv", ReportController, :export_csv
     get "/audit-logs", AuditLogController, :index
     get "/settings/2fa", TwoFactorController, :setup
     post "/settings/2fa/enable", TwoFactorController, :enable
@@ -66,6 +79,8 @@ defmodule LoanSystemWeb.Router do
     patch "/loans/:id/approve", LoanController, :approve
     patch "/loans/:id/reject", LoanController, :reject
     post "/loans/:id/payments", LoanController, :create_payment
+    post "/loans/:id/collateral", LoanController, :create_collateral
+    delete "/loans/:id/collateral/:collateral_id", LoanController, :delete_collateral
   end
 
   # Client routes
