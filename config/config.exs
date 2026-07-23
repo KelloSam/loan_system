@@ -1,7 +1,7 @@
 import Config
 
 # Configure Ecto repos
-config :loan_system, ecto_repos: [LoanSystem.Repo]
+config :miway_credit_core, ecto_repos: [MiwayCreditCore.Repo]
 
 # Configure timezone database for Timex
 config :elixir, :time_zone_database, Tzdata.TimeZoneDatabase

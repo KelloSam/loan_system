@@ -1,9 +1,9 @@
-defmodule LoanSystem.MixProject do
+defmodule MiwayCreditCore.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :loan_system,
+      app: :miway_credit_core,
       version: "0.1.0",
       elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
@@ -19,7 +19,7 @@ defmodule LoanSystem.MixProject do
   def application do
     [
       extra_applications: [:logger, :runtime_tools],
-      mod: {LoanSystem.Application, []}
+      mod: {MiwayCreditCore.Application, []}
     ]
   end
 

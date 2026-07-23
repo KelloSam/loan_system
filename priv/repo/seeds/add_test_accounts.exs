@@ -1,5 +1,5 @@
-defmodule LoanSystem.Seeds.AddTestAccounts do
-  alias LoanSystem.Accounts
+defmodule MiwayCreditCore.Seeds.AddTestAccounts do
+  alias MiwayCreditCore.Accounts
 
   def run do
     # Add admin account
@@ -33,5 +33,5 @@ defmodule LoanSystem.Seeds.AddTestAccounts do
 end
 
 # Run the seed script
-LoanSystem.Seeds.AddTestAccounts.run()
+MiwayCreditCore.Seeds.AddTestAccounts.run()
 

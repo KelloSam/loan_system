@@ -1,5 +1,5 @@
-defmodule LoanSystem.AccountsFixtures do
-  @moduledoc "Test helpers for creating LoanSystem.Accounts entities."
+defmodule MiwayCreditCore.AccountsFixtures do
+  @moduledoc "Test helpers for creating MiwayCreditCore.Accounts entities."
 
   def valid_user_email, do: "user#{System.unique_integer([:positive])}@example.com"
   def valid_user_password, do: "SuperSecret123"
@@ -15,7 +15,7 @@ defmodule LoanSystem.AccountsFixtures do
     {:ok, user} =
       attrs
       |> valid_user_attrs()
-      |> LoanSystem.Accounts.create_user()
+      |> MiwayCreditCore.Accounts.create_user()
 
     user
   end
@@ -25,7 +25,7 @@ defmodule LoanSystem.AccountsFixtures do
       attrs
       |> valid_user_attrs()
       |> Map.put(:role, "admin")
-      |> LoanSystem.Accounts.create_user_with_role()
+      |> MiwayCreditCore.Accounts.create_user_with_role()
 
     user
   end

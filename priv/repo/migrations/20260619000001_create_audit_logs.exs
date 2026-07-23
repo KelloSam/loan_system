@@ -1,4 +1,4 @@
-defmodule LoanSystem.Repo.Migrations.CreateAuditLogs do
+defmodule MiwayCreditCore.Repo.Migrations.CreateAuditLogs do
   use Ecto.Migration
 
   def change do

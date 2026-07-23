@@ -1,4 +1,4 @@
-defmodule LoanSystem.Repo.Migrations.AddRiskLevelToLoans do
+defmodule MiwayCreditCore.Repo.Migrations.AddRiskLevelToLoans do
   use Ecto.Migration
 
   def change do

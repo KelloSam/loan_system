@@ -1,7 +1,7 @@
 {
-  "name": "loan_system_assets",
+  "name": "miway_credit_core_assets",
   "version": "1.0.0",
-  "description": "Assets for Loan System",
+  "description": "Assets for Miway CreditCore",
   "main": "js/app.js",
   "scripts": {
     "deploy": "cd .. && mix assets.deploy",

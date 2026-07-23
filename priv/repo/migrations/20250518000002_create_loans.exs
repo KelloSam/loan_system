@@ -1,4 +1,4 @@
-defmodule LoanSystem.Repo.Migrations.CreateLoans do
+defmodule MiwayCreditCore.Repo.Migrations.CreateLoans do
   use Ecto.Migration
 
   def change do

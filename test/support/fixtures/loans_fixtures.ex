@@ -1,11 +1,11 @@
-defmodule LoanSystem.LoansFixtures do
-  @moduledoc "Test helpers for creating LoanSystem.Loans entities."
+defmodule MiwayCreditCore.LoansFixtures do
+  @moduledoc "Test helpers for creating MiwayCreditCore.Loans entities."
 
-  import LoanSystem.ClientsFixtures
+  import MiwayCreditCore.ClientsFixtures
 
   @doc """
   Builds valid loan attrs as string keys, matching what the real
-  controllers submit (LoanSystem.Loans.create_loan/1 puts "risk_level"
+  controllers submit (MiwayCreditCore.Loans.create_loan/1 puts "risk_level"
   in with a string key internally, so mixing atom/string keys here would
   break cast/3 — keep everything string-keyed like production does).
   """
@@ -28,7 +28,7 @@ defmodule LoanSystem.LoansFixtures do
     {:ok, loan} =
       attrs
       |> valid_loan_attrs()
-      |> LoanSystem.Loans.create_loan()
+      |> MiwayCreditCore.Loans.create_loan()
 
     loan
   end
@@ -36,11 +36,11 @@ defmodule LoanSystem.LoansFixtures do
   @doc "A loan_fixture/1 that's already approved."
   def approved_loan_fixture(attrs \\ %{}) do
     loan = loan_fixture(attrs)
-    {:ok, approved} = LoanSystem.Loans.approve_loan(loan)
+    {:ok, approved} = MiwayCreditCore.Loans.approve_loan(loan)
     approved
   end
 
-  def valid_payment_attrs(%LoanSystem.Loans.Loan{} = loan, attrs \\ %{}) do
+  def valid_payment_attrs(%MiwayCreditCore.Loans.Loan{} = loan, attrs \\ %{}) do
     Enum.into(stringify_keys(attrs), %{
       "loan_id" => loan.id,
       "amount" => "100.00",
@@ -49,11 +49,11 @@ defmodule LoanSystem.LoansFixtures do
     })
   end
 
-  def payment_fixture(%LoanSystem.Loans.Loan{} = loan, attrs \\ %{}) do
+  def payment_fixture(%MiwayCreditCore.Loans.Loan{} = loan, attrs \\ %{}) do
     {:ok, payment} =
       loan
       |> valid_payment_attrs(attrs)
-      |> LoanSystem.Loans.create_payment()
+      |> MiwayCreditCore.Loans.create_payment()
 
     payment
   end

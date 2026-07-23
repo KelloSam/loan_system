@@ -1,6 +1,6 @@
-alias LoanSystem.{Repo, Clients, Loans}
-alias LoanSystem.Clients.Client
-alias LoanSystem.Loans.{Loan, Payment}
+alias MiwayCreditCore.{Repo, Clients, Loans}
+alias MiwayCreditCore.Clients.Client
+alias MiwayCreditCore.Loans.{Loan, Payment}
 
 today = Date.utc_today()
 

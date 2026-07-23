@@ -3,7 +3,7 @@
 #     mix run priv/repo/seeds.exs
 #
 
-alias LoanSystem.Accounts
+alias MiwayCreditCore.Accounts
 
 # Create admin user
 {:ok, _admin} = Accounts.create_user(%{

@@ -1,4 +1,4 @@
-defmodule LoanSystem.Repo.Migrations.AddMicrosecondPrecisionToAuditLogs do
+defmodule MiwayCreditCore.Repo.Migrations.AddMicrosecondPrecisionToAuditLogs do
   use Ecto.Migration
 
   @moduledoc """

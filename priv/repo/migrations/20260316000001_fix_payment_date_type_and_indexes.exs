@@ -1,4 +1,4 @@
-defmodule LoanSystem.Repo.Migrations.FixPaymentDateTypeAndIndexes do
+defmodule MiwayCreditCore.Repo.Migrations.FixPaymentDateTypeAndIndexes do
   use Ecto.Migration
 
   def up do

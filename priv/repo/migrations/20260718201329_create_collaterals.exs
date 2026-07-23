@@ -1,4 +1,4 @@
-defmodule LoanSystem.Repo.Migrations.CreateCollaterals do
+defmodule MiwayCreditCore.Repo.Migrations.CreateCollaterals do
   use Ecto.Migration
 
   def change do

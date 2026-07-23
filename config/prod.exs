@@ -2,11 +2,11 @@ import Config
 
 # Static production config — runtime secrets and DB URL are in config/runtime.exs
 
-config :loan_system, LoanSystem.Repo,
+config :miway_credit_core, MiwayCreditCore.Repo,
   # pool_size and DATABASE_URL are set via env vars in runtime.exs
   ssl: true
 
-config :loan_system, LoanSystemWeb.Endpoint,
+config :miway_credit_core, MiwayCreditCoreWeb.Endpoint,
   # Force HTTPS in production
   force_ssl: [rewrite_on: [:x_forwarded_proto]],
   url: [scheme: "https", port: 443],

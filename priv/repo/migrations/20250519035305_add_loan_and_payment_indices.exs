@@ -1,4 +1,4 @@
-defmodule LoanSystem.Repo.Migrations.AddLoanAndPaymentIndices do
+defmodule MiwayCreditCore.Repo.Migrations.AddLoanAndPaymentIndices do
   use Ecto.Migration
   def change do
     # Add index for searching loans by purpose

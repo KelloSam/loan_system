@@ -1,5 +1,5 @@
-defmodule LoanSystem.ClientsFixtures do
-  @moduledoc "Test helpers for creating LoanSystem.Clients entities."
+defmodule MiwayCreditCore.ClientsFixtures do
+  @moduledoc "Test helpers for creating MiwayCreditCore.Clients entities."
 
   @doc "A phone number matching the '26' or '260' + 7+ digits format the schema requires."
   def valid_client_phone do
@@ -24,7 +24,7 @@ defmodule LoanSystem.ClientsFixtures do
     {:ok, client} =
       attrs
       |> valid_client_attrs()
-      |> LoanSystem.Clients.create_client()
+      |> MiwayCreditCore.Clients.create_client()
 
     client
   end

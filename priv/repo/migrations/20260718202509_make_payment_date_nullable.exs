@@ -1,4 +1,4 @@
-defmodule LoanSystem.Repo.Migrations.MakePaymentDateNullable do
+defmodule MiwayCreditCore.Repo.Migrations.MakePaymentDateNullable do
   use Ecto.Migration
 
   @moduledoc """

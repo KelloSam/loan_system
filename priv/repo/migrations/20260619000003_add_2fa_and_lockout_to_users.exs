@@ -1,4 +1,4 @@
-defmodule LoanSystem.Repo.Migrations.Add2faAndLockoutToUsers do
+defmodule MiwayCreditCore.Repo.Migrations.Add2faAndLockoutToUsers do
   use Ecto.Migration
 
   def change do
