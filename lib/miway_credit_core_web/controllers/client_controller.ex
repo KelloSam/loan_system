@@ -11,8 +11,8 @@ defmodule MiwayCreditCoreWeb.ClientController do
 
   def show(conn, %{"id" => id}) do
     client = Clients.get_client!(id)
-    loans = Loans.get_loans_for_client(client.id)
-    render(conn, :show, client: client, loans: loans)
+    applications = Loans.get_applications_for_client(client.id)
+    render(conn, :show, client: client, applications: applications)
   end
 
   def new(conn, _params) do

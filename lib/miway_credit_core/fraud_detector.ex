@@ -8,16 +8,16 @@ defmodule MiwayCreditCore.FraudDetector do
     56+   → "high"   urgent review required before approval
 
   Usage
-    # Before saving a new loan (exclude_loan_id is nil):
+    # Before saving a new application (exclude_application_id is nil):
     {level, score, signals} = FraudDetector.evaluate(client_id, amount)
 
-    # When re-evaluating an existing loan (exclude it from averages):
-    {level, score, signals} = FraudDetector.evaluate(client_id, amount, loan_id)
+    # When re-evaluating an existing application (exclude it from averages):
+    {level, score, signals} = FraudDetector.evaluate(client_id, amount, application_id)
   """
 
   import Ecto.Query
   alias MiwayCreditCore.Repo
-  alias MiwayCreditCore.Loans.Loan
+  alias MiwayCreditCore.Loans.LoanApplication
   alias MiwayCreditCore.Clients.Client
 
   @medium_threshold 26
@@ -25,18 +25,18 @@ defmodule MiwayCreditCore.FraudDetector do
 
   @doc """
   Evaluates a loan application and returns {risk_level, score, signal_texts}.
-  Pass `exclude_loan_id` when the loan already exists in the DB so it is not
-  counted in its own historical averages.
+  Pass `exclude_application_id` when the application already exists in the
+  DB so it is not counted in its own historical averages.
   """
-  def evaluate(client_id, amount, exclude_loan_id \\ nil) do
+  def evaluate(client_id, amount, exclude_application_id \\ nil) do
     d_amount = to_decimal(amount)
 
     signals =
       [
         signal_new_client(client_id),
-        signal_no_repayment_history(client_id, exclude_loan_id),
-        signal_large_first_loan(client_id, d_amount, exclude_loan_id),
-        signal_amount_vs_average(client_id, d_amount, exclude_loan_id),
+        signal_no_repayment_history(client_id, exclude_application_id),
+        signal_large_first_loan(client_id, d_amount, exclude_application_id),
+        signal_amount_vs_average(client_id, d_amount, exclude_application_id),
         signal_recent_rejection(client_id),
         signal_round_amount(d_amount)
       ]
@@ -127,12 +127,12 @@ defmodule MiwayCreditCore.FraudDetector do
       |> NaiveDateTime.truncate(:second)
 
     count =
-      from(l in Loan,
+      from(la in LoanApplication,
         where:
-          l.client_id == ^client_id and
-            l.status == "rejected" and
-            l.updated_at >= ^cutoff,
-        select: count(l.id)
+          la.client_id == ^client_id and
+            la.status == "rejected" and
+            la.updated_at >= ^cutoff,
+        select: count(la.id)
       )
       |> Repo.one()
 
@@ -160,39 +160,39 @@ defmodule MiwayCreditCore.FraudDetector do
   # ---------------------------------------------------------------------------
 
   defp prior_successful_count(client_id, nil) do
-    from(l in Loan,
-      where: l.client_id == ^client_id and l.status in ["approved", "completed"],
-      select: count(l.id)
+    from(la in LoanApplication,
+      where: la.client_id == ^client_id and la.status == "approved",
+      select: count(la.id)
     )
     |> Repo.one()
   end
 
   defp prior_successful_count(client_id, exclude_id) do
-    from(l in Loan,
+    from(la in LoanApplication,
       where:
-        l.client_id == ^client_id and
-          l.status in ["approved", "completed"] and
-          l.id != ^exclude_id,
-      select: count(l.id)
+        la.client_id == ^client_id and
+          la.status == "approved" and
+          la.id != ^exclude_id,
+      select: count(la.id)
     )
     |> Repo.one()
   end
 
   defp avg_prior_loans(client_id, nil) do
-    from(l in Loan,
-      where: l.client_id == ^client_id and l.status in ["approved", "completed"],
-      select: avg(l.amount)
+    from(la in LoanApplication,
+      where: la.client_id == ^client_id and la.status == "approved",
+      select: avg(la.requested_amount)
     )
     |> Repo.one()
   end
 
   defp avg_prior_loans(client_id, exclude_id) do
-    from(l in Loan,
+    from(la in LoanApplication,
       where:
-        l.client_id == ^client_id and
-          l.status in ["approved", "completed"] and
-          l.id != ^exclude_id,
-      select: avg(l.amount)
+        la.client_id == ^client_id and
+          la.status == "approved" and
+          la.id != ^exclude_id,
+      select: avg(la.requested_amount)
     )
     |> Repo.one()
   end

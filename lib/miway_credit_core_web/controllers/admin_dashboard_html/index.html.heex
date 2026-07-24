@@ -84,19 +84,19 @@
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-50">
-          <%= for loan <- @recent_loans do %>
+          <%= for application <- @recent_applications do %>
             <tr class="hover:bg-gray-50 transition-colors">
-              <td class="td font-medium text-navy-900"><%= loan.client.name %></td>
-              <td class="td">ZMW <%= loan.amount %></td>
+              <td class="td font-medium text-navy-900"><%= application.client.name %></td>
+              <td class="td">ZMW <%= application.requested_amount %></td>
               <td class="td">
-                <span class={"badge badge-#{loan.status}"}><%= String.capitalize(loan.status) %></span>
+                <span class={"badge badge-#{application.status}"}><%= String.capitalize(application.status) %></span>
               </td>
               <td class="td text-gray-400 hidden sm:table-cell">
-                <%= Calendar.strftime(loan.inserted_at, "%d %b %Y") %>
+                <%= Calendar.strftime(application.inserted_at, "%d %b %Y") %>
               </td>
             </tr>
           <% end %>
-          <%= if Enum.empty?(@recent_loans) do %>
+          <%= if Enum.empty?(@recent_applications) do %>
             <tr><td colspan="4" class="py-8 text-center text-sm text-gray-400">No loans yet.</td></tr>
           <% end %>
         </tbody>

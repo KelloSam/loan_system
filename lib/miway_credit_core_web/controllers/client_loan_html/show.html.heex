@@ -12,12 +12,14 @@
 <%# Summary cards %>
 <div class="grid grid-cols-2 gap-4 mb-6">
   <div class="card p-5">
-    <p class="text-xs text-gray-400 uppercase tracking-wide font-medium">Principal</p>
-    <p class="mt-1 text-xl font-bold text-navy-900">ZMW <%= @loan.amount %></p>
+    <p class="text-xs text-gray-400 uppercase tracking-wide font-medium">Requested</p>
+    <p class="mt-1 text-xl font-bold text-navy-900">ZMW <%= @application.requested_amount %></p>
   </div>
   <div class="card p-5">
-    <p class="text-xs text-gray-400 uppercase tracking-wide font-medium">Remaining Balance</p>
-    <p class="mt-1 text-xl font-bold text-red-600">ZMW <%= @loan.remaining_balance %></p>
+    <p class="text-xs text-gray-400 uppercase tracking-wide font-medium">Outstanding Balance</p>
+    <p class="mt-1 text-xl font-bold text-red-600">
+      <%= if @account, do: "ZMW #{@account.outstanding_balance}", else: "—" %>
+    </p>
   </div>
 </div>
 
@@ -29,71 +31,85 @@
     <dl class="space-y-3">
       <div class="flex justify-between text-sm">
         <dt class="text-gray-500">Status</dt>
-        <dd><span class={"badge badge-#{@loan.status}"}><%= String.capitalize(@loan.status) %></span></dd>
+        <% status = if @account, do: @account.status, else: @application.status %>
+        <dd><span class={"badge badge-#{status}"}><%= String.capitalize(status) %></span></dd>
       </div>
-      <div class="flex justify-between text-sm">
-        <dt class="text-gray-500">Annual Rate</dt>
-        <dd class="font-medium text-navy-900"><%= @loan.interest_rate %>%</dd>
-      </div>
-      <div class="flex justify-between text-sm">
-        <dt class="text-gray-500">Term</dt>
-        <dd class="font-medium text-navy-900"><%= @loan.term_months %> months</dd>
-      </div>
-      <div class="flex justify-between text-sm">
-        <dt class="text-gray-500">Next Payment</dt>
-        <dd class="font-medium text-navy-900"><%= @loan.next_payment_date || "—" %></dd>
-      </div>
+      <%= if @account do %>
+        <div class="flex justify-between text-sm">
+          <dt class="text-gray-500">Annual Rate</dt>
+          <dd class="font-medium text-navy-900"><%= @account.interest_rate %>%</dd>
+        </div>
+        <div class="flex justify-between text-sm">
+          <dt class="text-gray-500">Term</dt>
+          <dd class="font-medium text-navy-900"><%= @account.term_months %> months</dd>
+        </div>
+      <% else %>
+        <div class="flex justify-between text-sm">
+          <dt class="text-gray-500">Requested Term</dt>
+          <dd class="font-medium text-navy-900"><%= @application.requested_term_months %> months</dd>
+        </div>
+      <% end %>
     </dl>
   </div>
 
-  <div class="rounded-xl border-2 border-gold-200 bg-gold-50 p-6">
-    <h2 class="section-title mb-1">Repayment Breakdown</h2>
-    <p class="text-xs text-gray-500 mb-4">Monthly compounding</p>
-    <dl class="space-y-3">
-      <div class="flex justify-between items-center">
-        <dt class="text-sm text-gray-600">Monthly Payment</dt>
-        <dd class="font-bold text-navy-900">ZMW <%= @interest.monthly_payment %></dd>
-      </div>
-      <div class="flex justify-between items-center">
-        <dt class="text-sm text-gray-600">Total to Repay</dt>
-        <dd class="font-bold text-navy-900">ZMW <%= @interest.total_repayment %></dd>
-      </div>
-      <div class="flex justify-between items-center border-t border-gold-200 pt-3">
-        <dt class="text-sm text-gray-600">Total Interest</dt>
-        <dd class="font-bold text-gold-700">ZMW <%= @interest.total_interest %></dd>
-      </div>
-    </dl>
-  </div>
-
-</div>
-
-<%# Payment history %>
-<div class="card overflow-hidden">
-  <div class="px-5 py-4 border-b border-gray-100">
-    <h2 class="section-title">Payment History</h2>
-  </div>
-  <%= if Enum.empty?(@loan.payments) do %>
-    <div class="py-10 text-center text-sm text-gray-400">No payments recorded yet.</div>
+  <%= if @account do %>
+    <div class="rounded-xl border-2 border-gold-200 bg-gold-50 p-6">
+      <h2 class="section-title mb-1">Repayment Breakdown</h2>
+      <p class="text-xs text-gray-500 mb-4">Monthly compounding</p>
+      <dl class="space-y-3">
+        <div class="flex justify-between items-center">
+          <dt class="text-sm text-gray-600">Monthly Payment</dt>
+          <dd class="font-bold text-navy-900">ZMW <%= @interest.monthly_payment %></dd>
+        </div>
+        <div class="flex justify-between items-center">
+          <dt class="text-sm text-gray-600">Total to Repay</dt>
+          <dd class="font-bold text-navy-900">ZMW <%= @interest.total_repayment %></dd>
+        </div>
+        <div class="flex justify-between items-center border-t border-gold-200 pt-3">
+          <dt class="text-sm text-gray-600">Total Interest</dt>
+          <dd class="font-bold text-gold-700">ZMW <%= @interest.total_interest %></dd>
+        </div>
+      </dl>
+    </div>
   <% else %>
-    <table class="min-w-full">
-      <thead>
-        <tr class="bg-gray-50 border-b border-gray-100">
-          <th class="th">Date</th>
-          <th class="th">Amount</th>
-          <th class="th">Status</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-gray-50">
-        <%= for payment <- @loan.payments do %>
-          <tr class="hover:bg-gray-50">
-            <td class="td"><%= payment.payment_date %></td>
-            <td class="td font-medium">ZMW <%= payment.amount %></td>
-            <td class="td">
-              <span class={"badge badge-#{payment.status}"}><%= String.capitalize(payment.status) %></span>
-            </td>
-          </tr>
-        <% end %>
-      </tbody>
-    </table>
+    <div class="rounded-xl border border-gray-200 bg-gray-50 p-6 flex items-center justify-center text-sm text-gray-400">
+      Available once this application is approved.
+    </div>
   <% end %>
+
 </div>
+
+<%# Repayment schedule %>
+<%= if @account do %>
+  <div class="card overflow-hidden">
+    <div class="px-5 py-4 border-b border-gray-100">
+      <h2 class="section-title">Repayment Schedule</h2>
+    </div>
+    <%= if Enum.empty?(@installments) do %>
+      <div class="py-10 text-center text-sm text-gray-400">No installments scheduled yet.</div>
+    <% else %>
+      <table class="min-w-full">
+        <thead>
+          <tr class="bg-gray-50 border-b border-gray-100">
+            <th class="th">Due Date</th>
+            <th class="th">Amount</th>
+            <th class="th">Paid</th>
+            <th class="th">Status</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-50">
+          <%= for installment <- @installments do %>
+            <tr class="hover:bg-gray-50">
+              <td class="td"><%= installment.due_date %></td>
+              <td class="td font-medium">ZMW <%= installment.scheduled_amount %></td>
+              <td class="td">ZMW <%= installment.paid_amount %></td>
+              <td class="td">
+                <span class={"badge badge-#{installment.status}"}><%= String.capitalize(installment.status) %></span>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% end %>
+  </div>
+<% end %>

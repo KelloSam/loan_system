@@ -4,7 +4,7 @@
     <span>›</span>
     <span class="text-navy-900 font-medium">New Loan</span>
   </div>
-  <h1 class="text-2xl font-bold text-navy-900">Originate New Loan</h1>
+  <h1 class="text-2xl font-bold text-navy-900">New Loan Application</h1>
 </div>
 
 <div class="max-w-2xl">
@@ -30,31 +30,17 @@
 
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div>
-        <label class="form-label">Principal Amount (ZMW) <span class="text-red-500">*</span></label>
-        <%= number_input f, :amount, step: "0.01", min: "0", placeholder: "e.g. 5000.00",
+        <label class="form-label">Requested Amount (ZMW) <span class="text-red-500">*</span></label>
+        <%= number_input f, :requested_amount, step: "0.01", min: "0", placeholder: "e.g. 5000.00",
               class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
-        <%= error_tag f, :amount %>
-      </div>
-
-      <div>
-        <label class="form-label">Annual Interest Rate (%) <span class="text-red-500">*</span></label>
-        <%= number_input f, :interest_rate, step: "0.01", min: "0", placeholder: "e.g. 18.00",
-              class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
-        <%= error_tag f, :interest_rate %>
+        <%= error_tag f, :requested_amount %>
       </div>
 
       <div>
         <label class="form-label">Term (months) <span class="text-red-500">*</span></label>
-        <%= number_input f, :term_months, min: "1", placeholder: "e.g. 12",
+        <%= number_input f, :requested_term_months, min: "1", placeholder: "e.g. 12",
               class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
-        <%= error_tag f, :term_months %>
-      </div>
-
-      <div>
-        <label class="form-label">First Payment Date</label>
-        <%= date_input f, :next_payment_date,
-              class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
-        <%= error_tag f, :next_payment_date %>
+        <%= error_tag f, :requested_term_months %>
       </div>
     </div>
 
@@ -67,7 +53,7 @@
 
     <div class="flex justify-end gap-3 pt-2 border-t border-gray-100">
       <%= link "Cancel", to: ~p"/admin/loans", class: "btn-outline" %>
-      <%= submit "Create Loan", class: "btn-primary" %>
+      <%= submit "Create Application", class: "btn-primary" %>
     </div>
 
   </.form>

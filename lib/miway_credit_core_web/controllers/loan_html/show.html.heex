@@ -4,33 +4,33 @@
     <div class="flex items-center gap-2 text-sm text-gray-400 mb-1">
       <%= link "Loans", to: ~p"/admin/loans", class: "hover:text-navy-600" %>
       <span>›</span>
-      <span class="text-navy-900 font-medium"><%= @loan.client.name %></span>
+      <span class="text-navy-900 font-medium"><%= @application.client.name %></span>
     </div>
-    <h1 class="text-2xl font-bold text-navy-900">Loan Details</h1>
+    <h1 class="text-2xl font-bold text-navy-900">Loan Application</h1>
     <p class="text-xs text-gray-400 mt-0.5 font-mono">
-      #<%= String.slice(to_string(@loan.id), 0, 8) %>
+      #<%= String.slice(to_string(@application.id), 0, 8) %>
     </p>
   </div>
   <div class="flex flex-wrap gap-2">
-    <%= if @loan.status == "pending" do %>
-      <%= link "Edit", to: ~p"/admin/loans/#{@loan}/edit", class: "btn-outline" %>
+    <%= if @application.status == "pending" do %>
+      <%= link "Edit", to: ~p"/admin/loans/#{@application}/edit", class: "btn-outline" %>
       <%= link "Approve",
-            to: ~p"/admin/loans/#{@loan}/approve",
+            to: ~p"/admin/loans/#{@application}/approve",
             method: :patch,
-            data: [confirm: "Approve this loan?"],
+            data: [confirm: "Approve this application?"],
             class: "btn-gold" %>
       <%= link "Reject",
-            to: ~p"/admin/loans/#{@loan}/reject",
+            to: ~p"/admin/loans/#{@application}/reject",
             method: :patch,
-            data: [confirm: "Reject this loan?"],
+            data: [confirm: "Reject this application?"],
             class: "btn-danger" %>
     <% end %>
     <%= link "All Loans", to: ~p"/admin/loans", class: "text-sm font-medium text-gray-400 hover:text-navy-600 self-center" %>
   </div>
 </div>
 
-<%# Fraud risk warning — shown only when signals are detected on a pending loan %>
-<%= if @fraud_signals != [] and @loan.status == "pending" do %>
+<%# Fraud risk warning — shown only when signals are detected on a pending application %>
+<%= if @fraud_signals != [] and @application.status == "pending" do %>
   <div class="mb-6 rounded-xl border border-amber-300 bg-amber-50 p-4">
     <div class="flex items-start gap-3">
       <svg class="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
@@ -38,7 +38,7 @@
       </svg>
       <div>
         <h3 class="text-sm font-semibold text-amber-800">Fraud Risk Signals Detected</h3>
-        <p class="mt-0.5 text-xs text-amber-700">Review the following carefully before approving this loan.</p>
+        <p class="mt-0.5 text-xs text-amber-700">Review the following carefully before approving this application.</p>
         <ul class="mt-2 space-y-1">
           <%= for signal <- @fraud_signals do %>
             <li class="flex items-start gap-1.5 text-xs text-amber-700">
@@ -55,102 +55,121 @@
 <%# Summary cards %>
 <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
   <div class="card p-5">
-    <p class="text-xs text-gray-400 uppercase tracking-wide font-medium">Principal</p>
-    <p class="mt-1 text-xl font-bold text-navy-900">ZMW <%= @loan.amount %></p>
+    <p class="text-xs text-gray-400 uppercase tracking-wide font-medium">Requested</p>
+    <p class="mt-1 text-xl font-bold text-navy-900">ZMW <%= @application.requested_amount %></p>
   </div>
   <div class="card p-5">
-    <p class="text-xs text-gray-400 uppercase tracking-wide font-medium">Remaining</p>
-    <p class="mt-1 text-xl font-bold text-red-600">ZMW <%= @loan.remaining_balance %></p>
+    <p class="text-xs text-gray-400 uppercase tracking-wide font-medium">Outstanding</p>
+    <p class="mt-1 text-xl font-bold text-red-600">
+      <%= if @account, do: "ZMW #{@account.outstanding_balance}", else: "—" %>
+    </p>
   </div>
   <div class="card p-5 col-span-2 sm:col-span-1">
     <p class="text-xs text-gray-400 uppercase tracking-wide font-medium">Status</p>
+    <% status = if @account, do: @account.status, else: @application.status %>
     <div class="mt-2 flex items-center gap-2 flex-wrap">
-      <span class={"badge badge-#{@loan.status} text-sm px-3 py-1"}><%= String.capitalize(@loan.status) %></span>
-      <span class={"text-xs font-semibold px-2.5 py-1 rounded-full #{risk_badge_class(@loan.risk_level)}"}>
-        <%= String.capitalize(@loan.risk_level || "low") %> Risk
+      <span class={"badge badge-#{status} text-sm px-3 py-1"}><%= String.capitalize(status) %></span>
+      <span class={"text-xs font-semibold px-2.5 py-1 rounded-full #{risk_badge_class(@application.risk_level)}"}>
+        <%= String.capitalize(@application.risk_level || "low") %> Risk
       </span>
     </div>
   </div>
 </div>
 
-<%# Loan details + compound interest %>
+<%# Application details + compound interest %>
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
 
-  <%# Loan details %>
   <div class="card p-6">
     <h2 class="section-title mb-4">Loan Information</h2>
     <dl class="space-y-3">
       <div class="flex justify-between text-sm">
         <dt class="text-gray-500">Client</dt>
-        <dd class="font-medium text-navy-900"><%= @loan.client.name %></dd>
+        <dd class="font-medium text-navy-900"><%= @application.client.name %></dd>
       </div>
-      <div class="flex justify-between text-sm">
-        <dt class="text-gray-500">Annual Rate</dt>
-        <dd class="font-medium text-navy-900"><%= @loan.interest_rate %>%</dd>
-      </div>
-      <div class="flex justify-between text-sm">
-        <dt class="text-gray-500">Term</dt>
-        <dd class="font-medium text-navy-900"><%= @loan.term_months %> months</dd>
-      </div>
-      <%= if @loan.next_payment_date do %>
+      <%= if @account do %>
         <div class="flex justify-between text-sm">
-          <dt class="text-gray-500">Next Payment</dt>
-          <dd class="font-medium text-navy-900"><%= @loan.next_payment_date %></dd>
+          <dt class="text-gray-500">Annual Rate</dt>
+          <dd class="font-medium text-navy-900"><%= @account.interest_rate %>%</dd>
+        </div>
+        <div class="flex justify-between text-sm">
+          <dt class="text-gray-500">Term</dt>
+          <dd class="font-medium text-navy-900"><%= @account.term_months %> months</dd>
+        </div>
+        <div class="flex justify-between text-sm">
+          <dt class="text-gray-500">Opened</dt>
+          <dd class="font-medium text-navy-900"><%= Calendar.strftime(@account.opened_at, "%d %b %Y") %></dd>
+        </div>
+      <% else %>
+        <div class="flex justify-between text-sm">
+          <dt class="text-gray-500">Requested Term</dt>
+          <dd class="font-medium text-navy-900"><%= @application.requested_term_months %> months</dd>
         </div>
       <% end %>
-      <%= if @loan.approved_at do %>
+      <%= if @application.decided_at do %>
         <div class="flex justify-between text-sm">
-          <dt class="text-gray-500">Approved</dt>
-          <dd class="font-medium text-navy-900"><%= Calendar.strftime(@loan.approved_at, "%d %b %Y") %></dd>
+          <dt class="text-gray-500">Decided</dt>
+          <dd class="font-medium text-navy-900"><%= Calendar.strftime(@application.decided_at, "%d %b %Y") %></dd>
         </div>
       <% end %>
-      <%= if @loan.purpose do %>
+      <%= if @application.rejection_reason do %>
+        <div class="pt-2 border-t border-gray-100 text-sm">
+          <dt class="text-gray-500 mb-1">Rejection Reason</dt>
+          <dd class="text-navy-900"><%= @application.rejection_reason %></dd>
+        </div>
+      <% end %>
+      <%= if @application.purpose do %>
         <div class="pt-2 border-t border-gray-100 text-sm">
           <dt class="text-gray-500 mb-1">Purpose</dt>
-          <dd class="text-navy-900"><%= @loan.purpose %></dd>
+          <dd class="text-navy-900"><%= @application.purpose %></dd>
         </div>
       <% end %>
     </dl>
   </div>
 
-  <%# Compound interest breakdown %>
-  <div class="rounded-xl border-2 border-gold-200 bg-gold-50 p-6">
-    <h2 class="section-title text-navy-900 mb-1">Interest Breakdown</h2>
-    <p class="text-xs text-gray-500 mb-4">Monthly compounding</p>
-    <dl class="space-y-3">
-      <div class="flex justify-between items-center">
-        <dt class="text-sm text-gray-600">Monthly Payment</dt>
-        <dd class="text-base font-bold text-navy-900">ZMW <%= @interest.monthly_payment %></dd>
-      </div>
-      <div class="flex justify-between items-center">
-        <dt class="text-sm text-gray-600">Total Repayment</dt>
-        <dd class="text-base font-bold text-navy-900">ZMW <%= @interest.total_repayment %></dd>
-      </div>
-      <div class="flex justify-between items-center border-t border-gold-200 pt-3">
-        <dt class="text-sm text-gray-600">Total Interest</dt>
-        <dd class="text-base font-bold text-gold-700">ZMW <%= @interest.total_interest %></dd>
-      </div>
-      <div class="flex justify-between items-center">
-        <dt class="text-sm text-gray-600">Effective Annual Rate</dt>
-        <dd class="text-base font-bold text-navy-900"><%= @interest.effective_annual_rate %>%</dd>
-      </div>
-    </dl>
-    <p class="mt-4 text-xs text-gray-500 bg-white/60 rounded-lg px-3 py-2">
-      Lump-sum if no payments made: <strong>ZMW <%= @interest.compound_lump_sum %></strong>
-    </p>
-  </div>
+  <%# Compound interest breakdown — only once an account exists %>
+  <%= if @account do %>
+    <div class="rounded-xl border-2 border-gold-200 bg-gold-50 p-6">
+      <h2 class="section-title text-navy-900 mb-1">Interest Breakdown</h2>
+      <p class="text-xs text-gray-500 mb-4">Monthly compounding</p>
+      <dl class="space-y-3">
+        <div class="flex justify-between items-center">
+          <dt class="text-sm text-gray-600">Monthly Payment</dt>
+          <dd class="text-base font-bold text-navy-900">ZMW <%= @interest.monthly_payment %></dd>
+        </div>
+        <div class="flex justify-between items-center">
+          <dt class="text-sm text-gray-600">Total Repayment</dt>
+          <dd class="text-base font-bold text-navy-900">ZMW <%= @interest.total_repayment %></dd>
+        </div>
+        <div class="flex justify-between items-center border-t border-gold-200 pt-3">
+          <dt class="text-sm text-gray-600">Total Interest</dt>
+          <dd class="text-base font-bold text-gold-700">ZMW <%= @interest.total_interest %></dd>
+        </div>
+        <div class="flex justify-between items-center">
+          <dt class="text-sm text-gray-600">Effective Annual Rate</dt>
+          <dd class="text-base font-bold text-navy-900"><%= @interest.effective_annual_rate %>%</dd>
+        </div>
+      </dl>
+      <p class="mt-4 text-xs text-gray-500 bg-white/60 rounded-lg px-3 py-2">
+        Lump-sum if no payments made: <strong>ZMW <%= @interest.compound_lump_sum %></strong>
+      </p>
+    </div>
+  <% else %>
+    <div class="rounded-xl border border-gray-200 bg-gray-50 p-6 flex items-center justify-center text-sm text-gray-400">
+      Interest breakdown becomes available once this application is approved.
+    </div>
+  <% end %>
 
 </div>
 
-<%# Collateral %>
-<div class="card p-6 mb-6">
-  <h2 class="section-title mb-4">
-    Collateral
-    <span class="ml-1.5 text-sm font-normal text-gray-400">(<%= length(@collaterals) %>)</span>
-  </h2>
+<%# Collateral — only once an account exists (collateral secures a granted loan) %>
+<%= if @account do %>
+  <div class="card p-6 mb-6">
+    <h2 class="section-title mb-4">
+      Collateral
+      <span class="ml-1.5 text-sm font-normal text-gray-400">(<%= length(@collaterals) %>)</span>
+    </h2>
 
-  <%= if @loan.status == "pending" do %>
-    <.form :let={f} for={@collateral_changeset} action={~p"/admin/loans/#{@loan}/collateral"}
+    <.form :let={f} for={@collateral_changeset} action={~p"/admin/loans/#{@application}/collateral"}
            class="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end mb-5 pb-5 border-b border-gray-100">
       <div>
         <label class="form-label">Type</label>
@@ -174,62 +193,64 @@
         <%= submit "Add Collateral", class: "btn-outline w-full" %>
       </div>
     </.form>
-  <% end %>
 
-  <%= if Enum.empty?(@collaterals) do %>
-    <div class="py-6 text-center text-sm text-gray-400">No collateral recorded for this loan.</div>
-  <% else %>
-    <table class="min-w-full">
-      <thead>
-        <tr class="bg-gray-50 border-b border-gray-100">
-          <th class="th">Type</th>
-          <th class="th">Description</th>
-          <th class="th">Estimated Value</th>
-          <%= if @loan.status == "pending" do %>
+    <%= if Enum.empty?(@collaterals) do %>
+      <div class="py-6 text-center text-sm text-gray-400">No collateral recorded for this loan.</div>
+    <% else %>
+      <table class="min-w-full">
+        <thead>
+          <tr class="bg-gray-50 border-b border-gray-100">
+            <th class="th">Type</th>
+            <th class="th">Description</th>
+            <th class="th">Estimated Value</th>
             <th class="th"></th>
-          <% end %>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-gray-50">
-        <%= for collateral <- @collaterals do %>
-          <tr class="hover:bg-gray-50">
-            <td class="td"><%= String.capitalize(collateral.type) %></td>
-            <td class="td"><%= collateral.description %></td>
-            <td class="td font-medium">ZMW <%= collateral.estimated_value %></td>
-            <%= if @loan.status == "pending" do %>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-50">
+          <%= for collateral <- @collaterals do %>
+            <tr class="hover:bg-gray-50">
+              <td class="td"><%= String.capitalize(collateral.type) %></td>
+              <td class="td"><%= collateral.description %></td>
+              <td class="td font-medium">ZMW <%= collateral.estimated_value %></td>
               <td class="td text-right">
                 <%= link "Remove",
-                      to: ~p"/admin/loans/#{@loan}/collateral/#{collateral}",
+                      to: ~p"/admin/loans/#{@application}/collateral/#{collateral}",
                       method: :delete,
                       data: [confirm: "Remove this collateral record?"],
                       class: "text-xs font-medium text-red-600 hover:text-red-700" %>
               </td>
-            <% end %>
-          </tr>
-        <% end %>
-      </tbody>
-    </table>
-  <% end %>
-</div>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% end %>
+  </div>
+<% end %>
 
-<%# Record payment — only for approved loans with balance %>
-<%= if @loan.status == "approved" and Decimal.compare(@loan.remaining_balance, Decimal.new("0")) == :gt do %>
+<%# Record payment — only for active accounts with an outstanding balance %>
+<%= if @account && @account.status == "active" && Decimal.compare(@account.outstanding_balance, Decimal.new("0")) == :gt do %>
   <div class="card p-6 mb-6">
     <h2 class="section-title mb-4">Record Payment</h2>
-    <.form :let={f} for={@payment_changeset} action={~p"/admin/loans/#{@loan}/payments"}
-           class="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+    <.form :let={f} for={@payment_changeset} action={~p"/admin/loans/#{@application}/payments"}
+           class="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
       <div>
         <label class="form-label">Amount (ZMW)</label>
-        <p class="form-hint -mt-1 mb-1">Max: ZMW <%= @loan.remaining_balance %></p>
+        <p class="form-hint -mt-1 mb-1">Max: ZMW <%= @account.outstanding_balance %></p>
         <%= number_input f, :amount, step: "0.01", min: "0.01", placeholder: "0.00",
               class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
         <%= error_tag f, :amount %>
       </div>
       <div>
-        <label class="form-label">Payment Date</label>
-        <%= date_input f, :payment_date,
+        <label class="form-label">Method</label>
+        <%= select f, :method, [{"Cash", "cash"}, {"Bank Transfer", "bank_transfer"}, {"Mobile Money", "mobile_money"}, {"Cheque", "cheque"}, {"Other", "other"}],
               class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
-        <%= error_tag f, :payment_date %>
+        <%= error_tag f, :method %>
+      </div>
+      <div>
+        <label class="form-label">Date Received</label>
+        <%= date_input f, :received_at,
+              class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+        <%= error_tag f, :received_at %>
       </div>
       <div>
         <%= submit "Record Payment", class: "btn-primary w-full" %>
@@ -238,40 +259,74 @@
   </div>
 <% end %>
 
-<%# Payment history %>
-<div class="card overflow-hidden">
-  <div class="px-5 py-4 border-b border-gray-100">
-    <h2 class="section-title">
-      Repayment Schedule
-      <span class="ml-1.5 text-sm font-normal text-gray-400">(<%= length(@loan.payments) %>)</span>
-    </h2>
-  </div>
-  <%= if Enum.empty?(@loan.payments) do %>
-    <div class="py-10 text-center text-sm text-gray-400">
-      No payments or scheduled installments yet — the schedule is generated automatically once the loan is approved.
+<%# Repayment schedule %>
+<%= if @account do %>
+  <div class="card overflow-hidden mb-8">
+    <div class="px-5 py-4 border-b border-gray-100">
+      <h2 class="section-title">
+        Repayment Schedule
+        <span class="ml-1.5 text-sm font-normal text-gray-400">(<%= length(@installments) %>)</span>
+      </h2>
     </div>
-  <% else %>
     <table class="min-w-full">
       <thead>
         <tr class="bg-gray-50 border-b border-gray-100">
+          <th class="th">#</th>
           <th class="th">Due Date</th>
-          <th class="th">Paid Date</th>
           <th class="th">Amount</th>
+          <th class="th">Paid</th>
           <th class="th">Status</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-50">
-        <%= for payment <- @loan.payments do %>
+        <%= for installment <- @installments do %>
           <tr class="hover:bg-gray-50">
-            <td class="td"><%= payment.due_date || "—" %></td>
-            <td class="td"><%= payment.payment_date || "—" %></td>
-            <td class="td font-medium">ZMW <%= payment.amount %></td>
+            <td class="td"><%= installment.installment_number %></td>
+            <td class="td"><%= installment.due_date %></td>
+            <td class="td font-medium">ZMW <%= installment.scheduled_amount %></td>
+            <td class="td">ZMW <%= installment.paid_amount %></td>
             <td class="td">
-              <span class={"badge badge-#{payment.status}"}><%= String.capitalize(payment.status) %></span>
+              <span class={"badge badge-#{installment.status}"}><%= String.capitalize(installment.status) %></span>
             </td>
           </tr>
         <% end %>
       </tbody>
     </table>
-  <% end %>
-</div>
+  </div>
+
+  <%# Payment transactions %>
+  <div class="card overflow-hidden">
+    <div class="px-5 py-4 border-b border-gray-100">
+      <h2 class="section-title">
+        Payments Received
+        <span class="ml-1.5 text-sm font-normal text-gray-400">(<%= length(@transactions) %>)</span>
+      </h2>
+    </div>
+    <%= if Enum.empty?(@transactions) do %>
+      <div class="py-10 text-center text-sm text-gray-400">No payments recorded yet.</div>
+    <% else %>
+      <table class="min-w-full">
+        <thead>
+          <tr class="bg-gray-50 border-b border-gray-100">
+            <th class="th">Date</th>
+            <th class="th">Amount</th>
+            <th class="th">Method</th>
+            <th class="th">Status</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-50">
+          <%= for transaction <- @transactions do %>
+            <tr class="hover:bg-gray-50">
+              <td class="td"><%= Calendar.strftime(transaction.received_at, "%d %b %Y") %></td>
+              <td class="td font-medium">ZMW <%= transaction.amount %></td>
+              <td class="td"><%= String.capitalize(String.replace(transaction.method, "_", " ")) %></td>
+              <td class="td">
+                <span class={"badge badge-#{transaction.status}"}><%= String.capitalize(transaction.status) %></span>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% end %>
+  </div>
+<% end %>

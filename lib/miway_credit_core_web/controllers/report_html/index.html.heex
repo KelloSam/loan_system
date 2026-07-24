@@ -49,14 +49,14 @@
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-50">
-        <%= for payment <- @overdue_payments do %>
+        <%= for installment <- @overdue_payments do %>
           <tr class="hover:bg-gray-50">
-            <td class="td"><%= payment.loan.client.name %></td>
+            <td class="td"><%= installment.loan_account.client.name %></td>
             <td class="td">
-              <%= link "View", to: ~p"/admin/loans/#{payment.loan_id}", class: "text-navy-600 hover:underline" %>
+              <%= link "View", to: ~p"/admin/loans/#{installment.loan_account.loan_application_id}", class: "text-navy-600 hover:underline" %>
             </td>
-            <td class="td text-red-600 font-medium"><%= payment.due_date %></td>
-            <td class="td font-medium">ZMW <%= payment.amount %></td>
+            <td class="td text-red-600 font-medium"><%= installment.due_date %></td>
+            <td class="td font-medium">ZMW <%= Decimal.sub(installment.scheduled_amount, installment.paid_amount) %></td>
           </tr>
         <% end %>
       </tbody>
@@ -85,14 +85,14 @@
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-50">
-        <%= for payment <- @payments_due_soon do %>
+        <%= for installment <- @payments_due_soon do %>
           <tr class="hover:bg-gray-50">
-            <td class="td"><%= payment.loan.client.name %></td>
+            <td class="td"><%= installment.loan_account.client.name %></td>
             <td class="td">
-              <%= link "View", to: ~p"/admin/loans/#{payment.loan_id}", class: "text-navy-600 hover:underline" %>
+              <%= link "View", to: ~p"/admin/loans/#{installment.loan_account.loan_application_id}", class: "text-navy-600 hover:underline" %>
             </td>
-            <td class="td"><%= payment.due_date %></td>
-            <td class="td font-medium">ZMW <%= payment.amount %></td>
+            <td class="td"><%= installment.due_date %></td>
+            <td class="td font-medium">ZMW <%= Decimal.sub(installment.scheduled_amount, installment.paid_amount) %></td>
           </tr>
         <% end %>
       </tbody>

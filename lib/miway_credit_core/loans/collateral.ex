@@ -3,6 +3,10 @@ defmodule MiwayCreditCore.Loans.Collateral do
   An item pledged as security against a loan — a vehicle, land title,
   electronics, etc. Deliberately simple: type, description, and an
   estimated value. No status/workflow or document upload for now.
+
+  Attaches only to an approved LoanAccount, never to a pending
+  LoanApplication — collateral secures a granted loan, not a mere
+  request (confirmed product decision).
   """
 
   use Ecto.Schema
@@ -16,17 +20,17 @@ defmodule MiwayCreditCore.Loans.Collateral do
     field :description, :string
     field :estimated_value, :decimal
 
-    belongs_to :loan, MiwayCreditCore.Loans.Loan, type: :binary_id
+    belongs_to :loan_account, MiwayCreditCore.Loans.LoanAccount, type: :binary_id
 
     timestamps()
   end
 
   def changeset(collateral, attrs) do
     collateral
-    |> cast(attrs, [:type, :description, :estimated_value, :loan_id])
-    |> validate_required([:type, :description, :estimated_value, :loan_id])
+    |> cast(attrs, [:type, :description, :estimated_value, :loan_account_id])
+    |> validate_required([:type, :description, :estimated_value, :loan_account_id])
     |> validate_inclusion(:type, @types)
     |> validate_number(:estimated_value, greater_than: 0)
-    |> foreign_key_constraint(:loan_id)
+    |> foreign_key_constraint(:loan_account_id)
   end
 end

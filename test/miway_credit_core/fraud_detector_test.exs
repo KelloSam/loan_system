@@ -2,6 +2,7 @@ defmodule MiwayCreditCore.FraudDetectorTest do
   use MiwayCreditCore.DataCase, async: true
 
   import MiwayCreditCore.ClientsFixtures
+  import MiwayCreditCore.AccountsFixtures
   import MiwayCreditCore.LoansFixtures
   alias MiwayCreditCore.FraudDetector
   alias MiwayCreditCore.Loans
@@ -36,10 +37,11 @@ defmodule MiwayCreditCore.FraudDetectorTest do
       assert Enum.any?(signals, &(&1 =~ "round figure"))
     end
 
-    test "no_repayment_history clears once the client has an approved loan" do
+    test "no_repayment_history clears once the client has an approved application" do
       client = client_fixture()
-      loan = loan_fixture(%{"client_id" => client.id})
-      {:ok, _approved} = Loans.approve_loan(loan)
+      application = application_fixture(%{"client_id" => client.id})
+      admin = admin_fixture()
+      {:ok, _approved, _account} = Loans.approve_application(application, admin.id)
 
       {_level, _score, signals} = FraudDetector.evaluate(client.id, "1234.56")
       refute Enum.any?(signals, &(&1 =~ "No repayment history"))
@@ -47,32 +49,36 @@ defmodule MiwayCreditCore.FraudDetectorTest do
 
     test "amount_vs_average fires when the new amount exceeds 3x the client's approved average" do
       client = client_fixture()
-      prior = loan_fixture(%{"client_id" => client.id, "amount" => "1000.50", "remaining_balance" => "1000.50"})
-      {:ok, _approved} = Loans.approve_loan(prior)
+      admin = admin_fixture()
+
+      prior = application_fixture(%{"client_id" => client.id, "requested_amount" => "1000.50"})
+      {:ok, _approved, _account} = Loans.approve_application(prior, admin.id)
 
       {_level, _score, signals} = FraudDetector.evaluate(client.id, "5000")
       assert Enum.any?(signals, &(&1 =~ "3× the client's average"))
     end
 
-    test "recent_rejection fires within 90 days of a rejected loan" do
+    test "recent_rejection fires within 90 days of a rejected application" do
       client = client_fixture()
-      loan = loan_fixture(%{"client_id" => client.id})
-      {:ok, _rejected} = Loans.reject_loan(loan)
+      application = application_fixture(%{"client_id" => client.id})
+      admin = admin_fixture()
+      {:ok, _rejected} = Loans.reject_application(application, admin.id, "Not eligible")
 
       {_level, _score, signals} = FraudDetector.evaluate(client.id, "1234.56")
       assert Enum.any?(signals, &(&1 =~ "rejected within the last 90 days"))
     end
 
-    test "exclude_loan_id leaves the loan being re-evaluated out of its own history" do
+    test "exclude_application_id leaves the application being re-evaluated out of its own history" do
       client = client_fixture()
-      loan = loan_fixture(%{"client_id" => client.id})
-      {:ok, approved} = Loans.approve_loan(loan)
+      application = application_fixture(%{"client_id" => client.id})
+      admin = admin_fixture()
+      {:ok, approved, _account} = Loans.approve_application(application, admin.id)
 
-      # Without excluding: the loan counts as its own repayment history.
+      # Without excluding: the application counts as its own repayment history.
       {_level, _score, signals_included} = FraudDetector.evaluate(client.id, "1234.56")
       refute Enum.any?(signals_included, &(&1 =~ "No repayment history"))
 
-      # Excluding it: back to "no history", since that's the only loan.
+      # Excluding it: back to "no history", since that's the only application.
       {_level, _score, signals_excluded} = FraudDetector.evaluate(client.id, "1234.56", approved.id)
       assert Enum.any?(signals_excluded, &(&1 =~ "No repayment history"))
     end

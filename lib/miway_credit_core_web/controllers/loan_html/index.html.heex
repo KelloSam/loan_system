@@ -1,7 +1,7 @@
 <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
   <div>
     <h1 class="text-2xl font-bold text-navy-900">Loans</h1>
-    <p class="mt-0.5 text-sm text-gray-500">All loans in the system</p>
+    <p class="mt-0.5 text-sm text-gray-500">All loan applications in the system</p>
   </div>
   <%= link "New Loan", to: ~p"/admin/loans/new", class: "btn-primary self-start" %>
 </div>
@@ -12,7 +12,7 @@
       <thead>
         <tr class="bg-gray-50 border-b border-gray-100">
           <th class="th">Client</th>
-          <th class="th">Principal</th>
+          <th class="th">Requested</th>
           <th class="th hidden sm:table-cell">Balance</th>
           <th class="th hidden md:table-cell">Rate / Term</th>
           <th class="th">Status</th>
@@ -22,36 +22,49 @@
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-50">
-        <%= for loan <- @loans do %>
+        <%= for application <- @applications do %>
           <tr class="hover:bg-gray-50 transition-colors">
             <td class="td">
-              <p class="font-medium text-navy-900"><%= loan.client.name %></p>
+              <p class="font-medium text-navy-900"><%= application.client.name %></p>
             </td>
-            <td class="td font-medium">ZMW <%= loan.amount %></td>
-            <td class="td text-gray-500 hidden sm:table-cell">ZMW <%= loan.remaining_balance %></td>
-            <td class="td text-gray-500 hidden md:table-cell"><%= loan.interest_rate %>% / <%= loan.term_months %>mo</td>
+            <td class="td font-medium">ZMW <%= application.requested_amount %></td>
+            <td class="td text-gray-500 hidden sm:table-cell">
+              <%= if application.loan_account do %>
+                ZMW <%= application.loan_account.outstanding_balance %>
+              <% else %>
+                —
+              <% end %>
+            </td>
+            <td class="td text-gray-500 hidden md:table-cell">
+              <%= if application.loan_account do %>
+                <%= application.loan_account.interest_rate %>% / <%= application.loan_account.term_months %>mo
+              <% else %>
+                —
+              <% end %>
+            </td>
             <td class="td">
-              <span class={"badge badge-#{loan.status}"}><%= String.capitalize(loan.status) %></span>
+              <% status = if application.loan_account, do: application.loan_account.status, else: application.status %>
+              <span class={"badge badge-#{status}"}><%= String.capitalize(status) %></span>
             </td>
             <td class="td hidden sm:table-cell">
-              <span class={"text-xs font-semibold px-2 py-0.5 rounded-full #{risk_badge_class(loan.risk_level)}"}>
-                <%= String.capitalize(loan.risk_level || "low") %>
+              <span class={"text-xs font-semibold px-2 py-0.5 rounded-full #{risk_badge_class(application.risk_level)}"}>
+                <%= String.capitalize(application.risk_level || "low") %>
               </span>
             </td>
             <td class="td text-gray-400 hidden lg:table-cell">
-              <%= Calendar.strftime(loan.inserted_at, "%d %b %Y") %>
+              <%= Calendar.strftime(application.inserted_at, "%d %b %Y") %>
             </td>
             <td class="td text-right space-x-3">
-              <%= link "View", to: ~p"/admin/loans/#{loan}", class: "text-sm font-medium text-navy-600 hover:text-navy-900" %>
-              <%= if loan.status == "pending" do %>
-                <%= link "Edit", to: ~p"/admin/loans/#{loan}/edit", class: "text-sm font-medium text-gray-400 hover:text-gray-700" %>
+              <%= link "View", to: ~p"/admin/loans/#{application}", class: "text-sm font-medium text-navy-600 hover:text-navy-900" %>
+              <%= if application.status == "pending" do %>
+                <%= link "Edit", to: ~p"/admin/loans/#{application}/edit", class: "text-sm font-medium text-gray-400 hover:text-gray-700" %>
               <% end %>
             </td>
           </tr>
         <% end %>
-        <%= if Enum.empty?(@loans) do %>
+        <%= if Enum.empty?(@applications) do %>
           <tr>
-            <td colspan="7" class="py-12 text-center text-sm text-gray-400">No loans found.</td>
+            <td colspan="8" class="py-12 text-center text-sm text-gray-400">No loans found.</td>
           </tr>
         <% end %>
       </tbody>

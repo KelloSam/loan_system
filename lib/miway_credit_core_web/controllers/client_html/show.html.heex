@@ -65,11 +65,11 @@
 <%# Loan history %>
 <div class="card overflow-hidden">
   <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-    <h2 class="section-title">Loan History <span class="ml-1.5 text-sm font-normal text-gray-400">(<%= length(@loans) %>)</span></h2>
+    <h2 class="section-title">Loan History <span class="ml-1.5 text-sm font-normal text-gray-400">(<%= length(@applications) %>)</span></h2>
     <%= link "+ New Loan", to: ~p"/admin/loans/new", class: "text-sm font-medium text-gold-600 hover:text-gold-700" %>
   </div>
 
-  <%= if Enum.empty?(@loans) do %>
+  <%= if Enum.empty?(@applications) do %>
     <div class="py-12 text-center">
       <p class="text-sm text-gray-400">No loans recorded for this client.</p>
     </div>
@@ -87,19 +87,28 @@
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-50">
-          <%= for loan <- @loans do %>
+          <%= for application <- @applications do %>
             <tr class="hover:bg-gray-50 transition-colors">
-              <td class="td font-medium text-navy-900">ZMW <%= loan.amount %></td>
-              <td class="td">ZMW <%= loan.remaining_balance %></td>
-              <td class="td text-gray-500 hidden sm:table-cell"><%= loan.interest_rate %>% / <%= loan.term_months %>mo</td>
+              <td class="td font-medium text-navy-900">ZMW <%= application.requested_amount %></td>
               <td class="td">
-                <span class={"badge badge-#{loan.status}"}><%= String.capitalize(loan.status) %></span>
+                <%= if application.loan_account, do: "ZMW #{application.loan_account.outstanding_balance}", else: "—" %>
+              </td>
+              <td class="td text-gray-500 hidden sm:table-cell">
+                <%= if application.loan_account do %>
+                  <%= application.loan_account.interest_rate %>% / <%= application.loan_account.term_months %>mo
+                <% else %>
+                  —
+                <% end %>
+              </td>
+              <td class="td">
+                <% status = if application.loan_account, do: application.loan_account.status, else: application.status %>
+                <span class={"badge badge-#{status}"}><%= String.capitalize(status) %></span>
               </td>
               <td class="td text-gray-400 hidden md:table-cell">
-                <%= Calendar.strftime(loan.inserted_at, "%d %b %Y") %>
+                <%= Calendar.strftime(application.inserted_at, "%d %b %Y") %>
               </td>
               <td class="td text-right">
-                <%= link "View →", to: ~p"/admin/loans/#{loan}", class: "text-sm font-medium text-navy-600 hover:text-navy-900" %>
+                <%= link "View →", to: ~p"/admin/loans/#{application}", class: "text-sm font-medium text-navy-600 hover:text-navy-900" %>
               </td>
             </tr>
           <% end %>

@@ -1,25 +1,41 @@
 defmodule MiwayCreditCoreWeb.LoanController do
   use MiwayCreditCoreWeb, :controller
 
-  alias MiwayCreditCore.{Loans, Clients, Repo, AuditLogs}
-  alias MiwayCreditCore.Loans.{Loan, Payment, Collateral}
+  alias MiwayCreditCore.{Loans, Clients, AuditLogs}
+  alias MiwayCreditCore.Loans.{LoanApplication, PaymentTransaction, Collateral}
 
   def index(conn, _params) do
-    loans = Loans.list_loans()
-    render(conn, :index, loans: loans)
+    applications = Loans.list_applications()
+    render(conn, :index, applications: applications)
   end
 
   def show(conn, %{"id" => id}) do
-    loan = Loans.get_loan!(id) |> Repo.preload([:client, :payments])
-    interest = Loans.compound_interest_details(loan)
-    payment_changeset = Payment.changeset(%Payment{}, %{})
+    application = Loans.get_application!(id)
+    fraud_signals = Loans.fraud_signals(application)
+    payment_changeset = PaymentTransaction.changeset(%PaymentTransaction{}, %{})
     collateral_changeset = Collateral.changeset(%Collateral{}, %{})
-    collaterals = Loans.list_collaterals_for_loan(loan.id)
-    fraud_signals = Loans.fraud_signals(loan)
+
+    {account, interest, installments, transactions, collaterals} =
+      case application.loan_account do
+        nil ->
+          {nil, nil, [], [], []}
+
+        account ->
+          {
+            account,
+            Loans.compound_interest_details(account),
+            Loans.list_installments_for_account(account.id),
+            Loans.list_transactions_for_account(account.id),
+            Loans.list_collaterals_for_account(account.id)
+          }
+      end
 
     render(conn, :show,
-      loan: loan,
+      application: application,
+      account: account,
       interest: interest,
+      installments: installments,
+      transactions: transactions,
       payment_changeset: payment_changeset,
       collateral_changeset: collateral_changeset,
       collaterals: collaterals,
@@ -29,32 +45,29 @@ defmodule MiwayCreditCoreWeb.LoanController do
 
   def new(conn, _params) do
     clients = Clients.list_clients()
-    changeset = Loan.changeset(%Loan{}, %{})
+    changeset = LoanApplication.changeset(%LoanApplication{}, %{})
     render(conn, :new, changeset: changeset, clients: clients)
   end
 
-  def create(conn, %{"loan" => loan_params}) do
-    # remaining_balance starts equal to the principal amount
-    params = Map.put_new(loan_params, "remaining_balance", loan_params["amount"])
-
-    case Loans.create_loan(params) do
-      {:ok, loan} ->
-        AuditLogs.log("loan_created",
+  def create(conn, %{"loan_application" => application_params}) do
+    case Loans.create_application(application_params) do
+      {:ok, application} ->
+        AuditLogs.log("loan_application_created",
           actor_id: conn.assigns.current_user.id,
           actor_email: conn.assigns.current_user.email,
-          target_type: "loan",
-          target_id: loan.id,
+          target_type: "loan_application",
+          target_id: application.id,
           ip_address: get_ip(conn),
-          metadata: %{amount: loan.amount, client_id: loan.client_id}
+          metadata: %{requested_amount: application.requested_amount, client_id: application.client_id}
         )
 
         conn
-        |> put_flash(:info, "Loan created successfully.")
-        |> redirect(to: ~p"/admin/loans/#{loan}")
+        |> put_flash(:info, "Loan application created successfully.")
+        |> redirect(to: ~p"/admin/loans/#{application}")
 
-      {:error, :pending_loan_exists} ->
+      {:error, :pending_application_exists} ->
         conn
-        |> put_flash(:error, "Blocked: this client already has a pending loan. Resolve the existing application before creating a new one.")
+        |> put_flash(:error, "Blocked: this client already has a pending application. Resolve the existing application before creating a new one.")
         |> redirect(to: ~p"/admin/loans/new")
 
       {:error, :rejection_cooldown} ->
@@ -69,124 +82,131 @@ defmodule MiwayCreditCoreWeb.LoanController do
   end
 
   def edit(conn, %{"id" => id}) do
-    loan = Loans.get_loan!(id) |> Repo.preload(:client)
-    changeset = Loan.changeset(loan, %{})
-    render(conn, :edit, loan: loan, changeset: changeset)
+    application = Loans.get_application!(id)
+    changeset = LoanApplication.changeset(application, %{})
+    render(conn, :edit, application: application, changeset: changeset)
   end
 
-  def update(conn, %{"id" => id, "loan" => loan_params}) do
-    loan = Loans.get_loan!(id)
+  def update(conn, %{"id" => id, "loan_application" => application_params}) do
+    application = Loans.get_application!(id)
 
-    case Loans.update_loan(loan, loan_params) do
-      {:ok, loan} ->
+    case Loans.update_application(application, application_params) do
+      {:ok, application} ->
         conn
-        |> put_flash(:info, "Loan updated successfully.")
-        |> redirect(to: ~p"/admin/loans/#{loan}")
+        |> put_flash(:info, "Application updated successfully.")
+        |> redirect(to: ~p"/admin/loans/#{application}")
 
       {:error, changeset} ->
-        loan = Repo.preload(loan, :client)
-        render(conn, :edit, loan: loan, changeset: changeset)
+        render(conn, :edit, application: application, changeset: changeset)
     end
   end
 
   def delete(conn, %{"id" => id}) do
-    loan = Loans.get_loan!(id)
+    application = Loans.get_application!(id)
 
-    case Loans.delete_loan(loan) do
+    case Loans.delete_application(application) do
       {:ok, _} ->
         conn
-        |> put_flash(:info, "Loan deleted.")
+        |> put_flash(:info, "Application deleted.")
         |> redirect(to: ~p"/admin/loans")
 
       {:error, _} ->
         conn
-        |> put_flash(:error, "Cannot delete this loan — it may have associated payments.")
+        |> put_flash(:error, "Cannot delete this application.")
         |> redirect(to: ~p"/admin/loans/#{id}")
     end
   end
 
   def approve(conn, %{"id" => id}) do
-    loan = Loans.get_loan!(id)
+    application = Loans.get_application!(id)
 
-    case Loans.approve_loan(loan) do
-      {:ok, loan} ->
-        AuditLogs.log("loan_approved",
+    case Loans.approve_application(application, conn.assigns.current_user.id) do
+      {:ok, application, account} ->
+        AuditLogs.log("loan_application_approved",
           actor_id: conn.assigns.current_user.id,
           actor_email: conn.assigns.current_user.email,
-          target_type: "loan",
-          target_id: loan.id,
+          target_type: "loan_account",
+          target_id: account.id,
           ip_address: get_ip(conn),
-          metadata: %{amount: loan.amount, client_id: loan.client_id}
+          metadata: %{principal_amount: account.principal_amount, client_id: account.client_id}
         )
 
         conn
-        |> put_flash(:info, "Loan approved.")
-        |> redirect(to: ~p"/admin/loans/#{loan}")
+        |> put_flash(:info, "Application approved — account opened.")
+        |> redirect(to: ~p"/admin/loans/#{application}")
 
       {:error, _} ->
         conn
-        |> put_flash(:error, "Could not approve loan.")
+        |> put_flash(:error, "Could not approve application.")
         |> redirect(to: ~p"/admin/loans/#{id}")
     end
   end
 
-  def reject(conn, %{"id" => id}) do
-    loan = Loans.get_loan!(id)
+  def reject(conn, %{"id" => id} = params) do
+    application = Loans.get_application!(id)
+    reason = Map.get(params, "reason", "Not specified")
 
-    case Loans.reject_loan(loan) do
-      {:ok, loan} ->
-        AuditLogs.log("loan_rejected",
+    case Loans.reject_application(application, conn.assigns.current_user.id, reason) do
+      {:ok, application} ->
+        AuditLogs.log("loan_application_rejected",
           actor_id: conn.assigns.current_user.id,
           actor_email: conn.assigns.current_user.email,
-          target_type: "loan",
-          target_id: loan.id,
+          target_type: "loan_application",
+          target_id: application.id,
           ip_address: get_ip(conn),
-          metadata: %{amount: loan.amount, client_id: loan.client_id}
+          metadata: %{requested_amount: application.requested_amount, client_id: application.client_id}
         )
 
         conn
-        |> put_flash(:info, "Loan rejected.")
-        |> redirect(to: ~p"/admin/loans/#{loan}")
+        |> put_flash(:info, "Application rejected.")
+        |> redirect(to: ~p"/admin/loans/#{application}")
 
       {:error, _} ->
         conn
-        |> put_flash(:error, "Could not reject loan.")
+        |> put_flash(:error, "Could not reject application.")
         |> redirect(to: ~p"/admin/loans/#{id}")
     end
   end
 
   def create_payment(conn, %{"id" => id, "payment" => payment_params}) do
-    loan = Loans.get_loan!(id)
-    params = payment_params |> Map.put("loan_id", loan.id) |> Map.put("status", "paid")
+    application = Loans.get_application!(id)
+    account = application.loan_account
 
-    case Loans.create_payment(params) do
-      {:ok, payment} ->
+    params =
+      payment_params
+      |> Map.put("received_at", date_param_to_datetime(payment_params["received_at"]))
+      |> Map.put("loan_account_id", account.id)
+      |> Map.put("recorded_by_id", conn.assigns.current_user.id)
+
+    case Loans.record_payment(params) do
+      {:ok, transaction} ->
         AuditLogs.log("payment_recorded",
           actor_id: conn.assigns.current_user.id,
           actor_email: conn.assigns.current_user.email,
-          target_type: "payment",
-          target_id: payment.id,
+          target_type: "payment_transaction",
+          target_id: transaction.id,
           ip_address: get_ip(conn),
-          metadata: %{amount: payment.amount, loan_id: loan.id}
+          metadata: %{amount: transaction.amount, loan_account_id: account.id}
         )
 
         conn
         |> put_flash(:info, "Payment recorded successfully.")
-        |> redirect(to: ~p"/admin/loans/#{loan}")
+        |> redirect(to: ~p"/admin/loans/#{application}")
 
       {:error, :amount_exceeds_balance} ->
         conn
-        |> put_flash(:error, "Payment amount exceeds the remaining balance.")
-        |> redirect(to: ~p"/admin/loans/#{loan}")
+        |> put_flash(:error, "Payment amount exceeds the outstanding balance.")
+        |> redirect(to: ~p"/admin/loans/#{application}")
 
       {:error, changeset} ->
-        render_show_with_errors(conn, loan, payment_changeset: changeset)
+        render_show_with_errors(conn, application, payment_changeset: changeset)
     end
   end
 
   def create_collateral(conn, %{"id" => id, "collateral" => collateral_params}) do
-    loan = Loans.get_loan!(id)
-    params = Map.put(collateral_params, "loan_id", loan.id)
+    application = Loans.get_application!(id)
+    account = application.loan_account
+    params = Map.put(collateral_params, "loan_account_id", account.id)
 
     case Loans.create_collateral(params) do
       {:ok, collateral} ->
@@ -196,20 +216,20 @@ defmodule MiwayCreditCoreWeb.LoanController do
           target_type: "collateral",
           target_id: collateral.id,
           ip_address: get_ip(conn),
-          metadata: %{type: collateral.type, estimated_value: collateral.estimated_value, loan_id: loan.id}
+          metadata: %{type: collateral.type, estimated_value: collateral.estimated_value, loan_account_id: account.id}
         )
 
         conn
         |> put_flash(:info, "Collateral recorded.")
-        |> redirect(to: ~p"/admin/loans/#{loan}")
+        |> redirect(to: ~p"/admin/loans/#{application}")
 
       {:error, changeset} ->
-        render_show_with_errors(conn, loan, collateral_changeset: changeset)
+        render_show_with_errors(conn, application, collateral_changeset: changeset)
     end
   end
 
   def delete_collateral(conn, %{"id" => id, "collateral_id" => collateral_id}) do
-    loan = Loans.get_loan!(id)
+    application = Loans.get_application!(id)
     collateral = Loans.get_collateral!(collateral_id)
 
     {:ok, _} = Loans.delete_collateral(collateral)
@@ -220,29 +240,40 @@ defmodule MiwayCreditCoreWeb.LoanController do
       target_type: "collateral",
       target_id: collateral.id,
       ip_address: get_ip(conn),
-      metadata: %{type: collateral.type, estimated_value: collateral.estimated_value, loan_id: loan.id}
+      metadata: %{type: collateral.type, estimated_value: collateral.estimated_value}
     )
 
     conn
     |> put_flash(:info, "Collateral removed.")
-    |> redirect(to: ~p"/admin/loans/#{loan}")
+    |> redirect(to: ~p"/admin/loans/#{application}")
   end
 
-  # Re-renders the loan show page with every assign it needs, overriding
-  # just the one changeset that failed validation — used by both
-  # create_payment and create_collateral's error branches so a bad
+  # Re-renders the application show page with every assign it needs,
+  # overriding just the one changeset that failed validation — used by
+  # both create_payment and create_collateral's error branches so a bad
   # submission never crashes on a missing assign.
-  defp render_show_with_errors(conn, loan, overrides) do
-    loan = Loans.get_loan!(loan.id) |> Repo.preload([:client, :payments])
-    interest = Loans.compound_interest_details(loan)
-    fraud_signals = Loans.fraud_signals(loan)
-    collaterals = Loans.list_collaterals_for_loan(loan.id)
+  defp render_show_with_errors(conn, application, overrides) do
+    application = Loans.get_application!(application.id)
+    fraud_signals = Loans.fraud_signals(application)
+
+    {account, interest, installments, transactions, collaterals} =
+      case application.loan_account do
+        nil -> {nil, nil, [], [], []}
+        account ->
+          {account, Loans.compound_interest_details(account),
+           Loans.list_installments_for_account(account.id),
+           Loans.list_transactions_for_account(account.id),
+           Loans.list_collaterals_for_account(account.id)}
+      end
 
     assigns =
       [
-        loan: loan,
+        application: application,
+        account: account,
         interest: interest,
-        payment_changeset: Payment.changeset(%Payment{}, %{}),
+        installments: installments,
+        transactions: transactions,
+        payment_changeset: PaymentTransaction.changeset(%PaymentTransaction{}, %{}),
         collateral_changeset: Collateral.changeset(%Collateral{}, %{}),
         collaterals: collaterals,
         fraud_signals: fraud_signals
@@ -250,6 +281,23 @@ defmodule MiwayCreditCoreWeb.LoanController do
       |> Keyword.merge(overrides)
 
     render(conn, :show, assigns)
+  end
+
+  # The payment form submits a plain date (<input type="date">); the
+  # schema stores a full :utc_datetime, so this fills in a time
+  # component (the account's local "now") before casting.
+  defp date_param_to_datetime(nil), do: nil
+  defp date_param_to_datetime(""), do: nil
+
+  defp date_param_to_datetime(date_string) do
+    case Date.from_iso8601(date_string) do
+      {:ok, date} ->
+        now = DateTime.utc_now()
+        DateTime.new!(date, DateTime.to_time(now), "Etc/UTC")
+
+      {:error, _} ->
+        date_string
+    end
   end
 
   defp get_ip(conn), do: conn.remote_ip |> :inet.ntoa() |> to_string()

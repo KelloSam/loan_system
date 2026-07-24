@@ -5,23 +5,31 @@ defmodule MiwayCreditCoreWeb.ClientLoanController do
 
   def index(conn, _params) do
     client = client_for(conn)
-    loans = Loans.get_loans_for_client(client.id)
-    render(conn, :index, loans: loans)
+    applications = Loans.get_applications_for_client(client.id)
+    render(conn, :index, applications: applications)
   end
 
   def show(conn, %{"id" => id}) do
     client = client_for(conn)
-    loan = Loans.get_loan!(id) |> MiwayCreditCore.Repo.preload(:payments)
+    application = Loans.get_application!(id)
 
-    # Authorization: ensure this loan belongs to the current client
-    if loan.client_id != client.id do
+    # Authorization: ensure this application belongs to the current client
+    if application.client_id != client.id do
       conn
       |> put_flash(:error, "You are not authorized to view this loan.")
       |> redirect(to: ~p"/client/loans")
       |> halt()
     else
-      interest = Loans.compound_interest_details(loan)
-      render(conn, :show, loan: loan, interest: interest)
+      {account, interest, installments} =
+        case application.loan_account do
+          nil -> {nil, nil, []}
+          account ->
+            {account, Loans.compound_interest_details(account),
+             Loans.list_installments_for_account(account.id)}
+        end
+
+      render(conn, :show, application: application, account: account, interest: interest,
+        installments: installments)
     end
   end
 

@@ -7,22 +7,16 @@ defmodule MiwayCreditCoreWeb.ClientDashboardController do
     user = conn.assigns.current_user
     client = Clients.get_client_by_email(user.email)
 
-    {loans, next_payment_date, next_payment_amount} =
+    {applications, next_payment_date, next_payment_amount} =
       if client do
-        ls = Loans.get_loans_for_client(client.id)
+        apps = Loans.get_applications_for_client(client.id)
 
-        # Prefer a pending Payment record; fall back to the loan's next_payment_date field
-        case Loans.get_upcoming_payments(client.id) |> List.first() do
-          %{payment_date: date, amount: amount} ->
-            {ls, date, amount}
+        case Loans.get_upcoming_installments(client.id) |> List.first() do
+          %{due_date: date, scheduled_amount: amount, paid_amount: paid} ->
+            {apps, date, Decimal.sub(amount, paid)}
 
           nil ->
-            # Find the earliest next_payment_date across active loans
-            active = Enum.filter(ls, &(&1.status in ["approved", "pending"] and &1.next_payment_date))
-            case Enum.min_by(active, & &1.next_payment_date, fn -> nil end) do
-              nil  -> {ls, nil, nil}
-              loan -> {ls, loan.next_payment_date, nil}
-            end
+            {apps, nil, nil}
         end
       else
         {[], nil, nil}
@@ -30,7 +24,7 @@ defmodule MiwayCreditCoreWeb.ClientDashboardController do
 
     render(conn, :index,
       client: client,
-      loans: loans,
+      applications: applications,
       next_payment_date: next_payment_date,
       next_payment_amount: next_payment_amount
     )
