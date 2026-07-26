@@ -19,5 +19,8 @@ config :miway_credit_core, MiwayCreditCoreWeb.Endpoint,
   debug_errors: true,
   secret_key_base: "9f6YJKc5r4kRN8XSPqp/93qZ4ixDMPXwq5Tgq/BJQ7Sq1uHSb2QXo+pKavyZH0I6",
   pubsub_server: MiwayCreditCore.PubSub,
-  watchers: []
+  watchers: [
+    esbuild: {Esbuild, :install_and_run, [:default, ~w(--sourcemap=inline --watch)]},
+    tailwind: {Tailwind, :install_and_run, [:default, ~w(--watch)]}
+  ]
 

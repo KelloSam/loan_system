@@ -8,7 +8,8 @@ defmodule MiwayCreditCore.MixProject do
       elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
-      deps: deps()
+      deps: deps(),
+      aliases: aliases()
     ]
   end
 
@@ -42,7 +43,21 @@ defmodule MiwayCreditCore.MixProject do
       {:eqrcode, "~> 0.2"},       # QR code SVG generation for 2FA setup
       {:tzdata, "~> 1.1"},             # Timezone database (required by Tzdata.TimeZoneDatabase)
       {:phoenix_live_reload, "~> 1.4", only: :dev},  # Live code reloading in development
-      {:ex_doc, "~> 0.29", only: :dev, runtime: false}  # For documentation
+      {:ex_doc, "~> 0.29", only: :dev, runtime: false},  # For documentation
+      {:esbuild, "~> 0.8", runtime: Mix.env() == :dev},  # Bundles assets/js/app.js for the browser
+      {:tailwind, "~> 0.2", runtime: Mix.env() == :dev}  # Compiles assets/css/app.css
+    ]
+  end
+
+  defp aliases do
+    [
+      "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
+      "assets.build": ["tailwind default", "esbuild default"],
+      "assets.deploy": [
+        "tailwind default --minify",
+        "esbuild default --minify",
+        "phx.digest"
+      ]
     ]
   end
 end
