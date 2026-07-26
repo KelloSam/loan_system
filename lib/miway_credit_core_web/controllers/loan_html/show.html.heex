@@ -325,6 +325,7 @@
             <th class="th">Amount</th>
             <th class="th">Method</th>
             <th class="th">Status</th>
+            <th class="th"></th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-50">
@@ -335,6 +336,31 @@
               <td class="td"><%= String.capitalize(String.replace(transaction.method, "_", " ")) %></td>
               <td class="td">
                 <span class={"badge badge-#{transaction.status}"}><%= String.capitalize(transaction.status) %></span>
+                <%= if transaction.status == "voided" and transaction.void_reason do %>
+                  <span class="form-hint"><%= transaction.void_reason %></span>
+                <% end %>
+              </td>
+              <td class="td text-right">
+                <%= if transaction.status == "posted" do %>
+                  <details class="void-disclosure">
+                    <summary class="btn-outline void-toggle">Void</summary>
+                    <div class="card p-4 mt-2">
+                      <.form :let={_f} for={%{}} as={:void} action={~p"/admin/loans/#{@application}/payments/#{transaction}/void"} method="patch">
+                        <label class="form-label" for={"void_reason_#{transaction.id}"}>Void reason</label>
+                        <textarea
+                          id={"void_reason_#{transaction.id}"}
+                          name="reason"
+                          rows="3"
+                          required
+                          placeholder="Why is this payment being voided?"
+                        ></textarea>
+                        <div class="flex justify-end gap-2 mt-2">
+                          <button type="submit" class="btn-danger">Confirm Void</button>
+                        </div>
+                      </.form>
+                    </div>
+                  </details>
+                <% end %>
               </td>
             </tr>
           <% end %>

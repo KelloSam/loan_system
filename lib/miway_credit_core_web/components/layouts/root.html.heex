@@ -257,11 +257,12 @@
       .breadcrumb a { color: #9CA3AF; text-decoration: none; }
       .breadcrumb a:hover { color: #0B1A2E; }
 
-      /* ── Disclosure (reject reason form) ── */
-      .reject-disclosure { display: inline-block; text-align: left; }
-      .reject-toggle { list-style: none; cursor: pointer; }
-      .reject-toggle::-webkit-details-marker { display: none; }
+      /* ── Disclosure (reject/void reason forms) ── */
+      .reject-disclosure, .void-disclosure { display: inline-block; text-align: left; }
+      .reject-toggle, .void-toggle { list-style: none; cursor: pointer; }
+      .reject-toggle::-webkit-details-marker, .void-toggle::-webkit-details-marker { display: none; }
       .reject-disclosure > div { width: 300px; }
+      .void-disclosure > div { width: 260px; }
 
       /* ── Quick action cards ── */
       .quick-action {

@@ -79,6 +79,7 @@ defmodule MiwayCreditCoreWeb.Router do
     patch "/loans/:id/approve", LoanController, :approve
     patch "/loans/:id/reject", LoanController, :reject
     post "/loans/:id/payments", LoanController, :create_payment
+    patch "/loans/:id/payments/:transaction_id/void", LoanController, :void_payment
     post "/loans/:id/collateral", LoanController, :create_collateral
     delete "/loans/:id/collateral/:collateral_id", LoanController, :delete_collateral
   end

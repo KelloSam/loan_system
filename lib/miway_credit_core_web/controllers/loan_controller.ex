@@ -203,6 +203,43 @@ defmodule MiwayCreditCoreWeb.LoanController do
     end
   end
 
+  def void_payment(conn, %{"id" => id, "transaction_id" => transaction_id} = params) do
+    application = Loans.get_application!(id)
+    transaction = Loans.get_transaction!(transaction_id)
+    reason = Map.get(params, "reason", "Not specified")
+
+    case transaction.status do
+      "posted" ->
+        attrs = %{"voided_by_id" => conn.assigns.current_user.id, "void_reason" => reason}
+
+        case Loans.void_payment(transaction, attrs) do
+          {:ok, voided} ->
+            AuditLogs.log("payment_voided",
+              actor_id: conn.assigns.current_user.id,
+              actor_email: conn.assigns.current_user.email,
+              target_type: "payment_transaction",
+              target_id: voided.id,
+              ip_address: get_ip(conn),
+              metadata: %{amount: voided.amount, void_reason: reason}
+            )
+
+            conn
+            |> put_flash(:info, "Payment voided.")
+            |> redirect(to: ~p"/admin/loans/#{application}")
+
+          {:error, _} ->
+            conn
+            |> put_flash(:error, "Could not void payment.")
+            |> redirect(to: ~p"/admin/loans/#{application}")
+        end
+
+      _ ->
+        conn
+        |> put_flash(:error, "This payment has already been voided.")
+        |> redirect(to: ~p"/admin/loans/#{application}")
+    end
+  end
+
   def create_collateral(conn, %{"id" => id, "collateral" => collateral_params}) do
     application = Loans.get_application!(id)
     account = application.loan_account
