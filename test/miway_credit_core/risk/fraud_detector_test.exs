@@ -1,10 +1,10 @@
-defmodule MiwayCreditCore.FraudDetectorTest do
+defmodule MiwayCreditCore.Risk.FraudDetectorTest do
   use MiwayCreditCore.DataCase, async: true
 
   import MiwayCreditCore.CustomersFixtures
   import MiwayCreditCore.AccountsFixtures
   import MiwayCreditCore.LoansFixtures
-  alias MiwayCreditCore.FraudDetector
+  alias MiwayCreditCore.Risk.FraudDetector
   alias MiwayCreditCore.Loans
 
   describe "evaluate/3 — classification thresholds" do

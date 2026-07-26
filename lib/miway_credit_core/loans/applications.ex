@@ -11,7 +11,7 @@ defmodule MiwayCreditCore.Loans.Applications do
   alias MiwayCreditCore.Loans.{LoanApplication, LoanAccount, RepaymentScheduleInstallment,
                                AccountingEntry, CustomerStats}
   alias MiwayCreditCore.Loans.InterestCalculator
-  alias MiwayCreditCore.FraudDetector
+  alias MiwayCreditCore.Risk
 
   # ---------------------------------------------------------------------------
   # Queries
@@ -62,7 +62,7 @@ defmodule MiwayCreditCore.Loans.Applications do
          :ok <- check_rejection_cooldown(attrs) do
       customer_id = Map.get(attrs, :customer_id) || Map.get(attrs, "customer_id")
       amount    = Map.get(attrs, :requested_amount) || Map.get(attrs, "requested_amount")
-      {risk_level, risk_score, _signals} = FraudDetector.evaluate(customer_id, amount)
+      {risk_level, risk_score, _signals} = Risk.evaluate(customer_id, amount)
       attrs = attrs |> Map.put("risk_level", risk_level) |> Map.put("risk_score", risk_score)
 
       Ecto.Multi.new()
@@ -79,9 +79,9 @@ defmodule MiwayCreditCore.Loans.Applications do
     end
   end
 
-  @doc "Fraud signal strings for an existing application. Delegates to FraudDetector."
+  @doc "Fraud signal strings for an existing application. Delegates to Risk."
   def fraud_signals(%LoanApplication{id: id, customer_id: customer_id, requested_amount: amount}) do
-    {_level, _score, signals} = FraudDetector.evaluate(customer_id, amount, id)
+    {_level, _score, signals} = Risk.evaluate(customer_id, amount, id)
     signals
   end
 

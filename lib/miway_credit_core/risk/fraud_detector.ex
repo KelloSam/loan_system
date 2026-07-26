@@ -1,6 +1,8 @@
-defmodule MiwayCreditCore.FraudDetector do
+defmodule MiwayCreditCore.Risk.FraudDetector do
   @moduledoc """
   Scores a loan application across six risk signals and returns a risk level.
+  Internal to the Risk context — callers outside Risk should go through
+  `MiwayCreditCore.Risk.evaluate/3`, not this module directly.
 
   Thresholds
     0–25  → "low"    proceed normally
