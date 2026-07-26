@@ -1,7 +1,7 @@
 defmodule MiwayCreditCoreWeb.LoanController do
   use MiwayCreditCoreWeb, :controller
 
-  alias MiwayCreditCore.{Loans, Clients, AuditLogs}
+  alias MiwayCreditCore.{Loans, Customers, AuditLogs}
   alias MiwayCreditCore.Loans.{LoanApplication, PaymentTransaction, Collateral}
 
   def index(conn, _params) do
@@ -44,9 +44,9 @@ defmodule MiwayCreditCoreWeb.LoanController do
   end
 
   def new(conn, _params) do
-    clients = Clients.list_clients()
+    customers = Customers.list_customers()
     changeset = LoanApplication.changeset(%LoanApplication{}, %{})
-    render(conn, :new, changeset: changeset, clients: clients)
+    render(conn, :new, changeset: changeset, customers: customers)
   end
 
   def create(conn, %{"loan_application" => application_params}) do
@@ -58,7 +58,7 @@ defmodule MiwayCreditCoreWeb.LoanController do
           target_type: "loan_application",
           target_id: application.id,
           ip_address: get_ip(conn),
-          metadata: %{requested_amount: application.requested_amount, client_id: application.client_id}
+          metadata: %{requested_amount: application.requested_amount, customer_id: application.customer_id}
         )
 
         conn
@@ -67,17 +67,17 @@ defmodule MiwayCreditCoreWeb.LoanController do
 
       {:error, :pending_application_exists} ->
         conn
-        |> put_flash(:error, "Blocked: this client already has a pending application. Resolve the existing application before creating a new one.")
+        |> put_flash(:error, "Blocked: this customer already has a pending application. Resolve the existing application before creating a new one.")
         |> redirect(to: ~p"/admin/loans/new")
 
       {:error, :rejection_cooldown} ->
         conn
-        |> put_flash(:error, "Blocked: this client was rejected within the last 30 days. New applications are frozen during the cooling-off period.")
+        |> put_flash(:error, "Blocked: this customer was rejected within the last 30 days. New applications are frozen during the cooling-off period.")
         |> redirect(to: ~p"/admin/loans/new")
 
       {:error, changeset} ->
-        clients = Clients.list_clients()
-        render(conn, :new, changeset: changeset, clients: clients)
+        customers = Customers.list_customers()
+        render(conn, :new, changeset: changeset, customers: customers)
     end
   end
 
@@ -128,7 +128,7 @@ defmodule MiwayCreditCoreWeb.LoanController do
           target_type: "loan_account",
           target_id: account.id,
           ip_address: get_ip(conn),
-          metadata: %{principal_amount: account.principal_amount, client_id: account.client_id}
+          metadata: %{principal_amount: account.principal_amount, customer_id: account.customer_id}
         )
 
         conn
@@ -154,7 +154,7 @@ defmodule MiwayCreditCoreWeb.LoanController do
           target_type: "loan_application",
           target_id: application.id,
           ip_address: get_ip(conn),
-          metadata: %{requested_amount: application.requested_amount, client_id: application.client_id}
+          metadata: %{requested_amount: application.requested_amount, customer_id: application.customer_id}
         )
 
         conn

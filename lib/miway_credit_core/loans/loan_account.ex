@@ -28,7 +28,7 @@ defmodule MiwayCreditCore.Loans.LoanAccount do
     field :closed_at, :utc_datetime
 
     belongs_to :loan_application, MiwayCreditCore.Loans.LoanApplication, type: :binary_id
-    belongs_to :client, MiwayCreditCore.Clients.Client, type: :binary_id
+    belongs_to :customer, MiwayCreditCore.Customers.Customer, type: :binary_id
 
     has_many :repayment_schedule_installments, MiwayCreditCore.Loans.RepaymentScheduleInstallment,
       preload_order: [asc: :due_date]
@@ -41,9 +41,9 @@ defmodule MiwayCreditCore.Loans.LoanAccount do
 
   def changeset(loan_account, attrs) do
     loan_account
-    |> cast(attrs, [:loan_application_id, :client_id, :principal_amount, :interest_rate,
+    |> cast(attrs, [:loan_application_id, :customer_id, :principal_amount, :interest_rate,
                    :term_months, :opened_at, :status, :outstanding_balance, :closed_at])
-    |> validate_required([:loan_application_id, :client_id, :principal_amount, :interest_rate,
+    |> validate_required([:loan_application_id, :customer_id, :principal_amount, :interest_rate,
                           :term_months, :opened_at, :status, :outstanding_balance])
     |> validate_inclusion(:status, @statuses)
     |> validate_number(:principal_amount, greater_than: 0)
@@ -51,7 +51,7 @@ defmodule MiwayCreditCore.Loans.LoanAccount do
     |> validate_number(:term_months, greater_than: 0)
     |> validate_number(:outstanding_balance, greater_than_or_equal_to: 0)
     |> foreign_key_constraint(:loan_application_id)
-    |> foreign_key_constraint(:client_id)
+    |> foreign_key_constraint(:customer_id)
     |> unique_constraint(:loan_application_id)
   end
 end

@@ -11,7 +11,7 @@
     <table class="min-w-full">
       <thead>
         <tr class="bg-gray-50 border-b border-gray-100">
-          <th class="th">Client</th>
+          <th class="th">Customer</th>
           <th class="th">Requested</th>
           <th class="th hidden sm:table-cell">Balance</th>
           <th class="th hidden md:table-cell">Rate / Term</th>
@@ -25,7 +25,7 @@
         <%= for application <- @applications do %>
           <tr class="hover:bg-gray-50 transition-colors">
             <td class="td">
-              <p class="font-medium text-navy-900"><%= application.client.name %></p>
+              <p class="font-medium text-navy-900"><%= application.customer.name %></p>
             </td>
             <td class="td font-medium">ZMW <%= application.requested_amount %></td>
             <td class="td text-gray-500 hidden sm:table-cell">

@@ -45,7 +45,7 @@ defmodule MiwayCreditCore.Loans.ScheduleTest do
   end
 
   describe "count_overdue_installments/1 and total_overdue_amount/1" do
-    test "counts and totals overdue installments, optionally scoped to a client" do
+    test "counts and totals overdue installments, optionally scoped to a customer" do
       app1 = approved_application_fixture(%{"requested_term_months" => "1"})
       app2 = approved_application_fixture(%{"requested_term_months" => "1"})
 
@@ -57,10 +57,10 @@ defmodule MiwayCreditCore.Loans.ScheduleTest do
       Loans.mark_overdue_installments()
 
       assert Loans.count_overdue_installments() == 2
-      assert Loans.count_overdue_installments(app1.client_id) == 1
+      assert Loans.count_overdue_installments(app1.customer_id) == 1
 
       [installment] = Loans.list_installments_for_account(app1.loan_account.id)
-      assert Decimal.equal?(Loans.total_overdue_amount(app1.client_id), installment.scheduled_amount)
+      assert Decimal.equal?(Loans.total_overdue_amount(app1.customer_id), installment.scheduled_amount)
     end
 
     test "zero when there is no overdue installment" do
@@ -70,11 +70,11 @@ defmodule MiwayCreditCore.Loans.ScheduleTest do
   end
 
   describe "get_upcoming_installments/1" do
-    test "only returns unpaid, future-or-overdue installments for the client, oldest first" do
+    test "only returns unpaid, future-or-overdue installments for the customer, oldest first" do
       application = approved_application_fixture(%{"requested_term_months" => "3"})
       account = application.loan_account
 
-      results = Loans.get_upcoming_installments(application.client_id)
+      results = Loans.get_upcoming_installments(application.customer_id)
       assert length(results) == 3
       assert Enum.all?(results, &(&1.loan_account.id == account.id))
       assert results |> Enum.map(& &1.due_date) == Enum.sort(Enum.map(results, & &1.due_date), Date)

@@ -1,20 +1,20 @@
-defmodule MiwayCreditCoreWeb.ClientLoanController do
+defmodule MiwayCreditCoreWeb.CustomerLoanController do
   use MiwayCreditCoreWeb, :controller
 
-  alias MiwayCreditCore.{Loans, Clients}
+  alias MiwayCreditCore.{Loans, Customers}
 
   def index(conn, _params) do
-    client = client_for(conn)
-    applications = Loans.get_applications_for_client(client.id)
+    customer = customer_for(conn)
+    applications = Loans.get_applications_for_customer(customer.id)
     render(conn, :index, applications: applications)
   end
 
   def show(conn, %{"id" => id}) do
-    client = client_for(conn)
+    customer = customer_for(conn)
     application = Loans.get_application!(id)
 
-    # Authorization: ensure this application belongs to the current client
-    if application.client_id != client.id do
+    # Authorization: ensure this application belongs to the current customer
+    if application.customer_id != customer.id do
       conn
       |> put_flash(:error, "You are not authorized to view this loan.")
       |> redirect(to: ~p"/client/loans")
@@ -33,9 +33,9 @@ defmodule MiwayCreditCoreWeb.ClientLoanController do
     end
   end
 
-  defp client_for(conn) do
+  defp customer_for(conn) do
     user = conn.assigns.current_user
-    Clients.get_client_by_email(user.email) ||
-      raise "No client record found for user #{user.email}"
+    Customers.get_customer_by_email(user.email) ||
+      raise "No customer record found for user #{user.email}"
   end
 end

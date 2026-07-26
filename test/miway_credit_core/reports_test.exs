@@ -1,17 +1,17 @@
 defmodule MiwayCreditCore.ReportsTest do
   use MiwayCreditCore.DataCase, async: true
 
-  import MiwayCreditCore.{ClientsFixtures, LoansFixtures}
+  import MiwayCreditCore.{CustomersFixtures, LoansFixtures}
   alias MiwayCreditCore.{Loans, Reports, Repo}
 
   describe "portfolio_summary/0" do
     test "total_loans counts every application; active_loans counts active accounts only" do
-      client_fixture()
+      customer_fixture()
       loans_before = Reports.portfolio_summary().total_loans
       application = application_fixture()
 
       summary = Reports.portfolio_summary()
-      assert summary.total_clients >= 1
+      assert summary.total_customers >= 1
       assert summary.total_loans == loans_before + 1
       assert Decimal.compare(summary.outstanding_balance, Decimal.new("0")) != :lt
 
@@ -30,7 +30,7 @@ defmodule MiwayCreditCore.ReportsTest do
   end
 
   describe "overdue_payments/0" do
-    test "lists overdue installments oldest-first, with account and client preloaded" do
+    test "lists overdue installments oldest-first, with account and customer preloaded" do
       application = approved_application_fixture(%{"requested_term_months" => "1"})
       account = application.loan_account
       [installment] = Loans.list_installments_for_account(account.id)
@@ -44,7 +44,7 @@ defmodule MiwayCreditCore.ReportsTest do
       assert [found] = Reports.overdue_payments()
       assert found.id == installment.id
       assert found.loan_account.id == account.id
-      assert found.loan_account.client.id == application.client_id
+      assert found.loan_account.customer.id == application.customer_id
     end
   end
 
@@ -68,18 +68,18 @@ defmodule MiwayCreditCore.ReportsTest do
 
   describe "loans_csv/0" do
     test "produces a header row plus one row per application" do
-      client = client_fixture(%{name: "CSV, Client \"Test\""})
-      application_fixture(%{"client_id" => client.id})
+      customer = customer_fixture(%{name: "CSV, Customer \"Test\""})
+      application_fixture(%{"customer_id" => customer.id})
 
       csv = Reports.loans_csv()
       lines = String.split(csv, "\r\n", trim: true)
 
       assert hd(lines) ==
-               "application_id,client_name,status,risk_level,requested_amount,granted_amount,outstanding_balance,decided_at"
+               "application_id,customer_name,status,risk_level,requested_amount,granted_amount,outstanding_balance,decided_at"
 
       assert length(lines) >= 2
-      # a client name containing a comma and quotes must be properly CSV-escaped
-      assert Enum.any?(lines, &(&1 =~ ~s("CSV, Client ""Test""")))
+      # a customer name containing a comma and quotes must be properly CSV-escaped
+      assert Enum.any?(lines, &(&1 =~ ~s("CSV, Customer ""Test""")))
     end
 
     test "includes granted_amount/outstanding_balance once an application is approved" do

@@ -1,23 +1,23 @@
-defmodule MiwayCreditCore.Clients.Client do
+defmodule MiwayCreditCore.Customers.Customer do
   use Ecto.Schema
   import Ecto.Changeset
 
   @moduledoc """
-  This module handles client-related functionality.
+  This module handles customer-related functionality.
   
-  A client represents a person who can request loans in the system.
-  This module provides functions to create, validate, and manage clients.
+  A customer represents a person who can request loans in the system.
+  This module provides functions to create, validate, and manage customers.
   
   ## Examples
       
-      iex> alias MiwayCreditCore.Clients.Client
-      iex> {:ok, client} = Client.new(%{name: "John Doe", phone: "260123456789", id_number: "123456/78/9"})
-      iex> client.name
+      iex> alias MiwayCreditCore.Customers.Customer
+      iex> {:ok, customer} = Customer.new(%{name: "John Doe", phone: "260123456789", id_number: "123456/78/9"})
+      iex> customer.name
       "John Doe"
   """
 
   @primary_key {:id, :binary_id, autogenerate: true}
-  schema "clients" do
+  schema "customers" do
     field :name, :string
     field :phone, :string
     field :id_number, :string
@@ -40,7 +40,7 @@ defmodule MiwayCreditCore.Clients.Client do
   # and return. They're used by tools like Dialyzer for static analysis.
   # --------------------------------------------------------------
   
-  # Define a type for our client struct
+  # Define a type for our customer struct
   @type t() :: %__MODULE__{
     id: binary(),
     name: String.t(),
@@ -56,8 +56,8 @@ defmodule MiwayCreditCore.Clients.Client do
     loan_applications: [MiwayCreditCore.Loans.LoanApplication.t()] | Ecto.Association.NotLoaded.t(),
     loan_accounts: [MiwayCreditCore.Loans.LoanAccount.t()] | Ecto.Association.NotLoaded.t()
   }
-  # Define a type for client creation params
-  @type client_params() :: %{
+  # Define a type for customer creation params
+  @type customer_params() :: %{
     required(:name) => String.t(),
     required(:phone) => String.t(),
     required(:id_number) => String.t(),
@@ -73,24 +73,24 @@ defmodule MiwayCreditCore.Clients.Client do
   # --------------------------------------------------------------
   
   @doc """
-  Creates a new client from the provided parameters.
+  Creates a new customer from the provided parameters.
   
   ## Parameters
-    * `params` - A map containing client information
+    * `params` - A map containing customer information
     
   ## Returns
-    * `{:ok, client}` - If validation succeeds
+    * `{:ok, customer}` - If validation succeeds
     * `{:error, changeset}` - If validation fails
     
   ## Examples
       
-      iex> Client.new(%{name: "Jane Doe", phone: "260987654321", id_number: "987654/32/1"})
-      {:ok, %Client{name: "Jane Doe", phone: "260987654321", id_number: "987654/32/1"}}
+      iex> Customer.new(%{name: "Jane Doe", phone: "260987654321", id_number: "987654/32/1"})
+      {:ok, %Customer{name: "Jane Doe", phone: "260987654321", id_number: "987654/32/1"}}
       
-      iex> Client.new(%{name: "", phone: "123", id_number: ""})
+      iex> Customer.new(%{name: "", phone: "123", id_number: ""})
       {:error, %Ecto.Changeset{}}
   """
-  @spec new(client_params()) :: {:ok, t()} | {:error, Ecto.Changeset.t()}
+  @spec new(customer_params()) :: {:ok, t()} | {:error, Ecto.Changeset.t()}
   def new(params) do
     %__MODULE__{}
     |> changeset(params)
@@ -102,10 +102,10 @@ defmodule MiwayCreditCore.Clients.Client do
     end
   end
   @doc """
-  Creates a changeset for client.
+  Creates a changeset for customer.
   
   ## Parameters
-    * `client` - Existing client struct or %Client{}
+    * `customer` - Existing customer struct or %Customer{}
     * `attrs` - Map of attributes to change
     
   ## Validations
@@ -120,8 +120,8 @@ defmodule MiwayCreditCore.Clients.Client do
   ## Returns
     * Changeset
   """
-  def changeset(client, attrs) do
-    client
+  def changeset(customer, attrs) do
+    customer
     |> cast(attrs, [:name, :phone, :id_number, :email, :address, :active, :total_loans, :current_balance])
     |> validate_required([:name, :phone, :id_number])
     |> validate_phone_format()

@@ -74,7 +74,7 @@ defmodule MiwayCreditCoreWeb.Router do
     get "/settings/2fa", TwoFactorController, :setup
     post "/settings/2fa/enable", TwoFactorController, :enable
     delete "/settings/2fa/disable", TwoFactorController, :disable
-    resources "/clients", ClientController
+    resources "/customers", CustomerController
     resources "/loans", LoanController
     patch "/loans/:id/approve", LoanController, :approve
     patch "/loans/:id/reject", LoanController, :reject
@@ -84,11 +84,13 @@ defmodule MiwayCreditCoreWeb.Router do
     delete "/loans/:id/collateral/:collateral_id", LoanController, :delete_collateral
   end
 
-  # Client routes
+  # Customer portal routes — path stays "/client" to match the "client"
+  # auth role (MiwayCreditCore.Accounts concern); the controllers
+  # underneath are Customers-domain, hence the Customer* naming.
   scope "/client", MiwayCreditCoreWeb do
     pipe_through [:browser, :auth, :ensure_client]
 
-    get "/dashboard", ClientDashboardController, :index
-    resources "/loans", ClientLoanController, only: [:index, :show]
+    get "/dashboard", CustomerDashboardController, :index
+    resources "/loans", CustomerLoanController, only: [:index, :show]
   end
 end

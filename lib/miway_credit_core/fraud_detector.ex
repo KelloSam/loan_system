@@ -9,16 +9,16 @@ defmodule MiwayCreditCore.FraudDetector do
 
   Usage
     # Before saving a new application (exclude_application_id is nil):
-    {level, score, signals} = FraudDetector.evaluate(client_id, amount)
+    {level, score, signals} = FraudDetector.evaluate(customer_id, amount)
 
     # When re-evaluating an existing application (exclude it from averages):
-    {level, score, signals} = FraudDetector.evaluate(client_id, amount, application_id)
+    {level, score, signals} = FraudDetector.evaluate(customer_id, amount, application_id)
   """
 
   import Ecto.Query
   alias MiwayCreditCore.Repo
   alias MiwayCreditCore.Loans.LoanApplication
-  alias MiwayCreditCore.Clients.Client
+  alias MiwayCreditCore.Customers.Customer
 
   @medium_threshold 26
   @high_threshold   56
@@ -28,16 +28,16 @@ defmodule MiwayCreditCore.FraudDetector do
   Pass `exclude_application_id` when the application already exists in the
   DB so it is not counted in its own historical averages.
   """
-  def evaluate(client_id, amount, exclude_application_id \\ nil) do
+  def evaluate(customer_id, amount, exclude_application_id \\ nil) do
     d_amount = to_decimal(amount)
 
     signals =
       [
-        signal_new_client(client_id),
-        signal_no_repayment_history(client_id, exclude_application_id),
-        signal_large_first_loan(client_id, d_amount, exclude_application_id),
-        signal_amount_vs_average(client_id, d_amount, exclude_application_id),
-        signal_recent_rejection(client_id),
+        signal_new_customer(customer_id),
+        signal_no_repayment_history(customer_id, exclude_application_id),
+        signal_large_first_loan(customer_id, d_amount, exclude_application_id),
+        signal_amount_vs_average(customer_id, d_amount, exclude_application_id),
+        signal_recent_rejection(customer_id),
         signal_round_amount(d_amount)
       ]
       |> Enum.reject(&is_nil/1)
@@ -62,25 +62,25 @@ defmodule MiwayCreditCore.FraudDetector do
   # ---------------------------------------------------------------------------
 
   # +20 — account created less than 7 days ago
-  defp signal_new_client(nil), do: nil
-  defp signal_new_client(client_id) do
+  defp signal_new_customer(nil), do: nil
+  defp signal_new_customer(customer_id) do
     cutoff = NaiveDateTime.utc_now() |> NaiveDateTime.add(-7 * 24 * 60 * 60, :second)
 
     new? =
-      from(c in Client,
-        where: c.id == ^client_id and c.inserted_at >= ^cutoff,
+      from(c in Customer,
+        where: c.id == ^customer_id and c.inserted_at >= ^cutoff,
         select: count(c.id)
       )
       |> Repo.one()
       |> Kernel.>(0)
 
-    if new?, do: {20, "Client account is less than 7 days old"}, else: nil
+    if new?, do: {20, "Customer account is less than 7 days old"}, else: nil
   end
 
   # +15 — no approved or completed loans on record
   defp signal_no_repayment_history(nil, _exclude), do: nil
-  defp signal_no_repayment_history(client_id, exclude_id) do
-    if prior_successful_count(client_id, exclude_id) == 0 do
+  defp signal_no_repayment_history(customer_id, exclude_id) do
+    if prior_successful_count(customer_id, exclude_id) == 0 do
       {15, "No repayment history on record"}
     else
       nil
@@ -89,8 +89,8 @@ defmodule MiwayCreditCore.FraudDetector do
 
   # +25 — first loan AND amount exceeds 5 000 ZMW
   defp signal_large_first_loan(nil, _amount, _exclude), do: nil
-  defp signal_large_first_loan(client_id, amount, exclude_id) do
-    first? = prior_successful_count(client_id, exclude_id) == 0
+  defp signal_large_first_loan(customer_id, amount, exclude_id) do
+    first? = prior_successful_count(customer_id, exclude_id) == 0
     large? = Decimal.compare(amount, Decimal.new("5000")) == :gt
 
     if first? and large? do
@@ -100,17 +100,17 @@ defmodule MiwayCreditCore.FraudDetector do
     end
   end
 
-  # +20 — amount is more than 3× client's historical average
+  # +20 — amount is more than 3× customer's historical average
   defp signal_amount_vs_average(nil, _amount, _exclude), do: nil
-  defp signal_amount_vs_average(client_id, amount, exclude_id) do
-    case avg_prior_loans(client_id, exclude_id) do
+  defp signal_amount_vs_average(customer_id, amount, exclude_id) do
+    case avg_prior_loans(customer_id, exclude_id) do
       nil -> nil
       prior_avg ->
         threshold = Decimal.mult(prior_avg, Decimal.new("3"))
 
         if Decimal.compare(amount, threshold) == :gt do
           formatted = prior_avg |> Decimal.round(2) |> Decimal.to_string()
-          {20, "Amount ZMW #{amount} exceeds 3× the client's average of ZMW #{formatted}"}
+          {20, "Amount ZMW #{amount} exceeds 3× the customer's average of ZMW #{formatted}"}
         else
           nil
         end
@@ -120,7 +120,7 @@ defmodule MiwayCreditCore.FraudDetector do
   # +25 — a rejection within the last 90 days (Phase 1 blocks < 30 days;
   # this catches the 30–90 day window after that hard block lifts)
   defp signal_recent_rejection(nil), do: nil
-  defp signal_recent_rejection(client_id) do
+  defp signal_recent_rejection(customer_id) do
     cutoff =
       NaiveDateTime.utc_now()
       |> NaiveDateTime.add(-90 * 24 * 60 * 60, :second)
@@ -129,14 +129,14 @@ defmodule MiwayCreditCore.FraudDetector do
     count =
       from(la in LoanApplication,
         where:
-          la.client_id == ^client_id and
+          la.customer_id == ^customer_id and
             la.status == "rejected" and
             la.updated_at >= ^cutoff,
         select: count(la.id)
       )
       |> Repo.one()
 
-    if count > 0, do: {25, "Client had a loan rejected within the last 90 days"}, else: nil
+    if count > 0, do: {25, "Customer had a loan rejected within the last 90 days"}, else: nil
   end
 
   # +10 — amount is a suspiciously round number (divisible by 1 000)
@@ -159,18 +159,18 @@ defmodule MiwayCreditCore.FraudDetector do
   # DB helpers
   # ---------------------------------------------------------------------------
 
-  defp prior_successful_count(client_id, nil) do
+  defp prior_successful_count(customer_id, nil) do
     from(la in LoanApplication,
-      where: la.client_id == ^client_id and la.status == "approved",
+      where: la.customer_id == ^customer_id and la.status == "approved",
       select: count(la.id)
     )
     |> Repo.one()
   end
 
-  defp prior_successful_count(client_id, exclude_id) do
+  defp prior_successful_count(customer_id, exclude_id) do
     from(la in LoanApplication,
       where:
-        la.client_id == ^client_id and
+        la.customer_id == ^customer_id and
           la.status == "approved" and
           la.id != ^exclude_id,
       select: count(la.id)
@@ -178,18 +178,18 @@ defmodule MiwayCreditCore.FraudDetector do
     |> Repo.one()
   end
 
-  defp avg_prior_loans(client_id, nil) do
+  defp avg_prior_loans(customer_id, nil) do
     from(la in LoanApplication,
-      where: la.client_id == ^client_id and la.status == "approved",
+      where: la.customer_id == ^customer_id and la.status == "approved",
       select: avg(la.requested_amount)
     )
     |> Repo.one()
   end
 
-  defp avg_prior_loans(client_id, exclude_id) do
+  defp avg_prior_loans(customer_id, exclude_id) do
     from(la in LoanApplication,
       where:
-        la.client_id == ^client_id and
+        la.customer_id == ^customer_id and
           la.status == "approved" and
           la.id != ^exclude_id,
       select: avg(la.requested_amount)

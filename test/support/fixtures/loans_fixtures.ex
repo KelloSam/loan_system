@@ -1,7 +1,7 @@
 defmodule MiwayCreditCore.LoansFixtures do
   @moduledoc "Test helpers for creating MiwayCreditCore.Loans entities."
 
-  import MiwayCreditCore.ClientsFixtures
+  import MiwayCreditCore.CustomersFixtures
   import MiwayCreditCore.AccountsFixtures
 
   @doc """
@@ -12,10 +12,10 @@ defmodule MiwayCreditCore.LoansFixtures do
   string-keyed like production does).
   """
   def valid_application_attrs(attrs \\ %{}) do
-    client_id = attrs[:client_id] || attrs["client_id"] || client_fixture().id
+    customer_id = attrs[:customer_id] || attrs["customer_id"] || customer_fixture().id
 
     Enum.into(stringify_keys(attrs), %{
-      "client_id" => client_id,
+      "customer_id" => customer_id,
       # Deliberately not a round number — a round amount trips
       # FraudDetector's signal_round_amount and would make risk_level
       # unpredictable for tests that aren't about fraud scoring.
@@ -36,7 +36,7 @@ defmodule MiwayCreditCore.LoansFixtures do
   @doc """
   An application_fixture/1 that's already approved — returns the
   LoanApplication struct with :loan_account preloaded, so callers can
-  reach either `application.id` / `application.client_id` or
+  reach either `application.id` / `application.customer_id` or
   `application.loan_account.id` / `.outstanding_balance` etc.
   """
   def approved_application_fixture(attrs \\ %{}) do

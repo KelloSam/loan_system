@@ -1,11 +1,11 @@
 defmodule MiwayCreditCoreWeb.AdminDashboardController do
   use MiwayCreditCoreWeb, :controller
 
-  alias MiwayCreditCore.{Clients, Loans, AuditLogs}
+  alias MiwayCreditCore.{Customers, Loans, AuditLogs}
 
   def index(conn, _params) do
     stats = %{
-      total_clients: Clients.count_clients(),
+      total_customers: Customers.count_customers(),
       total_loans: Loans.count_applications(),
       active_loans: Loans.count_active_accounts(),
       outstanding_balance: Loans.total_outstanding_balance()

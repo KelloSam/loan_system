@@ -4,7 +4,7 @@ defmodule MiwayCreditCore.Loans.PaymentsTest do
   import MiwayCreditCore.LoansFixtures
   import MiwayCreditCore.AccountsFixtures
   alias MiwayCreditCore.Loans
-  alias MiwayCreditCore.Clients
+  alias MiwayCreditCore.Customers
 
   describe "record_payment/1" do
     test "deducts the payment amount from the account's outstanding balance" do
@@ -89,13 +89,13 @@ defmodule MiwayCreditCore.Loans.PaymentsTest do
       assert Decimal.equal?(Loans.rebuild_outstanding_balance(account.id), reloaded.outstanding_balance)
     end
 
-    test "recalculates the client's current_balance after a payment" do
+    test "recalculates the customer's current_balance after a payment" do
       application = approved_application_fixture()
       account = application.loan_account
       {:ok, _transaction} = payment_result(account, account.outstanding_balance)
 
-      reloaded_client = Clients.get_client!(application.client_id)
-      assert Decimal.equal?(reloaded_client.current_balance, Decimal.new("0.00"))
+      reloaded_customer = Customers.get_customer!(application.customer_id)
+      assert Decimal.equal?(reloaded_customer.current_balance, Decimal.new("0.00"))
     end
   end
 

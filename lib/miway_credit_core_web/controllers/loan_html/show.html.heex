@@ -4,7 +4,7 @@
     <div class="flex items-center gap-2 text-sm text-gray-400 mb-1">
       <%= link "Loans", to: ~p"/admin/loans", class: "hover:text-navy-600" %>
       <span>›</span>
-      <span class="text-navy-900 font-medium"><%= @application.client.name %></span>
+      <span class="text-navy-900 font-medium"><%= @application.customer.name %></span>
     </div>
     <h1 class="text-2xl font-bold text-navy-900">Loan Application</h1>
     <p class="text-xs text-gray-400 mt-0.5 font-mono">
@@ -96,8 +96,8 @@
     <h2 class="section-title mb-4">Loan Information</h2>
     <dl class="space-y-3">
       <div class="flex justify-between text-sm">
-        <dt class="text-gray-500">Client</dt>
-        <dd class="font-medium text-navy-900"><%= @application.client.name %></dd>
+        <dt class="text-gray-500">Customer</dt>
+        <dd class="font-medium text-navy-900"><%= @application.customer.name %></dd>
       </div>
       <%= if @account do %>
         <div class="flex justify-between text-sm">

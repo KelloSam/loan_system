@@ -1,6 +1,6 @@
 defmodule MiwayCreditCore.Loans.PaymentTransaction do
   @moduledoc """
-  Money actually received from a client. Never hard-deleted — a
+  Money actually received from a customer. Never hard-deleted — a
   mis-recorded payment is voided (see `MiwayCreditCore.Loans.Payments.void_payment/2`),
   which flips `status` to "voided" and reverses its effect via a
   compensating AccountingEntry, preserving the audit trail.

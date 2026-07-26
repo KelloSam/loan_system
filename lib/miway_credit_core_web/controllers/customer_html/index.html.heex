@@ -1,10 +1,10 @@
 <%# Page header %>
 <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
   <div>
-    <h1 class="text-2xl font-bold text-navy-900">Clients</h1>
-    <p class="mt-0.5 text-sm text-gray-500">Manage all registered clients</p>
+    <h1 class="text-2xl font-bold text-navy-900">Customers</h1>
+    <p class="mt-0.5 text-sm text-gray-500">Manage all registered customers</p>
   </div>
-  <%= link "New Client", to: ~p"/admin/clients/new", class: "btn-primary self-start" %>
+  <%= link "New Customer", to: ~p"/admin/customers/new", class: "btn-primary self-start" %>
 </div>
 
 <div class="card overflow-hidden">
@@ -22,41 +22,41 @@
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-50">
-        <%= for client <- @clients do %>
+        <%= for customer <- @customers do %>
           <tr class="hover:bg-gray-50 transition-colors">
             <td class="td">
               <div class="flex items-center gap-3">
                 <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-navy-900 text-xs font-bold text-gold-400">
-                  <%= String.at(client.name, 0) |> String.upcase() %>
+                  <%= String.at(customer.name, 0) |> String.upcase() %>
                 </div>
                 <div>
-                  <p class="font-medium text-navy-900"><%= client.name %></p>
-                  <%= if client.email do %>
-                    <p class="text-xs text-gray-400"><%= client.email %></p>
+                  <p class="font-medium text-navy-900"><%= customer.name %></p>
+                  <%= if customer.email do %>
+                    <p class="text-xs text-gray-400"><%= customer.email %></p>
                   <% end %>
                 </div>
               </div>
             </td>
-            <td class="td text-gray-500 hidden md:table-cell"><%= client.phone %></td>
-            <td class="td text-gray-500 hidden lg:table-cell"><%= client.id_number %></td>
-            <td class="td hidden sm:table-cell"><%= client.total_loans %></td>
-            <td class="td hidden sm:table-cell">ZMW <%= client.current_balance %></td>
+            <td class="td text-gray-500 hidden md:table-cell"><%= customer.phone %></td>
+            <td class="td text-gray-500 hidden lg:table-cell"><%= customer.id_number %></td>
+            <td class="td hidden sm:table-cell"><%= customer.total_loans %></td>
+            <td class="td hidden sm:table-cell">ZMW <%= customer.current_balance %></td>
             <td class="td">
-              <%= if client.active do %>
+              <%= if customer.active do %>
                 <span class="badge badge-active">Active</span>
               <% else %>
                 <span class="badge badge-inactive">Inactive</span>
               <% end %>
             </td>
             <td class="td text-right space-x-3">
-              <%= link "View", to: ~p"/admin/clients/#{client}", class: "text-sm font-medium text-navy-600 hover:text-navy-900" %>
-              <%= link "Edit", to: ~p"/admin/clients/#{client}/edit", class: "text-sm font-medium text-gray-400 hover:text-gray-700" %>
+              <%= link "View", to: ~p"/admin/customers/#{customer}", class: "text-sm font-medium text-navy-600 hover:text-navy-900" %>
+              <%= link "Edit", to: ~p"/admin/customers/#{customer}/edit", class: "text-sm font-medium text-gray-400 hover:text-gray-700" %>
             </td>
           </tr>
         <% end %>
-        <%= if Enum.empty?(@clients) do %>
+        <%= if Enum.empty?(@customers) do %>
           <tr>
-            <td colspan="7" class="py-12 text-center text-sm text-gray-400">No clients registered yet.</td>
+            <td colspan="7" class="py-12 text-center text-sm text-gray-400">No customers registered yet.</td>
           </tr>
         <% end %>
       </tbody>

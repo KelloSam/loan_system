@@ -2,7 +2,7 @@
   <div class="flex items-center gap-2 text-sm text-gray-400 mb-1">
     <%= link "Loans", to: ~p"/admin/loans", class: "hover:text-navy-600" %>
     <span>›</span>
-    <%= link @application.client.name, to: ~p"/admin/loans/#{@application}", class: "hover:text-navy-600" %>
+    <%= link @application.customer.name, to: ~p"/admin/loans/#{@application}", class: "hover:text-navy-600" %>
     <span>›</span>
     <span class="text-navy-900 font-medium">Edit</span>
   </div>

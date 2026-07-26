@@ -4,9 +4,9 @@
   <p class="mt-0.5 text-sm text-gray-500">Your loan account overview</p>
 </div>
 
-<%= if is_nil(@client) do %>
+<%= if is_nil(@customer) do %>
   <div class="card p-8 text-center">
-    <p class="text-gray-500">No client profile found linked to your account. Please contact an administrator.</p>
+    <p class="text-gray-500">No customer profile found linked to your account. Please contact an administrator.</p>
   </div>
 <% else %>
 
@@ -15,13 +15,13 @@
 
     <div class="card p-5">
       <p class="text-sm font-medium text-gray-500">Total Loans</p>
-      <p class="stat-value"><%= @client.total_loans %></p>
+      <p class="stat-value"><%= @customer.total_loans %></p>
       <p class="mt-1 text-xs text-gray-400">All time</p>
     </div>
 
     <div class="card p-5">
       <p class="text-sm font-medium text-gray-500">Outstanding Balance</p>
-      <p class="stat-value text-2xl text-red-600">ZMW <%= @client.current_balance %></p>
+      <p class="stat-value text-2xl text-red-600">ZMW <%= @customer.current_balance %></p>
       <p class="mt-1 text-xs text-gray-400">Across active loans</p>
     </div>
 

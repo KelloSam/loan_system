@@ -14,7 +14,7 @@ defmodule MiwayCreditCore.Loans.Payments do
   import Ecto.Query
   alias MiwayCreditCore.Repo
   alias MiwayCreditCore.Loans.{LoanAccount, PaymentTransaction, PaymentAllocation,
-                               RepaymentScheduleInstallment, AccountingEntry, ClientStats}
+                               RepaymentScheduleInstallment, AccountingEntry, CustomerStats}
 
   def list_transactions_for_account(loan_account_id) do
     PaymentTransaction
@@ -69,8 +69,8 @@ defmodule MiwayCreditCore.Loans.Payments do
           occurred_at: now
         })
       end)
-      |> Ecto.Multi.run(:update_client_stats, fn repo, %{account: account} ->
-        ClientStats.recalculate(repo, account.client_id)
+      |> Ecto.Multi.run(:update_customer_stats, fn repo, %{account: account} ->
+        CustomerStats.recalculate(repo, account.customer_id)
       end)
       |> Repo.transaction()
       |> case do
@@ -86,7 +86,7 @@ defmodule MiwayCreditCore.Loans.Payments do
   installment's paid_amount/status, posts a compensating reversal
   ledger entry, restores the account's outstanding_balance (reopening
   it if voiding pushes the balance back above zero), and recalculates
-  client stats. Never deletes the transaction row — the audit trail
+  customer stats. Never deletes the transaction row — the audit trail
   stays intact.
   """
   def void_payment(%PaymentTransaction{status: "posted"} = transaction, attrs) do
@@ -127,8 +127,8 @@ defmodule MiwayCreditCore.Loans.Payments do
         occurred_at: now
       })
     end)
-    |> Ecto.Multi.run(:update_client_stats, fn repo, %{account: account} ->
-      ClientStats.recalculate(repo, account.client_id)
+    |> Ecto.Multi.run(:update_customer_stats, fn repo, %{account: account} ->
+      CustomerStats.recalculate(repo, account.customer_id)
     end)
     |> Repo.transaction()
     |> case do

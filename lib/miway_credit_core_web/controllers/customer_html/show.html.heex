@@ -2,17 +2,17 @@
 <div class="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
   <div>
     <div class="flex items-center gap-2 text-sm text-gray-400 mb-1">
-      <%= link "Clients", to: ~p"/admin/clients", class: "hover:text-navy-600" %>
+      <%= link "Customers", to: ~p"/admin/customers", class: "hover:text-navy-600" %>
       <span>›</span>
-      <span class="text-navy-900 font-medium"><%= @client.name %></span>
+      <span class="text-navy-900 font-medium"><%= @customer.name %></span>
     </div>
-    <h1 class="text-2xl font-bold text-navy-900"><%= @client.name %></h1>
+    <h1 class="text-2xl font-bold text-navy-900"><%= @customer.name %></h1>
     <p class="text-sm text-gray-400 mt-0.5">
-      Member since <%= Calendar.strftime(@client.inserted_at, "%B %Y") %>
+      Member since <%= Calendar.strftime(@customer.inserted_at, "%B %Y") %>
     </p>
   </div>
   <div class="flex gap-2 flex-wrap">
-    <%= link "Edit Client", to: ~p"/admin/clients/#{@client}/edit", class: "btn-outline" %>
+    <%= link "Edit Customer", to: ~p"/admin/customers/#{@customer}/edit", class: "btn-outline" %>
     <%= link "New Loan", to: ~p"/admin/loans/new", class: "btn-gold" %>
   </div>
 </div>
@@ -21,38 +21,38 @@
 <div class="grid grid-cols-2 gap-4 mb-6">
   <div class="card p-5">
     <p class="text-sm text-gray-500">Total Loans</p>
-    <p class="stat-value"><%= @client.total_loans %></p>
+    <p class="stat-value"><%= @customer.total_loans %></p>
   </div>
   <div class="card p-5">
     <p class="text-sm text-gray-500">Outstanding Balance</p>
-    <p class="stat-value text-xl text-red-600">ZMW <%= @client.current_balance %></p>
+    <p class="stat-value text-xl text-red-600">ZMW <%= @customer.current_balance %></p>
   </div>
 </div>
 
-<%# Client details %>
+<%# Customer details %>
 <div class="card p-6 mb-6">
-  <h2 class="section-title mb-4">Client Details</h2>
+  <h2 class="section-title mb-4">Customer Details</h2>
   <dl class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
     <div>
       <dt class="text-xs font-medium text-gray-400 uppercase tracking-wide">Phone</dt>
-      <dd class="mt-1 text-sm font-medium text-navy-900"><%= @client.phone %></dd>
+      <dd class="mt-1 text-sm font-medium text-navy-900"><%= @customer.phone %></dd>
     </div>
     <div>
       <dt class="text-xs font-medium text-gray-400 uppercase tracking-wide">National ID</dt>
-      <dd class="mt-1 text-sm font-medium text-navy-900"><%= @client.id_number %></dd>
+      <dd class="mt-1 text-sm font-medium text-navy-900"><%= @customer.id_number %></dd>
     </div>
     <div>
       <dt class="text-xs font-medium text-gray-400 uppercase tracking-wide">Email</dt>
-      <dd class="mt-1 text-sm font-medium text-navy-900"><%= @client.email || "—" %></dd>
+      <dd class="mt-1 text-sm font-medium text-navy-900"><%= @customer.email || "—" %></dd>
     </div>
     <div>
       <dt class="text-xs font-medium text-gray-400 uppercase tracking-wide">Address</dt>
-      <dd class="mt-1 text-sm font-medium text-navy-900"><%= @client.address || "—" %></dd>
+      <dd class="mt-1 text-sm font-medium text-navy-900"><%= @customer.address || "—" %></dd>
     </div>
     <div>
       <dt class="text-xs font-medium text-gray-400 uppercase tracking-wide">Status</dt>
       <dd class="mt-1">
-        <%= if @client.active do %>
+        <%= if @customer.active do %>
           <span class="badge badge-active">Active</span>
         <% else %>
           <span class="badge badge-inactive">Inactive</span>
@@ -71,7 +71,7 @@
 
   <%= if Enum.empty?(@applications) do %>
     <div class="py-12 text-center">
-      <p class="text-sm text-gray-400">No loans recorded for this client.</p>
+      <p class="text-sm text-gray-400">No loans recorded for this customer.</p>
     </div>
   <% else %>
     <div class="overflow-x-auto">

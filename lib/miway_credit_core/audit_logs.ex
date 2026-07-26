@@ -11,7 +11,7 @@ defmodule MiwayCreditCore.AuditLogs do
     - actor_id:    UUID of the user who performed the action
     - actor_email: email of that user (stored so logs remain readable even
                    if the user record is later deleted)
-    - target_type: "loan", "client", "payment", etc.
+    - target_type: "loan", "customer", "payment", etc.
     - target_id:   ID of the affected record
     - metadata:    map of extra context (amounts, names, etc.)
     - ip_address:  request IP as a string

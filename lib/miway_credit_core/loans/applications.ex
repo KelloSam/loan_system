@@ -9,7 +9,7 @@ defmodule MiwayCreditCore.Loans.Applications do
   import Ecto.Query
   alias MiwayCreditCore.Repo
   alias MiwayCreditCore.Loans.{LoanApplication, LoanAccount, RepaymentScheduleInstallment,
-                               AccountingEntry, ClientStats}
+                               AccountingEntry, CustomerStats}
   alias MiwayCreditCore.Loans.InterestCalculator
   alias MiwayCreditCore.FraudDetector
 
@@ -17,30 +17,30 @@ defmodule MiwayCreditCore.Loans.Applications do
   # Queries
   # ---------------------------------------------------------------------------
 
-  @doc "Paginated applications, newest first, client preloaded. Accepts page:/per_page:."
+  @doc "Paginated applications, newest first, customer preloaded. Accepts page:/per_page:."
   def list_applications(opts \\ []) do
     page     = Keyword.get(opts, :page, 1)
     per_page = Keyword.get(opts, :per_page, 50)
     offset   = (page - 1) * per_page
 
     LoanApplication
-    |> preload(:client)
+    |> preload(:customer)
     |> order_by([a], desc: a.inserted_at)
     |> limit(^per_page)
     |> offset(^offset)
     |> Repo.all()
   end
 
-  @doc "Applications for a client, newest first, loan_account preloaded."
-  def get_applications_for_client(client_id) do
+  @doc "Applications for a customer, newest first, loan_account preloaded."
+  def get_applications_for_customer(customer_id) do
     LoanApplication
-    |> where([a], a.client_id == ^client_id)
+    |> where([a], a.customer_id == ^customer_id)
     |> order_by([a], desc: a.inserted_at)
     |> preload(:loan_account)
     |> Repo.all()
   end
 
-  def get_application!(id), do: Repo.get!(LoanApplication, id) |> Repo.preload([:client, :loan_account])
+  def get_application!(id), do: Repo.get!(LoanApplication, id) |> Repo.preload([:customer, :loan_account])
 
   def count_applications, do: Repo.aggregate(LoanApplication, :count)
 
@@ -55,20 +55,20 @@ defmodule MiwayCreditCore.Loans.Applications do
 
   @doc """
   Submits a loan application and atomically recalculates the owning
-  client's stats (total_loans).
+  customer's stats (total_loans).
   """
   def create_application(attrs \\ %{}) do
     with :ok <- check_pending_application(attrs),
          :ok <- check_rejection_cooldown(attrs) do
-      client_id = Map.get(attrs, :client_id) || Map.get(attrs, "client_id")
+      customer_id = Map.get(attrs, :customer_id) || Map.get(attrs, "customer_id")
       amount    = Map.get(attrs, :requested_amount) || Map.get(attrs, "requested_amount")
-      {risk_level, risk_score, _signals} = FraudDetector.evaluate(client_id, amount)
+      {risk_level, risk_score, _signals} = FraudDetector.evaluate(customer_id, amount)
       attrs = attrs |> Map.put("risk_level", risk_level) |> Map.put("risk_score", risk_score)
 
       Ecto.Multi.new()
       |> Ecto.Multi.insert(:application, LoanApplication.changeset(%LoanApplication{}, attrs))
-      |> Ecto.Multi.run(:update_client_stats, fn repo, %{application: application} ->
-        ClientStats.recalculate(repo, application.client_id)
+      |> Ecto.Multi.run(:update_customer_stats, fn repo, %{application: application} ->
+        CustomerStats.recalculate(repo, application.customer_id)
       end)
       |> Repo.transaction()
       |> case do
@@ -80,8 +80,8 @@ defmodule MiwayCreditCore.Loans.Applications do
   end
 
   @doc "Fraud signal strings for an existing application. Delegates to FraudDetector."
-  def fraud_signals(%LoanApplication{id: id, client_id: client_id, requested_amount: amount}) do
-    {_level, _score, signals} = FraudDetector.evaluate(client_id, amount, id)
+  def fraud_signals(%LoanApplication{id: id, customer_id: customer_id, requested_amount: amount}) do
+    {_level, _score, signals} = FraudDetector.evaluate(customer_id, amount, id)
     signals
   end
 
@@ -97,12 +97,12 @@ defmodule MiwayCreditCore.Loans.Applications do
     |> Repo.update()
   end
 
-  @doc "Deletes an application and recalculates the owning client's stats."
+  @doc "Deletes an application and recalculates the owning customer's stats."
   def delete_application(%LoanApplication{} = application) do
     Ecto.Multi.new()
     |> Ecto.Multi.delete(:application, application)
-    |> Ecto.Multi.run(:update_client_stats, fn repo, _ ->
-      ClientStats.recalculate(repo, application.client_id)
+    |> Ecto.Multi.run(:update_customer_stats, fn repo, _ ->
+      CustomerStats.recalculate(repo, application.customer_id)
     end)
     |> Repo.transaction()
     |> case do
@@ -115,7 +115,7 @@ defmodule MiwayCreditCore.Loans.Applications do
   @doc """
   Approves a pending application: creates its LoanAccount, generates the
   repayment schedule, posts the opening disbursement ledger entry, and
-  recalculates client stats — all in one transaction.
+  recalculates customer stats — all in one transaction.
   """
   def approve_application(%LoanApplication{} = application, admin_id) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
@@ -138,7 +138,7 @@ defmodule MiwayCreditCore.Loans.Applications do
     |> Ecto.Multi.insert(:account, fn %{application: application} ->
       LoanAccount.changeset(%LoanAccount{}, %{
         loan_application_id: application.id,
-        client_id: application.client_id,
+        customer_id: application.customer_id,
         principal_amount: application.requested_amount,
         interest_rate: interest_rate,
         term_months: application.requested_term_months,
@@ -147,7 +147,7 @@ defmodule MiwayCreditCore.Loans.Applications do
         # The account owes the full scheduled repayment (principal +
         # interest), not just the principal disbursed — this is what
         # reconciles against the sum of repayment_schedule_installments
-        # and is what a client actually needs to pay to close the loan.
+        # and is what a customer actually needs to pay to close the loan.
         outstanding_balance: total_repayment
       })
     end)
@@ -166,8 +166,8 @@ defmodule MiwayCreditCore.Loans.Applications do
     |> Ecto.Multi.run(:schedule, fn repo, %{account: account} ->
       generate_repayment_schedule(repo, account)
     end)
-    |> Ecto.Multi.run(:update_client_stats, fn repo, %{account: account} ->
-      ClientStats.recalculate(repo, account.client_id)
+    |> Ecto.Multi.run(:update_customer_stats, fn repo, %{account: account} ->
+      CustomerStats.recalculate(repo, account.customer_id)
     end)
     |> Repo.transaction()
     |> case do
@@ -177,7 +177,7 @@ defmodule MiwayCreditCore.Loans.Applications do
     end
   end
 
-  @doc "Rejects a pending application. Recalculates client stats (no-op today, kept for symmetry)."
+  @doc "Rejects a pending application. Recalculates customer stats (no-op today, kept for symmetry)."
   def reject_application(%LoanApplication{} = application, admin_id, reason) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
@@ -192,7 +192,7 @@ defmodule MiwayCreditCore.Loans.Applications do
       |> Repo.update()
 
     with {:ok, updated} <- result do
-      ClientStats.recalculate(updated.client_id)
+      CustomerStats.recalculate(updated.customer_id)
       {:ok, updated}
     end
   end
@@ -253,14 +253,14 @@ defmodule MiwayCreditCore.Loans.Applications do
   end
 
   defp check_pending_application(attrs) do
-    client_id = Map.get(attrs, :client_id) || Map.get(attrs, "client_id")
+    customer_id = Map.get(attrs, :customer_id) || Map.get(attrs, "customer_id")
 
-    if is_nil(client_id) do
+    if is_nil(customer_id) do
       :ok
     else
       count =
         from(a in LoanApplication,
-          where: a.client_id == ^client_id and a.status == "pending",
+          where: a.customer_id == ^customer_id and a.status == "pending",
           select: count(a.id)
         )
         |> Repo.one()
@@ -270,9 +270,9 @@ defmodule MiwayCreditCore.Loans.Applications do
   end
 
   defp check_rejection_cooldown(attrs) do
-    client_id = Map.get(attrs, :client_id) || Map.get(attrs, "client_id")
+    customer_id = Map.get(attrs, :customer_id) || Map.get(attrs, "customer_id")
 
-    if is_nil(client_id) do
+    if is_nil(customer_id) do
       :ok
     else
       cutoff =
@@ -283,7 +283,7 @@ defmodule MiwayCreditCore.Loans.Applications do
       count =
         from(a in LoanApplication,
           where:
-            a.client_id == ^client_id and
+            a.customer_id == ^customer_id and
               a.status == "rejected" and
               a.updated_at >= ^cutoff,
           select: count(a.id)

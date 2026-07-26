@@ -9,17 +9,17 @@ defmodule MiwayCreditCore.Loans.Servicing do
 
   import Ecto.Query
   alias MiwayCreditCore.Repo
-  alias MiwayCreditCore.Loans.{LoanAccount, AccountingEntry, ClientStats}
+  alias MiwayCreditCore.Loans.{LoanAccount, AccountingEntry, CustomerStats}
 
   def get_account!(id) do
     LoanAccount
     |> Repo.get!(id)
-    |> Repo.preload([:loan_application, :client])
+    |> Repo.preload([:loan_application, :customer])
   end
 
-  def list_accounts_for_client(client_id) do
+  def list_accounts_for_customer(customer_id) do
     LoanAccount
-    |> where([a], a.client_id == ^client_id)
+    |> where([a], a.customer_id == ^customer_id)
     |> order_by([a], desc: a.inserted_at)
     |> preload(:repayment_schedule_installments)
     |> Repo.all()
@@ -50,7 +50,7 @@ defmodule MiwayCreditCore.Loans.Servicing do
   @doc """
   Writes off the remaining balance of an account: zeroes
   outstanding_balance, posts a compensating `write_off` ledger entry,
-  and recalculates the client's stats — all in one transaction.
+  and recalculates the customer's stats — all in one transaction.
   """
   def write_off_account(%LoanAccount{} = account, admin_id) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
@@ -71,8 +71,8 @@ defmodule MiwayCreditCore.Loans.Servicing do
       recorded_by_id: admin_id,
       occurred_at: now
     }))
-    |> Ecto.Multi.run(:update_client_stats, fn repo, %{account: account} ->
-      ClientStats.recalculate(repo, account.client_id)
+    |> Ecto.Multi.run(:update_customer_stats, fn repo, %{account: account} ->
+      CustomerStats.recalculate(repo, account.customer_id)
     end)
     |> Repo.transaction()
     |> case do

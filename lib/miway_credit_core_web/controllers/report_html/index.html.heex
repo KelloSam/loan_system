@@ -24,7 +24,7 @@
   <div class="card p-5">
     <p class="text-sm font-medium text-gray-500">Portfolio</p>
     <p class="stat-value"><%= @summary.total_loans %></p>
-    <p class="mt-1 text-xs text-gray-400"><%= @summary.total_clients %> clients on record</p>
+    <p class="mt-1 text-xs text-gray-400"><%= @summary.total_customers %> customers on record</p>
   </div>
 </div>
 
@@ -42,7 +42,7 @@
     <table class="min-w-full">
       <thead>
         <tr class="bg-gray-50 border-b border-gray-100">
-          <th class="th">Client</th>
+          <th class="th">Customer</th>
           <th class="th">Loan</th>
           <th class="th">Due Date</th>
           <th class="th">Amount</th>
@@ -51,7 +51,7 @@
       <tbody class="divide-y divide-gray-50">
         <%= for installment <- @overdue_payments do %>
           <tr class="hover:bg-gray-50">
-            <td class="td"><%= installment.loan_account.client.name %></td>
+            <td class="td"><%= installment.loan_account.customer.name %></td>
             <td class="td">
               <%= link "View", to: ~p"/admin/loans/#{installment.loan_account.loan_application_id}", class: "text-navy-600 hover:underline" %>
             </td>
@@ -78,7 +78,7 @@
     <table class="min-w-full">
       <thead>
         <tr class="bg-gray-50 border-b border-gray-100">
-          <th class="th">Client</th>
+          <th class="th">Customer</th>
           <th class="th">Loan</th>
           <th class="th">Due Date</th>
           <th class="th">Amount</th>
@@ -87,7 +87,7 @@
       <tbody class="divide-y divide-gray-50">
         <%= for installment <- @payments_due_soon do %>
           <tr class="hover:bg-gray-50">
-            <td class="td"><%= installment.loan_account.client.name %></td>
+            <td class="td"><%= installment.loan_account.customer.name %></td>
             <td class="td">
               <%= link "View", to: ~p"/admin/loans/#{installment.loan_account.loan_application_id}", class: "text-navy-600 hover:underline" %>
             </td>

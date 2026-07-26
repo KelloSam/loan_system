@@ -23,9 +23,9 @@ defmodule MiwayCreditCore.AuditLogsTest do
     end
 
     test "accepts an atom event name and stringifies it" do
-      :ok = AuditLogs.log(:client_created)
+      :ok = AuditLogs.log(:customer_created)
       [entry] = AuditLogs.list_recent()
-      assert entry.event == "client_created"
+      assert entry.event == "customer_created"
     end
 
     test "stringifies a non-binary target_id" do

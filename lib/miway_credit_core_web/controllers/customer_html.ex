@@ -1,7 +1,7 @@
-defmodule MiwayCreditCoreWeb.ClientHTML do
+defmodule MiwayCreditCoreWeb.CustomerHTML do
   use MiwayCreditCoreWeb, :html
 
-  embed_templates "client_html/*"
+  embed_templates "customer_html/*"
 
   def loan_status_class("approved"),  do: "bg-green-100 text-green-800"
   def loan_status_class("pending"),   do: "bg-yellow-100 text-yellow-800"

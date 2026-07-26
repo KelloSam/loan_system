@@ -18,7 +18,7 @@ defmodule MiwayCreditCore.Loans do
   # ---------------------------------------------------------------------------
 
   defdelegate list_applications(opts \\ []), to: Applications
-  defdelegate get_applications_for_client(client_id), to: Applications
+  defdelegate get_applications_for_customer(customer_id), to: Applications
   defdelegate get_application!(id), to: Applications
   defdelegate create_application(attrs \\ %{}), to: Applications
   defdelegate update_application(application, attrs), to: Applications
@@ -34,7 +34,7 @@ defmodule MiwayCreditCore.Loans do
   # ---------------------------------------------------------------------------
 
   defdelegate get_account!(id), to: Servicing
-  defdelegate list_accounts_for_client(client_id), to: Servicing
+  defdelegate list_accounts_for_customer(customer_id), to: Servicing
   defdelegate close_account(account), to: Servicing
   defdelegate write_off_account(account, admin_id), to: Servicing
   defdelegate count_active_accounts(), to: Servicing
@@ -51,10 +51,10 @@ defmodule MiwayCreditCore.Loans do
 
   defdelegate list_installments_for_account(loan_account_id), to: Schedule
   defdelegate get_installment!(id), to: Schedule
-  defdelegate get_upcoming_installments(client_id), to: Schedule
+  defdelegate get_upcoming_installments(customer_id), to: Schedule
   defdelegate mark_overdue_installments(), to: Schedule
-  defdelegate count_overdue_installments(client_id \\ nil), to: Schedule
-  defdelegate total_overdue_amount(client_id \\ nil), to: Schedule
+  defdelegate count_overdue_installments(customer_id \\ nil), to: Schedule
+  defdelegate total_overdue_amount(customer_id \\ nil), to: Schedule
   defdelegate overdue_installments(), to: Schedule
   defdelegate installments_due_soon(days \\ 7), to: Schedule
 

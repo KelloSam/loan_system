@@ -20,12 +20,12 @@
     <% end %>
 
     <div>
-      <label class="form-label">Client <span class="text-red-500">*</span></label>
-      <%= select f, :client_id,
-            Enum.map(@clients, &{&1.name, &1.id}),
-            prompt: "Select a client…",
+      <label class="form-label">Customer <span class="text-red-500">*</span></label>
+      <%= select f, :customer_id,
+            Enum.map(@customers, &{&1.name, &1.id}),
+            prompt: "Select a customer…",
             class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
-      <%= error_tag f, :client_id %>
+      <%= error_tag f, :customer_id %>
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">

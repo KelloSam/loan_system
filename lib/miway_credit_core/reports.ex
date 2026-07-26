@@ -2,18 +2,18 @@ defmodule MiwayCreditCore.Reports do
   @moduledoc """
   Portfolio-level reporting for the admin Reports page — aggregate
   numbers, the overdue/upcoming work queues, and a CSV export. Built on
-  top of the existing Loans/Clients contexts rather than duplicating
+  top of the existing Loans/Customers contexts rather than duplicating
   their queries.
   """
 
   import Ecto.Query
-  alias MiwayCreditCore.{Repo, Loans, Clients}
+  alias MiwayCreditCore.{Repo, Loans, Customers}
   alias MiwayCreditCore.Loans.{RepaymentScheduleInstallment, LoanApplication}
 
   @doc "Portfolio-wide numbers for the Reports overview."
   def portfolio_summary do
     %{
-      total_clients: Clients.count_clients(),
+      total_customers: Customers.count_customers(),
       total_loans: Loans.count_applications(),
       active_loans: Loans.count_active_accounts(),
       outstanding_balance: Loans.total_outstanding_balance(),
@@ -22,12 +22,12 @@ defmodule MiwayCreditCore.Reports do
     }
   end
 
-  @doc "Every overdue installment, oldest due_date (most urgent) first, with account + client preloaded."
+  @doc "Every overdue installment, oldest due_date (most urgent) first, with account + customer preloaded."
   def overdue_payments do
     RepaymentScheduleInstallment
     |> where([i], i.status == "overdue")
     |> order_by([i], asc: i.due_date)
-    |> preload(loan_account: [:client, :loan_application])
+    |> preload(loan_account: [:customer, :loan_application])
     |> Repo.all()
   end
 
@@ -39,29 +39,29 @@ defmodule MiwayCreditCore.Reports do
     RepaymentScheduleInstallment
     |> where([i], i.status in ["upcoming", "partially_paid"] and i.due_date >= ^today and i.due_date <= ^cutoff)
     |> order_by([i], asc: i.due_date)
-    |> preload(loan_account: [:client, :loan_application])
+    |> preload(loan_account: [:customer, :loan_application])
     |> Repo.all()
   end
 
   @doc """
-  A CSV export of every loan application — id, client, status, risk
+  A CSV export of every loan application — id, customer, status, risk
   level, requested amount, granted amount, outstanding balance,
   decided date. Granted amount / outstanding balance are blank for
   applications that never reached an approved account. Hand-built
   rather than pulling in a CSV dependency for one export.
   """
   def loans_csv do
-    header = ~w(application_id client_name status risk_level requested_amount granted_amount outstanding_balance decided_at)
+    header = ~w(application_id customer_name status risk_level requested_amount granted_amount outstanding_balance decided_at)
 
     rows =
       LoanApplication
-      |> preload([:client, :loan_account])
+      |> preload([:customer, :loan_account])
       |> order_by([a], desc: a.inserted_at)
       |> Repo.all()
       |> Enum.map(fn application ->
         [
           application.id,
-          application.client.name,
+          application.customer.name,
           application.status,
           application.risk_level,
           Decimal.to_string(application.requested_amount),

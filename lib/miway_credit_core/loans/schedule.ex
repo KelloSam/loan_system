@@ -19,11 +19,11 @@ defmodule MiwayCreditCore.Loans.Schedule do
 
   def get_installment!(id), do: Repo.get!(RepaymentScheduleInstallment, id)
 
-  @doc "Earliest unpaid installment due for a client, ordered by due_date, loan_account preloaded."
-  def get_upcoming_installments(client_id) do
+  @doc "Earliest unpaid installment due for a customer, ordered by due_date, loan_account preloaded."
+  def get_upcoming_installments(customer_id) do
     RepaymentScheduleInstallment
     |> join(:inner, [i], a in assoc(i, :loan_account))
-    |> where([i, a], a.client_id == ^client_id)
+    |> where([i, a], a.customer_id == ^customer_id)
     |> where([i], i.status in ["upcoming", "overdue", "partially_paid"])
     |> order_by([i], asc: i.due_date)
     |> preload(:loan_account)
@@ -47,29 +47,29 @@ defmodule MiwayCreditCore.Loans.Schedule do
     count
   end
 
-  @doc "Count of overdue installments, optionally scoped to one client."
-  def count_overdue_installments(client_id \\ nil) do
+  @doc "Count of overdue installments, optionally scoped to one customer."
+  def count_overdue_installments(customer_id \\ nil) do
     RepaymentScheduleInstallment
-    |> maybe_join_client(client_id)
+    |> maybe_join_customer(customer_id)
     |> where([i], i.status == "overdue")
     |> Repo.aggregate(:count)
   end
 
-  @doc "Total value of all overdue installments, optionally scoped to one client."
-  def total_overdue_amount(client_id \\ nil) do
+  @doc "Total value of all overdue installments, optionally scoped to one customer."
+  def total_overdue_amount(customer_id \\ nil) do
     RepaymentScheduleInstallment
-    |> maybe_join_client(client_id)
+    |> maybe_join_customer(customer_id)
     |> where([i], i.status == "overdue")
     |> select([i], coalesce(sum(i.scheduled_amount - i.paid_amount), ^Decimal.new("0.00")))
     |> Repo.one()
   end
 
-  @doc "Overdue installments, oldest due_date first, loan_account + client preloaded."
+  @doc "Overdue installments, oldest due_date first, loan_account + customer preloaded."
   def overdue_installments do
     RepaymentScheduleInstallment
     |> where([i], i.status == "overdue")
     |> order_by([i], asc: i.due_date)
-    |> preload(loan_account: :client)
+    |> preload(loan_account: :customer)
     |> Repo.all()
   end
 
@@ -81,15 +81,15 @@ defmodule MiwayCreditCore.Loans.Schedule do
     RepaymentScheduleInstallment
     |> where([i], i.status in ["upcoming", "partially_paid"] and i.due_date >= ^today and i.due_date <= ^cutoff)
     |> order_by([i], asc: i.due_date)
-    |> preload(loan_account: :client)
+    |> preload(loan_account: :customer)
     |> Repo.all()
   end
 
-  defp maybe_join_client(query, nil), do: query
+  defp maybe_join_customer(query, nil), do: query
 
-  defp maybe_join_client(query, client_id) do
+  defp maybe_join_customer(query, customer_id) do
     query
     |> join(:inner, [i], a in assoc(i, :loan_account))
-    |> where([i, a], a.client_id == ^client_id)
+    |> where([i, a], a.customer_id == ^customer_id)
   end
 end
