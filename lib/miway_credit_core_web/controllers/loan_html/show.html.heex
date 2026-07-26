@@ -19,11 +19,24 @@
             method: :patch,
             data: [confirm: "Approve this application?"],
             class: "btn-gold" %>
-      <%= link "Reject",
-            to: ~p"/admin/loans/#{@application}/reject",
-            method: :patch,
-            data: [confirm: "Reject this application?"],
-            class: "btn-danger" %>
+      <details class="reject-disclosure">
+        <summary class="btn-danger reject-toggle">Reject</summary>
+        <div class="card p-4 mt-2">
+          <.form :let={_f} for={%{}} as={:reject} action={~p"/admin/loans/#{@application}/reject"} method="patch">
+            <label class="form-label" for="reject_reason">Rejection reason</label>
+            <textarea
+              id="reject_reason"
+              name="reason"
+              rows="3"
+              required
+              placeholder="Why is this application being rejected?"
+            ></textarea>
+            <div class="flex justify-end gap-2 mt-2">
+              <button type="submit" class="btn-danger">Confirm Reject</button>
+            </div>
+          </.form>
+        </div>
+      </details>
     <% end %>
     <%= link "All Loans", to: ~p"/admin/loans", class: "text-sm font-medium text-gray-400 hover:text-navy-600 self-center" %>
   </div>
