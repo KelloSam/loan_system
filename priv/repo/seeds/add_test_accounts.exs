@@ -5,9 +5,12 @@ defmodule MiwayCreditCore.Seeds.AddTestAccounts do
     # Add admin account
     case Accounts.get_user_by_email("admin@example.com") do
       nil ->
-        {:ok, admin} = Accounts.create_user(%{
+        # create_user_with_role/1 is required here — create_user/1's
+        # changeset never casts :role, so it would silently create a
+        # "client" regardless of what's passed.
+        {:ok, admin} = Accounts.create_user_with_role(%{
           email: "admin@example.com",
-          password: "admin12345",
+          password: "Admin123456!",
           role: "admin"
         })
         IO.puts("Admin account created: #{admin.email}")
@@ -20,8 +23,7 @@ defmodule MiwayCreditCore.Seeds.AddTestAccounts do
       nil ->
         {:ok, client} = Accounts.create_user(%{
           email: "client@example.com",
-          password: "client12345",
-          role: "client"
+          password: "Client123456!"
         })
         IO.puts("Client account created: #{client.email}")
       user ->

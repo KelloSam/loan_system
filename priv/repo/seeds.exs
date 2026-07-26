@@ -5,18 +5,19 @@
 
 alias MiwayCreditCore.Accounts
 
-# Create admin user
-{:ok, _admin} = Accounts.create_user(%{
+# Create admin user — create_user_with_role/1 is required here;
+# create_user/1's changeset never casts :role, so it would silently
+# create a "client" regardless of what's passed.
+{:ok, _admin} = Accounts.create_user_with_role(%{
   email: "admin@example.com",
-  password: "admin12345",
+  password: "Admin123456!",
   role: "admin"
 })
 
 # Create a test client user
 {:ok, _client} = Accounts.create_user(%{
   email: "client@example.com",
-  password: "client12345",
-  role: "client"
+  password: "Client123456!"
 })
 
 IO.puts "Database seeded successfully!"
