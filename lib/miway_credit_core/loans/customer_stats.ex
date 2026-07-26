@@ -12,7 +12,8 @@ defmodule MiwayCreditCore.Loans.CustomerStats do
   import Ecto.Query
   alias MiwayCreditCore.Repo
   alias MiwayCreditCore.Customers.Customer
-  alias MiwayCreditCore.Loans.{LoanApplication, LoanAccount}
+  alias MiwayCreditCore.Loans.LoanApplication
+  alias MiwayCreditCore.Lending.LoanAccount
 
   def recalculate(repo \\ Repo, customer_id) do
     balance =

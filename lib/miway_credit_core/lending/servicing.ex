@@ -1,4 +1,4 @@
-defmodule MiwayCreditCore.Loans.Servicing do
+defmodule MiwayCreditCore.Lending.Servicing do
   @moduledoc """
   LoanAccount lifecycle — everything about an already-approved loan
   except money movement (see Payments) and the schedule (see Schedule).
@@ -9,7 +9,8 @@ defmodule MiwayCreditCore.Loans.Servicing do
 
   import Ecto.Query
   alias MiwayCreditCore.Repo
-  alias MiwayCreditCore.Loans.{LoanAccount, AccountingEntry, CustomerStats}
+  alias MiwayCreditCore.Loans.{AccountingEntry, CustomerStats}
+  alias MiwayCreditCore.Lending.LoanAccount
 
   def get_account!(id) do
     LoanAccount

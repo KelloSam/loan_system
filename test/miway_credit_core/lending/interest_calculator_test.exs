@@ -1,7 +1,7 @@
-defmodule MiwayCreditCore.Loans.InterestCalculatorTest do
+defmodule MiwayCreditCore.Lending.InterestCalculatorTest do
   use ExUnit.Case, async: true
 
-  alias MiwayCreditCore.Loans.InterestCalculator
+  alias MiwayCreditCore.Lending.InterestCalculator
 
   describe "calculate/1" do
     test "computes compound interest for a standard loan" do

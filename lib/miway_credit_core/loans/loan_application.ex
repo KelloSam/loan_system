@@ -25,7 +25,7 @@ defmodule MiwayCreditCore.Loans.LoanApplication do
 
     belongs_to :customer, MiwayCreditCore.Customers.Customer, type: :binary_id
     belongs_to :decided_by, MiwayCreditCore.Accounts.User
-    has_one :loan_account, MiwayCreditCore.Loans.LoanAccount
+    has_one :loan_account, MiwayCreditCore.Lending.LoanAccount
 
     timestamps()
   end

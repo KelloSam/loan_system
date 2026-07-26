@@ -1,4 +1,4 @@
-defmodule MiwayCreditCore.Loans.InterestCalculator do
+defmodule MiwayCreditCore.Lending.InterestCalculator do
   @moduledoc false
 
   @doc """

@@ -8,7 +8,8 @@ defmodule MiwayCreditCore.Reports do
 
   import Ecto.Query
   alias MiwayCreditCore.{Repo, Loans, Customers}
-  alias MiwayCreditCore.Loans.{RepaymentScheduleInstallment, LoanApplication}
+  alias MiwayCreditCore.Loans.LoanApplication
+  alias MiwayCreditCore.Lending.RepaymentScheduleInstallment
 
   @doc "Portfolio-wide numbers for the Reports overview."
   def portfolio_summary do

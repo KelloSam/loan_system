@@ -15,7 +15,7 @@ defmodule MiwayCreditCore.Loans.PaymentAllocation do
     field :allocated_amount, :decimal
 
     belongs_to :payment_transaction, MiwayCreditCore.Loans.PaymentTransaction, type: :binary_id
-    belongs_to :repayment_schedule_installment, MiwayCreditCore.Loans.RepaymentScheduleInstallment,
+    belongs_to :repayment_schedule_installment, MiwayCreditCore.Lending.RepaymentScheduleInstallment,
       type: :binary_id
 
     timestamps(updated_at: false)

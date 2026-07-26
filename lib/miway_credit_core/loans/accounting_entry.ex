@@ -30,7 +30,7 @@ defmodule MiwayCreditCore.Loans.AccountingEntry do
 
     field :occurred_at, :utc_datetime
 
-    belongs_to :loan_account, MiwayCreditCore.Loans.LoanAccount, type: :binary_id
+    belongs_to :loan_account, MiwayCreditCore.Lending.LoanAccount, type: :binary_id
     belongs_to :recorded_by, MiwayCreditCore.Accounts.User
 
     timestamps(updated_at: false)

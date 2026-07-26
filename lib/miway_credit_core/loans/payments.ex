@@ -13,8 +13,8 @@ defmodule MiwayCreditCore.Loans.Payments do
 
   import Ecto.Query
   alias MiwayCreditCore.Repo
-  alias MiwayCreditCore.Loans.{LoanAccount, PaymentTransaction, PaymentAllocation,
-                               RepaymentScheduleInstallment, AccountingEntry, CustomerStats}
+  alias MiwayCreditCore.Loans.{PaymentTransaction, PaymentAllocation, AccountingEntry, CustomerStats}
+  alias MiwayCreditCore.Lending.{LoanAccount, RepaymentScheduleInstallment}
 
   def list_transactions_for_account(loan_account_id) do
     PaymentTransaction

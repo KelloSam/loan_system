@@ -1,17 +1,16 @@
 defmodule MiwayCreditCore.Loans do
   @moduledoc """
-  Public facade over the loan domain. The domain is split into five
-  bounded concepts — application, account, schedule, payment
-  transaction, and accounting ledger (see
-  `docs/MIWAY_CREDITCORE_CONSTITUTION.md`) — each implemented in its own
-  submodule; this module just re-exposes their functions under one
-  familiar import site (`alias MiwayCreditCore.Loans`).
+  Public facade over the loan-origination domain. Account/schedule
+  concerns now live in `MiwayCreditCore.Lending` — this module
+  delegates to it rather than owning that logic, and is being wound
+  down in favor of callers using `Applications`/`Lending`/`Payments`
+  directly (see `docs/architecture/context_boundaries.md`).
   """
 
   import Ecto.Query
   alias MiwayCreditCore.Repo
-  alias MiwayCreditCore.Loans.{Applications, Servicing, Schedule, Payments, Ledger, Collateral,
-                               InterestCalculator}
+  alias MiwayCreditCore.Lending
+  alias MiwayCreditCore.Loans.{Applications, Payments, Ledger, Collateral}
 
   # ---------------------------------------------------------------------------
   # Applications
@@ -30,33 +29,24 @@ defmodule MiwayCreditCore.Loans do
   defdelegate count_active_applications(), to: Applications
 
   # ---------------------------------------------------------------------------
-  # Servicing (LoanAccount lifecycle)
+  # Account/schedule — delegated to Lending
   # ---------------------------------------------------------------------------
 
-  defdelegate get_account!(id), to: Servicing
-  defdelegate list_accounts_for_customer(customer_id), to: Servicing
-  defdelegate close_account(account), to: Servicing
-  defdelegate write_off_account(account, admin_id), to: Servicing
-  defdelegate count_active_accounts(), to: Servicing
-  defdelegate total_outstanding_balance(), to: Servicing
-
-  @doc "Compound interest details for an account. See `InterestCalculator.calculate/1`."
-  def compound_interest_details(%{principal_amount: amount, interest_rate: rate, term_months: term}) do
-    InterestCalculator.calculate(%{amount: amount, interest_rate: rate, term_months: term})
-  end
-
-  # ---------------------------------------------------------------------------
-  # Schedule
-  # ---------------------------------------------------------------------------
-
-  defdelegate list_installments_for_account(loan_account_id), to: Schedule
-  defdelegate get_installment!(id), to: Schedule
-  defdelegate get_upcoming_installments(customer_id), to: Schedule
-  defdelegate mark_overdue_installments(), to: Schedule
-  defdelegate count_overdue_installments(customer_id \\ nil), to: Schedule
-  defdelegate total_overdue_amount(customer_id \\ nil), to: Schedule
-  defdelegate overdue_installments(), to: Schedule
-  defdelegate installments_due_soon(days \\ 7), to: Schedule
+  defdelegate get_account!(id), to: Lending
+  defdelegate list_accounts_for_customer(customer_id), to: Lending
+  defdelegate close_account(account), to: Lending
+  defdelegate write_off_account(account, admin_id), to: Lending
+  defdelegate count_active_accounts(), to: Lending
+  defdelegate total_outstanding_balance(), to: Lending
+  defdelegate compound_interest_details(account), to: Lending
+  defdelegate list_installments_for_account(loan_account_id), to: Lending
+  defdelegate get_installment!(id), to: Lending
+  defdelegate get_upcoming_installments(customer_id), to: Lending
+  defdelegate mark_overdue_installments(), to: Lending
+  defdelegate count_overdue_installments(customer_id \\ nil), to: Lending
+  defdelegate total_overdue_amount(customer_id \\ nil), to: Lending
+  defdelegate overdue_installments(), to: Lending
+  defdelegate installments_due_soon(days \\ 7), to: Lending
 
   # ---------------------------------------------------------------------------
   # Payments

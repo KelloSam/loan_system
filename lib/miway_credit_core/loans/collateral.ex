@@ -20,7 +20,7 @@ defmodule MiwayCreditCore.Loans.Collateral do
     field :description, :string
     field :estimated_value, :decimal
 
-    belongs_to :loan_account, MiwayCreditCore.Loans.LoanAccount, type: :binary_id
+    belongs_to :loan_account, MiwayCreditCore.Lending.LoanAccount, type: :binary_id
 
     timestamps()
   end

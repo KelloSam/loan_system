@@ -46,7 +46,7 @@ defmodule MiwayCreditCore.LoansFixtures do
     %{approved | loan_account: account}
   end
 
-  def valid_payment_attrs(%MiwayCreditCore.Loans.LoanAccount{} = account, attrs \\ %{}) do
+  def valid_payment_attrs(%MiwayCreditCore.Lending.LoanAccount{} = account, attrs \\ %{}) do
     recorder = admin_fixture()
 
     Enum.into(stringify_keys(attrs), %{
@@ -58,7 +58,7 @@ defmodule MiwayCreditCore.LoansFixtures do
     })
   end
 
-  def payment_fixture(%MiwayCreditCore.Loans.LoanAccount{} = account, attrs \\ %{}) do
+  def payment_fixture(%MiwayCreditCore.Lending.LoanAccount{} = account, attrs \\ %{}) do
     {:ok, transaction} =
       account
       |> valid_payment_attrs(attrs)

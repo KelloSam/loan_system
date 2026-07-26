@@ -1,8 +1,8 @@
-defmodule MiwayCreditCore.Loans.RepaymentScheduleInstallment do
+defmodule MiwayCreditCore.Lending.RepaymentScheduleInstallment do
   @moduledoc """
   One row of the repayment plan for a LoanAccount. Pure plan — never
   mutated directly by money-received logic. Only two things touch it:
-  `MiwayCreditCore.Loans.Schedule.mark_overdue_installments/0` (flips
+  `MiwayCreditCore.Lending.Schedule.mark_overdue_installments/0` (flips
   status on time) and payment allocation (credits `paid_amount`).
   """
 
@@ -24,7 +24,7 @@ defmodule MiwayCreditCore.Loans.RepaymentScheduleInstallment do
     field :status, :string, default: "upcoming"
     field :paid_at, :utc_datetime
 
-    belongs_to :loan_account, MiwayCreditCore.Loans.LoanAccount, type: :binary_id
+    belongs_to :loan_account, MiwayCreditCore.Lending.LoanAccount, type: :binary_id
     has_many :payment_allocations, MiwayCreditCore.Loans.PaymentAllocation
 
     timestamps()

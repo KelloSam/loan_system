@@ -1,4 +1,4 @@
-defmodule MiwayCreditCore.Loans.Schedule do
+defmodule MiwayCreditCore.Lending.Schedule do
   @moduledoc """
   Read access to the repayment plan, plus the arrears sweep. Rows here
   are never touched by money-received logic directly — only by
@@ -8,7 +8,7 @@ defmodule MiwayCreditCore.Loans.Schedule do
 
   import Ecto.Query
   alias MiwayCreditCore.Repo
-  alias MiwayCreditCore.Loans.RepaymentScheduleInstallment
+  alias MiwayCreditCore.Lending.RepaymentScheduleInstallment
 
   def list_installments_for_account(loan_account_id) do
     RepaymentScheduleInstallment

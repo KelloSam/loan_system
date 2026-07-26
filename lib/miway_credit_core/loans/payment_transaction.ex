@@ -24,7 +24,7 @@ defmodule MiwayCreditCore.Loans.PaymentTransaction do
     field :voided_at, :utc_datetime
     field :void_reason, :string
 
-    belongs_to :loan_account, MiwayCreditCore.Loans.LoanAccount, type: :binary_id
+    belongs_to :loan_account, MiwayCreditCore.Lending.LoanAccount, type: :binary_id
     belongs_to :recorded_by, MiwayCreditCore.Accounts.User
     belongs_to :voided_by, MiwayCreditCore.Accounts.User
 

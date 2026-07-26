@@ -1,4 +1,4 @@
-defmodule MiwayCreditCore.Loans.LoanAccount do
+defmodule MiwayCreditCore.Lending.LoanAccount do
   @moduledoc """
   The credit actually extended. Created exactly once, when a
   LoanApplication is approved — never re-created for the same
@@ -30,7 +30,7 @@ defmodule MiwayCreditCore.Loans.LoanAccount do
     belongs_to :loan_application, MiwayCreditCore.Loans.LoanApplication, type: :binary_id
     belongs_to :customer, MiwayCreditCore.Customers.Customer, type: :binary_id
 
-    has_many :repayment_schedule_installments, MiwayCreditCore.Loans.RepaymentScheduleInstallment,
+    has_many :repayment_schedule_installments, MiwayCreditCore.Lending.RepaymentScheduleInstallment,
       preload_order: [asc: :due_date]
     has_many :payment_transactions, MiwayCreditCore.Loans.PaymentTransaction
     has_many :accounting_entries, MiwayCreditCore.Loans.AccountingEntry

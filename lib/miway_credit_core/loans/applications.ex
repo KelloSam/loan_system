@@ -8,9 +8,8 @@ defmodule MiwayCreditCore.Loans.Applications do
 
   import Ecto.Query
   alias MiwayCreditCore.Repo
-  alias MiwayCreditCore.Loans.{LoanApplication, LoanAccount, RepaymentScheduleInstallment,
-                               AccountingEntry, CustomerStats}
-  alias MiwayCreditCore.Loans.InterestCalculator
+  alias MiwayCreditCore.Loans.{LoanApplication, AccountingEntry, CustomerStats}
+  alias MiwayCreditCore.Lending.{LoanAccount, RepaymentScheduleInstallment, InterestCalculator}
   alias MiwayCreditCore.Risk
 
   # ---------------------------------------------------------------------------
