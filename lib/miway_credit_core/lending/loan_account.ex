@@ -8,7 +8,7 @@ defmodule MiwayCreditCore.Lending.LoanAccount do
   (AccountingEntry) is the source of truth, and this field is only ever
   written inside the same Ecto.Multi that inserts the corresponding
   ledger entry, so it cannot drift under normal operation. See
-  `MiwayCreditCore.Loans.Ledger.rebuild_outstanding_balance/1`.
+  `MiwayCreditCore.Accounting.rebuild_outstanding_balance/1`.
   """
 
   use Ecto.Schema
@@ -33,7 +33,7 @@ defmodule MiwayCreditCore.Lending.LoanAccount do
     has_many :repayment_schedule_installments, MiwayCreditCore.Lending.RepaymentScheduleInstallment,
       preload_order: [asc: :due_date]
     has_many :payment_transactions, MiwayCreditCore.Loans.PaymentTransaction
-    has_many :accounting_entries, MiwayCreditCore.Loans.AccountingEntry
+    has_many :accounting_entries, MiwayCreditCore.Accounting.AccountingEntry
     has_many :collaterals, MiwayCreditCore.Loans.Collateral
 
     timestamps()

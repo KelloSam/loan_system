@@ -9,8 +9,8 @@ defmodule MiwayCreditCore.Loans do
 
   import Ecto.Query
   alias MiwayCreditCore.Repo
-  alias MiwayCreditCore.Lending
-  alias MiwayCreditCore.Loans.{Applications, Payments, Ledger, Collateral}
+  alias MiwayCreditCore.{Lending, Accounting}
+  alias MiwayCreditCore.Loans.{Applications, Payments, Collateral}
 
   # ---------------------------------------------------------------------------
   # Applications
@@ -58,11 +58,11 @@ defmodule MiwayCreditCore.Loans do
   defdelegate void_payment(transaction, attrs), to: Payments
 
   # ---------------------------------------------------------------------------
-  # Ledger
+  # Ledger — delegated to Accounting
   # ---------------------------------------------------------------------------
 
-  defdelegate list_entries_for_account(loan_account_id), to: Ledger
-  defdelegate rebuild_outstanding_balance(loan_account_id), to: Ledger
+  defdelegate list_entries_for_account(loan_account_id), to: Accounting
+  defdelegate rebuild_outstanding_balance(loan_account_id), to: Accounting
 
   # ---------------------------------------------------------------------------
   # Collateral — attaches only to an approved LoanAccount

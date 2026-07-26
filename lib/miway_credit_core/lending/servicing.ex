@@ -9,8 +9,9 @@ defmodule MiwayCreditCore.Lending.Servicing do
 
   import Ecto.Query
   alias MiwayCreditCore.Repo
-  alias MiwayCreditCore.Loans.{AccountingEntry, CustomerStats}
+  alias MiwayCreditCore.Loans.CustomerStats
   alias MiwayCreditCore.Lending.LoanAccount
+  alias MiwayCreditCore.Accounting.AccountingEntry
 
   def get_account!(id) do
     LoanAccount

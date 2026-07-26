@@ -1,4 +1,4 @@
-defmodule MiwayCreditCore.Loans.Ledger do
+defmodule MiwayCreditCore.Accounting.Ledger do
   @moduledoc """
   Read access to the accounting ledger. Entries are inserted inline by
   whichever operation causes them (disbursement in `Applications`,
@@ -10,7 +10,7 @@ defmodule MiwayCreditCore.Loans.Ledger do
 
   import Ecto.Query
   alias MiwayCreditCore.Repo
-  alias MiwayCreditCore.Loans.AccountingEntry
+  alias MiwayCreditCore.Accounting.AccountingEntry
 
   def list_entries_for_account(loan_account_id) do
     AccountingEntry

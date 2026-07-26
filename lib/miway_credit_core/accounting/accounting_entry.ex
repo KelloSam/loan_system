@@ -1,4 +1,4 @@
-defmodule MiwayCreditCore.Loans.AccountingEntry do
+defmodule MiwayCreditCore.Accounting.AccountingEntry do
   @moduledoc """
   Immutable, insert-only ledger row — the single source of truth for a
   LoanAccount's balance history. A per-account subledger (signed amount
@@ -8,7 +8,7 @@ defmodule MiwayCreditCore.Loans.AccountingEntry do
   GL later if ever needed.
 
   No update changeset is exposed anywhere in this module or the
-  `MiwayCreditCore.Loans.Ledger` context — immutability is enforced at
+  `MiwayCreditCore.Accounting.Ledger` context — immutability is enforced at
   the context layer, the same pattern `AuditLogs` uses.
   """
 
