@@ -95,17 +95,7 @@ If those two numbers ever disagree in production, that is a bug to investigate i
 
 ## Context Boundaries
 
-One public-facing module, `MiwayCreditCore.Loans`, is the single import site every caller uses (`alias MiwayCreditCore.Loans`). Internally it delegates to five submodules, each owning one concept:
-
-| Submodule | Owns |
-|---|---|
-| `Loans.Applications` | Submission, the fraud/cooldown guards, approval (which also creates the account, schedule, and disbursement entry), rejection |
-| `Loans.Servicing` | Account lifecycle — closing, writing off. Named `Servicing`, not `Accounts`, to avoid colliding with the unrelated auth `MiwayCreditCore.Accounts` context |
-| `Loans.Schedule` | Installment queries and the arrears sweep (`mark_overdue_installments/0`) |
-| `Loans.Payments` | Recording and voiding payments — allocation, ledger entries, balance updates |
-| `Loans.Ledger` | Reading the ledger and rebuilding/verifying the balance |
-
-Collateral CRUD stays directly on the `Loans` facade — small and unchanged in shape, just repointed at `LoanAccount` instead of the old `Loan`.
+The five entities above no longer live behind one `Loans` facade with internal submodules — each concept is its own top-level context (`Applications`, `Lending`, `Payments`, `Accounting`, plus `Customers` and `Risk`). `Loans` still exists but only as a deprecated compatibility shim. See [`docs/architecture/context_boundaries.md`](architecture/context_boundaries.md) for the authoritative, current map — this document stays about the domain model (fields, state machines, the ledger invariant), not which module owns which function, so the two don't drift against each other.
 
 ## What This Rules Out Going Forward
 

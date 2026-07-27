@@ -1,14 +1,22 @@
-defmodule MiwayCreditCore.Loans.Applications do
+defmodule MiwayCreditCore.Applications do
   @moduledoc """
-  The request-and-decision half of the domain. Approving an application
-  is the one moment that creates a LoanAccount, generates its repayment
-  schedule, and posts the opening disbursement ledger entry — all in one
-  transaction, so an account never exists half-formed.
+  The request-and-decision half of the domain, plus the collateral
+  pledged to secure an approved loan. Approving an application is the
+  one moment that creates a LoanAccount, generates its repayment
+  schedule, and posts the opening disbursement ledger entry — all in
+  one transaction, so an account never exists half-formed.
+
+  Collateral lives here rather than as its own top-level context: it's
+  supporting information for a granted application with no proven
+  independent lifecycle yet (no valuation, custody, or lien tracking).
+  Promote it out only if that changes — see
+  `docs/architecture/context_boundaries.md`.
   """
 
   import Ecto.Query
   alias MiwayCreditCore.Repo
-  alias MiwayCreditCore.Loans.{LoanApplication, CustomerStats}
+  alias MiwayCreditCore.Applications.{LoanApplication, Collateral}
+  alias MiwayCreditCore.Customers.CustomerStats
   alias MiwayCreditCore.Lending.{LoanAccount, RepaymentScheduleInstallment, InterestCalculator}
   alias MiwayCreditCore.Accounting.AccountingEntry
   alias MiwayCreditCore.Risk
@@ -195,6 +203,35 @@ defmodule MiwayCreditCore.Loans.Applications do
       CustomerStats.recalculate(updated.customer_id)
       {:ok, updated}
     end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Collateral — attaches only to an approved LoanAccount
+  # ---------------------------------------------------------------------------
+
+  def list_collaterals_for_account(loan_account_id) do
+    Collateral
+    |> where([c], c.loan_account_id == ^loan_account_id)
+    |> order_by([c], asc: c.inserted_at)
+    |> Repo.all()
+  end
+
+  def get_collateral!(id), do: Repo.get!(Collateral, id)
+
+  def create_collateral(attrs \\ %{}) do
+    %Collateral{}
+    |> Collateral.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  def delete_collateral(%Collateral{} = collateral), do: Repo.delete(collateral)
+
+  def total_collateral_value(loan_account_id) do
+    from(c in Collateral,
+      where: c.loan_account_id == ^loan_account_id,
+      select: coalesce(sum(c.estimated_value), ^Decimal.new("0.00"))
+    )
+    |> Repo.one()
   end
 
   # ---------------------------------------------------------------------------

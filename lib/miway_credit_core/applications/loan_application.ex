@@ -1,4 +1,4 @@
-defmodule MiwayCreditCore.Loans.LoanApplication do
+defmodule MiwayCreditCore.Applications.LoanApplication do
   @moduledoc """
   The request and the decision made on it. Holds nothing about money
   actually moving — that starts only once a LoanAccount exists.

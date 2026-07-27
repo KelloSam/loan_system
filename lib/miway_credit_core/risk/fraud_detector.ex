@@ -19,7 +19,7 @@ defmodule MiwayCreditCore.Risk.FraudDetector do
 
   import Ecto.Query
   alias MiwayCreditCore.Repo
-  alias MiwayCreditCore.Loans.LoanApplication
+  alias MiwayCreditCore.Applications.LoanApplication
   alias MiwayCreditCore.Customers.Customer
 
   @medium_threshold 26

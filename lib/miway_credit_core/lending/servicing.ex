@@ -9,7 +9,7 @@ defmodule MiwayCreditCore.Lending.Servicing do
 
   import Ecto.Query
   alias MiwayCreditCore.Repo
-  alias MiwayCreditCore.Loans.CustomerStats
+  alias MiwayCreditCore.Customers.CustomerStats
   alias MiwayCreditCore.Lending.LoanAccount
   alias MiwayCreditCore.Accounting.AccountingEntry
 

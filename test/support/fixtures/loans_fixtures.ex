@@ -6,9 +6,9 @@ defmodule MiwayCreditCore.LoansFixtures do
 
   @doc """
   Builds valid application attrs as string keys, matching what the real
-  controllers submit (MiwayCreditCore.Loans.create_application/1 puts
-  "risk_level"/"risk_score" in with string keys internally, so mixing
-  atom/string keys here would break cast/3 — keep everything
+  controllers submit (MiwayCreditCore.Applications.create_application/1
+  puts "risk_level"/"risk_score" in with string keys internally, so
+  mixing atom/string keys here would break cast/3 — keep everything
   string-keyed like production does).
   """
   def valid_application_attrs(attrs \\ %{}) do
@@ -28,7 +28,7 @@ defmodule MiwayCreditCore.LoansFixtures do
     {:ok, application} =
       attrs
       |> valid_application_attrs()
-      |> MiwayCreditCore.Loans.create_application()
+      |> MiwayCreditCore.Applications.create_application()
 
     application
   end
@@ -42,7 +42,7 @@ defmodule MiwayCreditCore.LoansFixtures do
   def approved_application_fixture(attrs \\ %{}) do
     application = application_fixture(attrs)
     admin = admin_fixture()
-    {:ok, approved, account} = MiwayCreditCore.Loans.approve_application(application, admin.id)
+    {:ok, approved, account} = MiwayCreditCore.Applications.approve_application(application, admin.id)
     %{approved | loan_account: account}
   end
 
@@ -62,7 +62,7 @@ defmodule MiwayCreditCore.LoansFixtures do
     {:ok, transaction} =
       account
       |> valid_payment_attrs(attrs)
-      |> MiwayCreditCore.Loans.record_payment()
+      |> MiwayCreditCore.Payments.record_payment()
 
     transaction
   end

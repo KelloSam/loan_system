@@ -18,12 +18,21 @@ for the full domain model behind these.
 
 | Context | Owns |
 |---|---|
-| `Customers` | Client identity and profile |
+| `Customers` | Client identity/profile, plus `CustomerStats` (denormalized total_loans/current_balance, recalculated by `Applications`, `Payments`, and `Lending`) |
 | `Risk` | Fraud detection at application time |
+| `Applications` | The request-and-decision half of lending, plus `Collateral` (see below) |
 | `Lending` | Loan accounts, repayment schedules, interest |
 | `Payments` | Payment transactions and their allocation to installments |
 | `Accounting` | The per-account ledger (`AccountingEntry`) |
-| `Loans` | The public facade coordinating the above for applications, servicing, and collateral |
+| `Loans` | **Deprecated.** A compatibility facade delegating to the five contexts above — every function is `@deprecated`. Kept only so existing callers (`loan_controller.ex`, `customer_loan_controller.ex`, `arrears_scheduler.ex`) don't break during migration. Delete once they call the real contexts directly. |
+
+`Collateral` is nested under `Applications`, not a top-level context of
+its own: it's supporting information for a granted application with
+no proven independent lifecycle (no valuation, custody, or lien
+tracking). Promote it out only if it grows one of those — reusable
+security across several loans, revaluation, legal perfection, liens,
+substitution/release/repossession — at which point a `Security` or
+`CollateralManagement` context would be justified.
 
 ## Reserved Contexts
 
@@ -40,7 +49,7 @@ sits below the others, not on top of them.
 risk, or reporting logic. Its only job is answering "which
 organisation does this row belong to."
 
-**Why it's reserved now:** `Customers`, `Loans`, `Payments`,
+**Why it's reserved now:** `Customers`, `Applications`, `Payments`,
 `CreditReporting`, and `Notifications` will all eventually need to
 resolve tenancy. Naming the boundary before those contexts grow
 ad hoc `organisation_id` handling prevents tenancy logic from leaking
@@ -56,7 +65,7 @@ adapters.
 customer).
 
 **Prohibited responsibilities:** Must never make a lending or risk
-decision itself — it supplies data that `Risk` and `Loans.Applications`
+decision itself — it supplies data that `Risk` and `Applications`
 consume, it doesn't consume its own output. No other context may call
 a CRB provider directly; every bureau interaction routes through here
 so the provider can be swapped without rippling through the app.
@@ -82,7 +91,7 @@ not call out to business contexts. It will depend on whichever
 provider adapters (email/SMS) it's given at implementation time.
 
 **Prohibited responsibilities:** Must never decide an outcome.
-`Loans.Applications` decides an application was approved;
+`Applications` decides an application was approved;
 `Notifications` only sends the message that says so. It has no
 opinion on business logic and must not be used as a place to smuggle
 decisions in.

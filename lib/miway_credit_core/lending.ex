@@ -3,7 +3,7 @@ defmodule MiwayCreditCore.Lending do
   Owns the credit actually extended: the `LoanAccount` itself, its
   repayment schedule, compound interest, and servicing (closing,
   writing off). Created only as the side effect of an approved
-  `LoanApplication` — see `MiwayCreditCore.Loans.Applications`, which
+  `LoanApplication` — see `MiwayCreditCore.Applications`, which
   still owns that one atomic transaction (account + schedule +
   disbursement entry together) rather than this module reaching back
   into Applications.

@@ -1,4 +1,4 @@
-defmodule MiwayCreditCore.Loans.Collateral do
+defmodule MiwayCreditCore.Applications.Collateral do
   @moduledoc """
   An item pledged as security against a loan — a vehicle, land title,
   electronics, etc. Deliberately simple: type, description, and an

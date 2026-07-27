@@ -27,14 +27,14 @@ defmodule MiwayCreditCore.Lending.LoanAccount do
     field :outstanding_balance, :decimal
     field :closed_at, :utc_datetime
 
-    belongs_to :loan_application, MiwayCreditCore.Loans.LoanApplication, type: :binary_id
+    belongs_to :loan_application, MiwayCreditCore.Applications.LoanApplication, type: :binary_id
     belongs_to :customer, MiwayCreditCore.Customers.Customer, type: :binary_id
 
     has_many :repayment_schedule_installments, MiwayCreditCore.Lending.RepaymentScheduleInstallment,
       preload_order: [asc: :due_date]
     has_many :payment_transactions, MiwayCreditCore.Payments.PaymentTransaction
     has_many :accounting_entries, MiwayCreditCore.Accounting.AccountingEntry
-    has_many :collaterals, MiwayCreditCore.Loans.Collateral
+    has_many :collaterals, MiwayCreditCore.Applications.Collateral
 
     timestamps()
   end

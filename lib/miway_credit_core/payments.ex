@@ -13,7 +13,7 @@ defmodule MiwayCreditCore.Payments do
 
   import Ecto.Query
   alias MiwayCreditCore.Repo
-  alias MiwayCreditCore.Loans.CustomerStats
+  alias MiwayCreditCore.Customers.CustomerStats
   alias MiwayCreditCore.Payments.{PaymentTransaction, PaymentAllocation}
   alias MiwayCreditCore.Lending.{LoanAccount, RepaymentScheduleInstallment}
   alias MiwayCreditCore.Accounting.AccountingEntry

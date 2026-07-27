@@ -2,24 +2,24 @@ defmodule MiwayCreditCore.Reports do
   @moduledoc """
   Portfolio-level reporting for the admin Reports page — aggregate
   numbers, the overdue/upcoming work queues, and a CSV export. Built on
-  top of the existing Loans/Customers contexts rather than duplicating
-  their queries.
+  top of the existing Applications/Lending/Customers contexts rather
+  than duplicating their queries.
   """
 
   import Ecto.Query
-  alias MiwayCreditCore.{Repo, Loans, Customers}
-  alias MiwayCreditCore.Loans.LoanApplication
+  alias MiwayCreditCore.{Repo, Applications, Lending, Customers}
+  alias MiwayCreditCore.Applications.LoanApplication
   alias MiwayCreditCore.Lending.RepaymentScheduleInstallment
 
   @doc "Portfolio-wide numbers for the Reports overview."
   def portfolio_summary do
     %{
       total_customers: Customers.count_customers(),
-      total_loans: Loans.count_applications(),
-      active_loans: Loans.count_active_accounts(),
-      outstanding_balance: Loans.total_outstanding_balance(),
-      overdue_count: Loans.count_overdue_installments(),
-      overdue_amount: Loans.total_overdue_amount()
+      total_loans: Applications.count_applications(),
+      active_loans: Lending.count_active_accounts(),
+      outstanding_balance: Lending.total_outstanding_balance(),
+      overdue_count: Lending.count_overdue_installments(),
+      overdue_amount: Lending.total_overdue_amount()
     }
   end
 

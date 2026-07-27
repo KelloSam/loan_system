@@ -27,7 +27,7 @@ defmodule MiwayCreditCore.Customers.Customer do
     field :total_loans, :integer, default: 0
     field :current_balance, :decimal, default: Decimal.new("0.00")
 
-    has_many :loan_applications, MiwayCreditCore.Loans.LoanApplication
+    has_many :loan_applications, MiwayCreditCore.Applications.LoanApplication
     has_many :loan_accounts, MiwayCreditCore.Lending.LoanAccount
 
     timestamps()
@@ -53,7 +53,7 @@ defmodule MiwayCreditCore.Customers.Customer do
     active: boolean(),
     total_loans: non_neg_integer(),
     current_balance: Decimal.t() | nil,
-    loan_applications: [MiwayCreditCore.Loans.LoanApplication.t()] | Ecto.Association.NotLoaded.t(),
+    loan_applications: [MiwayCreditCore.Applications.LoanApplication.t()] | Ecto.Association.NotLoaded.t(),
     loan_accounts: [MiwayCreditCore.Lending.LoanAccount.t()] | Ecto.Association.NotLoaded.t()
   }
   # Define a type for customer creation params

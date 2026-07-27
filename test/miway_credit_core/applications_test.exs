@@ -1,11 +1,11 @@
-defmodule MiwayCreditCore.Loans.ApplicationsTest do
+defmodule MiwayCreditCore.ApplicationsTest do
   use MiwayCreditCore.DataCase, async: true
 
   import MiwayCreditCore.CustomersFixtures
   import MiwayCreditCore.AccountsFixtures
   import MiwayCreditCore.LoansFixtures
-  alias MiwayCreditCore.Loans
-  alias MiwayCreditCore.Loans.LoanApplication
+  alias MiwayCreditCore.{Applications, Accounting, Lending}
+  alias MiwayCreditCore.Applications.LoanApplication
   alias MiwayCreditCore.Customers
 
   describe "create_application/1" do
@@ -13,7 +13,7 @@ defmodule MiwayCreditCore.Loans.ApplicationsTest do
       customer = customer_fixture()
 
       assert {:ok, %LoanApplication{} = application} =
-               Loans.create_application(valid_application_attrs(%{"customer_id" => customer.id}))
+               Applications.create_application(valid_application_attrs(%{"customer_id" => customer.id}))
 
       assert application.status == "pending"
       # A brand-new customer with no repayment history always scores at
@@ -25,7 +25,7 @@ defmodule MiwayCreditCore.Loans.ApplicationsTest do
 
     test "recalculates the customer's total_loans; current_balance stays zero (no account yet)" do
       customer = customer_fixture()
-      {:ok, _application} = Loans.create_application(valid_application_attrs(%{"customer_id" => customer.id}))
+      {:ok, _application} = Applications.create_application(valid_application_attrs(%{"customer_id" => customer.id}))
 
       reloaded = Customers.get_customer!(customer.id)
       assert reloaded.total_loans == 1
@@ -34,27 +34,27 @@ defmodule MiwayCreditCore.Loans.ApplicationsTest do
 
     test "blocks a second application while one is still pending" do
       customer = customer_fixture()
-      {:ok, _first} = Loans.create_application(valid_application_attrs(%{"customer_id" => customer.id}))
+      {:ok, _first} = Applications.create_application(valid_application_attrs(%{"customer_id" => customer.id}))
 
       assert {:error, :pending_application_exists} =
-               Loans.create_application(valid_application_attrs(%{"customer_id" => customer.id}))
+               Applications.create_application(valid_application_attrs(%{"customer_id" => customer.id}))
     end
 
     test "blocks a new application within 30 days of a rejection" do
       customer = customer_fixture()
       application = application_fixture(%{"customer_id" => customer.id})
       admin = admin_fixture()
-      {:ok, _rejected} = Loans.reject_application(application, admin.id, "Insufficient income")
+      {:ok, _rejected} = Applications.reject_application(application, admin.id, "Insufficient income")
 
       assert {:error, :rejection_cooldown} =
-               Loans.create_application(valid_application_attrs(%{"customer_id" => customer.id}))
+               Applications.create_application(valid_application_attrs(%{"customer_id" => customer.id}))
     end
 
     test "rejects invalid attrs with a changeset error" do
       customer = customer_fixture()
 
       assert {:error, %Ecto.Changeset{}} =
-               Loans.create_application(
+               Applications.create_application(
                  valid_application_attrs(%{"customer_id" => customer.id, "requested_amount" => "-5"})
                )
     end
@@ -63,7 +63,7 @@ defmodule MiwayCreditCore.Loans.ApplicationsTest do
   describe "fraud_signals/1" do
     test "lists the human-readable signals behind the risk score" do
       application = application_fixture()
-      signals = Loans.fraud_signals(application)
+      signals = Applications.fraud_signals(application)
       assert is_list(signals)
       assert Enum.any?(signals, &(&1 =~ "less than 7 days old"))
       assert Enum.any?(signals, &(&1 =~ "No repayment history"))
@@ -75,7 +75,7 @@ defmodule MiwayCreditCore.Loans.ApplicationsTest do
       application = application_fixture()
       admin = admin_fixture()
 
-      assert {:ok, approved, account} = Loans.approve_application(application, admin.id)
+      assert {:ok, approved, account} = Applications.approve_application(application, admin.id)
       assert approved.status == "approved"
       assert approved.decided_at
       assert approved.decided_by_id == admin.id
@@ -89,11 +89,11 @@ defmodule MiwayCreditCore.Loans.ApplicationsTest do
     test "the opening balance reconciles against the ledger's disbursement entry" do
       application = application_fixture()
       admin = admin_fixture()
-      {:ok, _approved, account} = Loans.approve_application(application, admin.id)
+      {:ok, _approved, account} = Applications.approve_application(application, admin.id)
 
-      assert Decimal.equal?(Loans.rebuild_outstanding_balance(account.id), account.outstanding_balance)
+      assert Decimal.equal?(Accounting.rebuild_outstanding_balance(account.id), account.outstanding_balance)
 
-      [entry] = Loans.list_entries_for_account(account.id)
+      [entry] = Accounting.list_entries_for_account(account.id)
       assert entry.entry_type == "disbursement"
       assert Decimal.equal?(entry.amount, account.outstanding_balance)
     end
@@ -101,7 +101,7 @@ defmodule MiwayCreditCore.Loans.ApplicationsTest do
     test "recalculates the customer's current_balance to the new account's outstanding_balance" do
       application = application_fixture()
       admin = admin_fixture()
-      {:ok, _approved, account} = Loans.approve_application(application, admin.id)
+      {:ok, _approved, account} = Applications.approve_application(application, admin.id)
 
       reloaded_customer = Customers.get_customer!(application.customer_id)
       assert Decimal.equal?(reloaded_customer.current_balance, account.outstanding_balance)
@@ -110,9 +110,9 @@ defmodule MiwayCreditCore.Loans.ApplicationsTest do
     test "generates a monthly repayment schedule matching the account's term" do
       application = application_fixture(%{"requested_term_months" => "3"})
       admin = admin_fixture()
-      {:ok, _approved, account} = Loans.approve_application(application, admin.id)
+      {:ok, _approved, account} = Applications.approve_application(application, admin.id)
 
-      installments = Loans.list_installments_for_account(account.id)
+      installments = Lending.list_installments_for_account(account.id)
       assert length(installments) == 3
       assert Enum.all?(installments, &(&1.status == "upcoming"))
       assert Enum.all?(installments, &Decimal.equal?(&1.paid_amount, Decimal.new("0.00")))
@@ -133,7 +133,7 @@ defmodule MiwayCreditCore.Loans.ApplicationsTest do
       application = application_fixture()
       admin = admin_fixture()
 
-      assert {:ok, rejected} = Loans.reject_application(application, admin.id, "Debt-to-income too high")
+      assert {:ok, rejected} = Applications.reject_application(application, admin.id, "Debt-to-income too high")
       assert rejected.status == "rejected"
       assert rejected.decided_at
       assert rejected.decided_by_id == admin.id
@@ -143,23 +143,23 @@ defmodule MiwayCreditCore.Loans.ApplicationsTest do
     test "does not create a LoanAccount" do
       application = application_fixture()
       admin = admin_fixture()
-      {:ok, rejected} = Loans.reject_application(application, admin.id, "Not eligible")
+      {:ok, rejected} = Applications.reject_application(application, admin.id, "Not eligible")
 
-      assert Loans.get_application!(rejected.id).loan_account == nil
+      assert Applications.get_application!(rejected.id).loan_account == nil
     end
   end
 
   describe "update_application/2 and delete_application/1" do
     test "update_application/2 updates permitted fields" do
       application = application_fixture()
-      assert {:ok, updated} = Loans.update_application(application, %{"purpose" => "School fees"})
+      assert {:ok, updated} = Applications.update_application(application, %{"purpose" => "School fees"})
       assert updated.purpose == "School fees"
     end
 
     test "delete_application/1 removes the application and recalculates customer stats" do
       application = application_fixture()
-      assert {:ok, _} = Loans.delete_application(application)
-      assert_raise Ecto.NoResultsError, fn -> Loans.get_application!(application.id) end
+      assert {:ok, _} = Applications.delete_application(application)
+      assert_raise Ecto.NoResultsError, fn -> Applications.get_application!(application.id) end
 
       reloaded_customer = Customers.get_customer!(application.customer_id)
       assert reloaded_customer.total_loans == 0
@@ -168,17 +168,17 @@ defmodule MiwayCreditCore.Loans.ApplicationsTest do
 
   describe "aggregate counters" do
     test "count_applications/0 and count_active_applications/0" do
-      before_count = Loans.count_applications()
-      active_before = Loans.count_active_applications()
+      before_count = Applications.count_applications()
+      active_before = Applications.count_active_applications()
 
       application = application_fixture()
 
-      assert Loans.count_applications() == before_count + 1
-      assert Loans.count_active_applications() == active_before + 1
+      assert Applications.count_applications() == before_count + 1
+      assert Applications.count_active_applications() == active_before + 1
 
       admin = admin_fixture()
-      {:ok, _} = Loans.reject_application(application, admin.id, "Not eligible")
-      assert Loans.count_active_applications() == active_before
+      {:ok, _} = Applications.reject_application(application, admin.id, "Not eligible")
+      assert Applications.count_active_applications() == active_before
     end
   end
 end
