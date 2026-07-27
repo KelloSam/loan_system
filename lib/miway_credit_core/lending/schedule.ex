@@ -3,7 +3,7 @@ defmodule MiwayCreditCore.Lending.Schedule do
   Read access to the repayment plan, plus the arrears sweep. Rows here
   are never touched by money-received logic directly — only by
   `mark_overdue_installments/0` (time-based) and payment allocation
-  (money-based, see `MiwayCreditCore.Loans.Payments`).
+  (money-based, see `MiwayCreditCore.Payments`).
   """
 
   import Ecto.Query

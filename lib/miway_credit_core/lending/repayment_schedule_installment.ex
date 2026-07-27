@@ -25,7 +25,7 @@ defmodule MiwayCreditCore.Lending.RepaymentScheduleInstallment do
     field :paid_at, :utc_datetime
 
     belongs_to :loan_account, MiwayCreditCore.Lending.LoanAccount, type: :binary_id
-    has_many :payment_allocations, MiwayCreditCore.Loans.PaymentAllocation
+    has_many :payment_allocations, MiwayCreditCore.Payments.PaymentAllocation
 
     timestamps()
   end

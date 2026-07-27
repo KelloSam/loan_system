@@ -1,4 +1,4 @@
-defmodule MiwayCreditCore.Loans.Payments do
+defmodule MiwayCreditCore.Payments do
   @moduledoc """
   Money actually received. `record_payment/1` allocates the amount
   across that account's unpaid installments oldest-due-date-first (a
@@ -13,7 +13,8 @@ defmodule MiwayCreditCore.Loans.Payments do
 
   import Ecto.Query
   alias MiwayCreditCore.Repo
-  alias MiwayCreditCore.Loans.{PaymentTransaction, PaymentAllocation, CustomerStats}
+  alias MiwayCreditCore.Loans.CustomerStats
+  alias MiwayCreditCore.Payments.{PaymentTransaction, PaymentAllocation}
   alias MiwayCreditCore.Lending.{LoanAccount, RepaymentScheduleInstallment}
   alias MiwayCreditCore.Accounting.AccountingEntry
 

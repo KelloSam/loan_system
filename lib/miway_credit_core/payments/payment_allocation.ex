@@ -1,4 +1,4 @@
-defmodule MiwayCreditCore.Loans.PaymentAllocation do
+defmodule MiwayCreditCore.Payments.PaymentAllocation do
   @moduledoc """
   Links a PaymentTransaction to the installment(s) it satisfies. A join
   table rather than a direct FK on the transaction because a single
@@ -14,7 +14,7 @@ defmodule MiwayCreditCore.Loans.PaymentAllocation do
   schema "payment_allocations" do
     field :allocated_amount, :decimal
 
-    belongs_to :payment_transaction, MiwayCreditCore.Loans.PaymentTransaction, type: :binary_id
+    belongs_to :payment_transaction, MiwayCreditCore.Payments.PaymentTransaction, type: :binary_id
     belongs_to :repayment_schedule_installment, MiwayCreditCore.Lending.RepaymentScheduleInstallment,
       type: :binary_id
 

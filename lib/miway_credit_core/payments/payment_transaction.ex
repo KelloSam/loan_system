@@ -1,7 +1,7 @@
-defmodule MiwayCreditCore.Loans.PaymentTransaction do
+defmodule MiwayCreditCore.Payments.PaymentTransaction do
   @moduledoc """
   Money actually received from a customer. Never hard-deleted — a
-  mis-recorded payment is voided (see `MiwayCreditCore.Loans.Payments.void_payment/2`),
+  mis-recorded payment is voided (see `MiwayCreditCore.Payments.void_payment/2`),
   which flips `status` to "voided" and reverses its effect via a
   compensating AccountingEntry, preserving the audit trail.
   """
@@ -28,7 +28,7 @@ defmodule MiwayCreditCore.Loans.PaymentTransaction do
     belongs_to :recorded_by, MiwayCreditCore.Accounts.User
     belongs_to :voided_by, MiwayCreditCore.Accounts.User
 
-    has_many :payment_allocations, MiwayCreditCore.Loans.PaymentAllocation
+    has_many :payment_allocations, MiwayCreditCore.Payments.PaymentAllocation
 
     timestamps()
   end

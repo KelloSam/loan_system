@@ -2,7 +2,8 @@ defmodule MiwayCreditCoreWeb.LoanController do
   use MiwayCreditCoreWeb, :controller
 
   alias MiwayCreditCore.{Loans, Customers, AuditLogs}
-  alias MiwayCreditCore.Loans.{LoanApplication, PaymentTransaction, Collateral}
+  alias MiwayCreditCore.Loans.{LoanApplication, Collateral}
+  alias MiwayCreditCore.Payments.PaymentTransaction
 
   def index(conn, _params) do
     applications = Loans.list_applications()

@@ -9,8 +9,8 @@ defmodule MiwayCreditCore.Loans do
 
   import Ecto.Query
   alias MiwayCreditCore.Repo
-  alias MiwayCreditCore.{Lending, Accounting}
-  alias MiwayCreditCore.Loans.{Applications, Payments, Collateral}
+  alias MiwayCreditCore.{Lending, Accounting, Payments}
+  alias MiwayCreditCore.Loans.{Applications, Collateral}
 
   # ---------------------------------------------------------------------------
   # Applications
@@ -49,7 +49,7 @@ defmodule MiwayCreditCore.Loans do
   defdelegate installments_due_soon(days \\ 7), to: Lending
 
   # ---------------------------------------------------------------------------
-  # Payments
+  # Payments — delegated to the top-level Payments context
   # ---------------------------------------------------------------------------
 
   defdelegate list_transactions_for_account(loan_account_id), to: Payments

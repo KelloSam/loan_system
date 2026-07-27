@@ -32,7 +32,7 @@ defmodule MiwayCreditCore.Lending.LoanAccount do
 
     has_many :repayment_schedule_installments, MiwayCreditCore.Lending.RepaymentScheduleInstallment,
       preload_order: [asc: :due_date]
-    has_many :payment_transactions, MiwayCreditCore.Loans.PaymentTransaction
+    has_many :payment_transactions, MiwayCreditCore.Payments.PaymentTransaction
     has_many :accounting_entries, MiwayCreditCore.Accounting.AccountingEntry
     has_many :collaterals, MiwayCreditCore.Loans.Collateral
 
