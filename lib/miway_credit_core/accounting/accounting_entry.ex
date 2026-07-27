@@ -30,6 +30,7 @@ defmodule MiwayCreditCore.Accounting.AccountingEntry do
 
     field :occurred_at, :utc_datetime
 
+    belongs_to :organisation, MiwayCreditCore.Organisations.Organisation, type: :binary_id
     belongs_to :loan_account, MiwayCreditCore.Lending.LoanAccount, type: :binary_id
     belongs_to :recorded_by, MiwayCreditCore.Accounts.User
 
@@ -38,12 +39,13 @@ defmodule MiwayCreditCore.Accounting.AccountingEntry do
 
   def changeset(entry, attrs) do
     entry
-    |> cast(attrs, [:loan_account_id, :entry_type, :amount, :running_balance, :source_type,
+    |> cast(attrs, [:organisation_id, :loan_account_id, :entry_type, :amount, :running_balance, :source_type,
                    :source_id, :description, :recorded_by_id, :occurred_at])
-    |> validate_required([:loan_account_id, :entry_type, :amount, :running_balance, :source_type,
+    |> validate_required([:organisation_id, :loan_account_id, :entry_type, :amount, :running_balance, :source_type,
                           :occurred_at])
     |> validate_inclusion(:entry_type, @entry_types)
     |> validate_inclusion(:source_type, @source_types)
+    |> foreign_key_constraint(:organisation_id)
     |> foreign_key_constraint(:loan_account_id)
     |> foreign_key_constraint(:recorded_by_id)
   end

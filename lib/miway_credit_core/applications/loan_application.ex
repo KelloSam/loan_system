@@ -23,6 +23,7 @@ defmodule MiwayCreditCore.Applications.LoanApplication do
     field :decided_at, :utc_datetime
     field :rejection_reason, :string
 
+    belongs_to :organisation, MiwayCreditCore.Organisations.Organisation, type: :binary_id
     belongs_to :customer, MiwayCreditCore.Customers.Customer, type: :binary_id
     belongs_to :decided_by, MiwayCreditCore.Accounts.User
     has_one :loan_account, MiwayCreditCore.Lending.LoanAccount
@@ -30,17 +31,25 @@ defmodule MiwayCreditCore.Applications.LoanApplication do
     timestamps()
   end
 
-  @doc "Changeset for the initial application submission — status is always pending."
+  @doc """
+  Changeset for the initial application submission — status is always
+  pending. `organisation_id` is cast here, but Applications.create_application/2
+  always computes and overwrites it from the customer being applied for
+  before this ever runs — never taken as-is from raw caller input, so
+  an application can't be filed under a different organisation than
+  its own customer.
+  """
   def changeset(loan_application, attrs) do
     loan_application
-    |> cast(attrs, [:customer_id, :requested_amount, :requested_term_months, :purpose,
+    |> cast(attrs, [:organisation_id, :customer_id, :requested_amount, :requested_term_months, :purpose,
                    :risk_level, :risk_score])
-    |> validate_required([:customer_id, :requested_amount, :requested_term_months])
+    |> validate_required([:organisation_id, :customer_id, :requested_amount, :requested_term_months])
     |> validate_inclusion(:risk_level, @risk_levels)
     |> validate_number(:requested_amount, greater_than: 0)
     |> validate_number(:requested_term_months, greater_than: 0)
     |> validate_length(:purpose, max: 500, message: "must be less than 500 characters")
     |> foreign_key_constraint(:customer_id)
+    |> foreign_key_constraint(:organisation_id)
   end
 
   @doc "Changeset for deciding a pending application (approve/reject/withdraw)."

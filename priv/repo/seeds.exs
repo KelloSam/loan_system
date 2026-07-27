@@ -3,9 +3,19 @@
 #     mix run priv/repo/seeds.exs
 #
 
-alias MiwayCreditCore.{Accounts, Customers}
+alias MiwayCreditCore.{Accounts, Customers, Organisations}
+alias MiwayCreditCore.Organisations.Organisation
+alias MiwayCreditCore.Accounts.Scope
+alias MiwayCreditCore.Repo
 
-# Create the platform administrator (staff identity)
+organisation =
+  Repo.get_by(Organisation, name: "Miway") ||
+    (
+      {:ok, organisation} = Organisations.create_organisation(%{name: "Miway"})
+      organisation
+    )
+
+# Create the platform administrator (staff identity — platform-wide, no organisation membership needed)
 {:ok, _admin, _staff_member} = Accounts.register_staff_member(
   %{email: "admin@example.com", password: "Admin123456!"},
   "platform_administrator"
@@ -16,7 +26,7 @@ customer =
   Customers.get_customer_by_email("client@example.com") ||
     (
       {:ok, customer} =
-        Customers.create_customer(%{
+        Customers.create_customer(%Scope{organisation_id: organisation.id}, %{
           name: "Demo Client",
           phone: "260970000000",
           id_number: "999999/99/9",

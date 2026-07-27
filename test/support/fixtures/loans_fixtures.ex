@@ -4,6 +4,10 @@ defmodule MiwayCreditCore.LoansFixtures do
   import MiwayCreditCore.CustomersFixtures
   import MiwayCreditCore.AccountsFixtures
 
+  alias MiwayCreditCore.Repo
+  alias MiwayCreditCore.Customers.Customer
+  alias MiwayCreditCore.Accounts.Scope
+
   @doc """
   Builds valid application attrs as string keys, matching what the real
   controllers submit (MiwayCreditCore.Applications.create_application/1
@@ -24,12 +28,16 @@ defmodule MiwayCreditCore.LoansFixtures do
     })
   end
 
-  def application_fixture(attrs \\ %{}) do
-    {:ok, application} =
-      attrs
-      |> valid_application_attrs()
-      |> MiwayCreditCore.Applications.create_application()
+  @doc "Scope matching whichever customer this application is (or will be) filed under."
+  def scope_for_customer_id(customer_id) do
+    %Scope{organisation_id: Repo.get!(Customer, customer_id).organisation_id}
+  end
 
+  def application_fixture(attrs \\ %{}) do
+    attrs = valid_application_attrs(attrs)
+    scope = scope_for_customer_id(attrs["customer_id"])
+
+    {:ok, application} = MiwayCreditCore.Applications.create_application(scope, attrs)
     application
   end
 
@@ -59,10 +67,12 @@ defmodule MiwayCreditCore.LoansFixtures do
   end
 
   def payment_fixture(%MiwayCreditCore.Lending.LoanAccount{} = account, attrs \\ %{}) do
+    scope = %Scope{organisation_id: account.organisation_id}
+
     {:ok, transaction} =
       account
       |> valid_payment_attrs(attrs)
-      |> MiwayCreditCore.Payments.record_payment()
+      |> then(&MiwayCreditCore.Payments.record_payment(scope, &1))
 
     transaction
   end

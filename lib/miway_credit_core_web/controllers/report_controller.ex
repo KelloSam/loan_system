@@ -4,10 +4,12 @@ defmodule MiwayCreditCoreWeb.ReportController do
   alias MiwayCreditCore.Reports
 
   def index(conn, _params) do
+    scope = conn.assigns.current_scope
+
     render(conn, :index,
-      summary: Reports.portfolio_summary(),
-      overdue_payments: Reports.overdue_payments(),
-      payments_due_soon: Reports.payments_due_soon()
+      summary: Reports.portfolio_summary(scope),
+      overdue_payments: Reports.overdue_payments(scope),
+      payments_due_soon: Reports.payments_due_soon(scope)
     )
   end
 
@@ -15,6 +17,6 @@ defmodule MiwayCreditCoreWeb.ReportController do
     conn
     |> put_resp_content_type("text/csv")
     |> put_resp_header("content-disposition", ~s(attachment; filename="loans.csv"))
-    |> send_resp(200, Reports.loans_csv())
+    |> send_resp(200, Reports.loans_csv(conn.assigns.current_scope))
   end
 end

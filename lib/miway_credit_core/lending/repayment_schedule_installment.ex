@@ -24,6 +24,7 @@ defmodule MiwayCreditCore.Lending.RepaymentScheduleInstallment do
     field :status, :string, default: "upcoming"
     field :paid_at, :utc_datetime
 
+    belongs_to :organisation, MiwayCreditCore.Organisations.Organisation, type: :binary_id
     belongs_to :loan_account, MiwayCreditCore.Lending.LoanAccount, type: :binary_id
     has_many :payment_allocations, MiwayCreditCore.Payments.PaymentAllocation
 
@@ -32,13 +33,14 @@ defmodule MiwayCreditCore.Lending.RepaymentScheduleInstallment do
 
   def changeset(installment, attrs) do
     installment
-    |> cast(attrs, [:loan_account_id, :installment_number, :due_date, :scheduled_amount,
+    |> cast(attrs, [:organisation_id, :loan_account_id, :installment_number, :due_date, :scheduled_amount,
                    :scheduled_principal, :scheduled_interest, :paid_amount, :status, :paid_at])
-    |> validate_required([:loan_account_id, :installment_number, :due_date, :scheduled_amount,
+    |> validate_required([:organisation_id, :loan_account_id, :installment_number, :due_date, :scheduled_amount,
                           :scheduled_principal, :scheduled_interest, :status])
     |> validate_inclusion(:status, @statuses)
     |> validate_number(:scheduled_amount, greater_than: 0)
     |> validate_number(:paid_amount, greater_than_or_equal_to: 0)
+    |> foreign_key_constraint(:organisation_id)
     |> foreign_key_constraint(:loan_account_id)
   end
 end

@@ -3,6 +3,16 @@ import Config
 # Configure Ecto repos
 config :miway_credit_core, ecto_repos: [MiwayCreditCore.Repo]
 
+# Render a real error page/JSON body for exceptions instead of Phoenix's
+# ancient fallback (which looks for a nonexistent MiwayCreditCoreWeb.ErrorView
+# and raises ArgumentError trying to render one) — this mattered concretely
+# once Step 5 needed a clean 404 for an out-of-scope record, not a crash.
+config :miway_credit_core, MiwayCreditCoreWeb.Endpoint,
+  render_errors: [
+    formats: [html: MiwayCreditCoreWeb.ErrorHTML, json: MiwayCreditCoreWeb.ErrorJSON],
+    layout: false
+  ]
+
 # Configure timezone database for Timex
 config :elixir, :time_zone_database, Tzdata.TimeZoneDatabase
 

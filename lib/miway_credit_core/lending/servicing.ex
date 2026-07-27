@@ -12,31 +12,37 @@ defmodule MiwayCreditCore.Lending.Servicing do
   alias MiwayCreditCore.Customers.CustomerStats
   alias MiwayCreditCore.Lending.LoanAccount
   alias MiwayCreditCore.Accounting.AccountingEntry
+  alias MiwayCreditCore.Accounts.Scope
 
-  def get_account!(id) do
+  @doc "Fetches an account by id, scoped — one belonging to a different organisation raises the same NoResultsError as an unknown id."
+  def get_account!(%Scope{} = scope, id) do
     LoanAccount
+    |> scope_organisation(scope)
     |> Repo.get!(id)
     |> Repo.preload([:loan_application, :customer])
   end
 
-  def list_accounts_for_customer(customer_id) do
+  def list_accounts_for_customer(%Scope{} = scope, customer_id) do
     LoanAccount
+    |> scope_organisation(scope)
     |> where([a], a.customer_id == ^customer_id)
     |> order_by([a], desc: a.inserted_at)
     |> preload(:repayment_schedule_installments)
     |> Repo.all()
   end
 
-  def count_active_accounts do
-    from(a in LoanAccount, where: a.status == "active")
+  def count_active_accounts(%Scope{} = scope) do
+    LoanAccount
+    |> scope_organisation(scope)
+    |> where([a], a.status == "active")
     |> Repo.aggregate(:count)
   end
 
-  def total_outstanding_balance do
-    from(a in LoanAccount,
-      where: a.status == "active",
-      select: coalesce(sum(a.outstanding_balance), ^Decimal.new("0.00"))
-    )
+  def total_outstanding_balance(%Scope{} = scope) do
+    LoanAccount
+    |> scope_organisation(scope)
+    |> where([a], a.status == "active")
+    |> select([a], coalesce(sum(a.outstanding_balance), ^Decimal.new("0.00")))
     |> Repo.one()
   end
 
@@ -64,6 +70,7 @@ defmodule MiwayCreditCore.Lending.Servicing do
       closed_at: now
     }))
     |> Ecto.Multi.insert(:entry, AccountingEntry.changeset(%AccountingEntry{}, %{
+      organisation_id: account.organisation_id,
       loan_account_id: account.id,
       entry_type: "write_off",
       amount: Decimal.negate(account.outstanding_balance),
@@ -81,5 +88,10 @@ defmodule MiwayCreditCore.Lending.Servicing do
       {:ok, %{account: account}}    -> {:ok, account}
       {:error, _, reason, _}        -> {:error, reason}
     end
+  end
+
+  defp scope_organisation(query, %Scope{organisation_id: :all}), do: query
+  defp scope_organisation(query, %Scope{organisation_id: organisation_id}) do
+    where(query, organisation_id: ^organisation_id)
   end
 end

@@ -10,34 +10,37 @@ defmodule MiwayCreditCore.Reports do
   alias MiwayCreditCore.{Repo, Applications, Lending, Customers}
   alias MiwayCreditCore.Applications.LoanApplication
   alias MiwayCreditCore.Lending.RepaymentScheduleInstallment
+  alias MiwayCreditCore.Accounts.Scope
 
-  @doc "Portfolio-wide numbers for the Reports overview."
-  def portfolio_summary do
+  @doc "Portfolio-wide numbers for the Reports overview, scoped to the caller's organisation."
+  def portfolio_summary(%Scope{} = scope) do
     %{
-      total_customers: Customers.count_customers(),
-      total_loans: Applications.count_applications(),
-      active_loans: Lending.count_active_accounts(),
-      outstanding_balance: Lending.total_outstanding_balance(),
-      overdue_count: Lending.count_overdue_installments(),
-      overdue_amount: Lending.total_overdue_amount()
+      total_customers: Customers.count_customers(scope),
+      total_loans: Applications.count_applications(scope),
+      active_loans: Lending.count_active_accounts(scope),
+      outstanding_balance: Lending.total_outstanding_balance(scope),
+      overdue_count: Lending.count_overdue_installments(scope),
+      overdue_amount: Lending.total_overdue_amount(scope)
     }
   end
 
   @doc "Every overdue installment, oldest due_date (most urgent) first, with account + customer preloaded."
-  def overdue_payments do
+  def overdue_payments(%Scope{} = scope) do
     RepaymentScheduleInstallment
+    |> scope_organisation(scope)
     |> where([i], i.status == "overdue")
     |> order_by([i], asc: i.due_date)
     |> preload(loan_account: [:customer, :loan_application])
     |> Repo.all()
   end
 
-  @doc "Installments due within the next `days` days (default 7), portfolio-wide."
-  def payments_due_soon(days \\ 7) do
+  @doc "Installments due within the next `days` days (default 7), scoped to the caller's organisation."
+  def payments_due_soon(%Scope{} = scope, days \\ 7) do
     today = Date.utc_today()
     cutoff = Date.add(today, days)
 
     RepaymentScheduleInstallment
+    |> scope_organisation(scope)
     |> where([i], i.status in ["upcoming", "partially_paid"] and i.due_date >= ^today and i.due_date <= ^cutoff)
     |> order_by([i], asc: i.due_date)
     |> preload(loan_account: [:customer, :loan_application])
@@ -51,11 +54,12 @@ defmodule MiwayCreditCore.Reports do
   applications that never reached an approved account. Hand-built
   rather than pulling in a CSV dependency for one export.
   """
-  def loans_csv do
+  def loans_csv(%Scope{} = scope) do
     header = ~w(application_id customer_name status risk_level requested_amount granted_amount outstanding_balance decided_at)
 
     rows =
       LoanApplication
+      |> scope_organisation(scope)
       |> preload([:customer, :loan_account])
       |> order_by([a], desc: a.inserted_at)
       |> Repo.all()
@@ -75,6 +79,11 @@ defmodule MiwayCreditCore.Reports do
     [header | rows]
     |> Enum.map(&csv_row/1)
     |> Enum.join()
+  end
+
+  defp scope_organisation(query, %Scope{organisation_id: :all}), do: query
+  defp scope_organisation(query, %Scope{organisation_id: organisation_id}) do
+    where(query, organisation_id: ^organisation_id)
   end
 
   defp csv_row(fields) do

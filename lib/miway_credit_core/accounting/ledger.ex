@@ -11,9 +11,11 @@ defmodule MiwayCreditCore.Accounting.Ledger do
   import Ecto.Query
   alias MiwayCreditCore.Repo
   alias MiwayCreditCore.Accounting.AccountingEntry
+  alias MiwayCreditCore.Accounts.Scope
 
-  def list_entries_for_account(loan_account_id) do
+  def list_entries_for_account(%Scope{} = scope, loan_account_id) do
     AccountingEntry
+    |> scope_organisation(scope)
     |> where([e], e.loan_account_id == ^loan_account_id)
     |> order_by([e], asc: e.inserted_at)
     |> Repo.all()
@@ -27,11 +29,16 @@ defmodule MiwayCreditCore.Accounting.Ledger do
   should never diverge under normal operation, but this makes that
   claim checkable (and tests assert on it after every operation).
   """
-  def rebuild_outstanding_balance(loan_account_id) do
-    from(e in AccountingEntry,
-      where: e.loan_account_id == ^loan_account_id,
-      select: coalesce(sum(e.amount), ^Decimal.new("0.00"))
-    )
+  def rebuild_outstanding_balance(%Scope{} = scope, loan_account_id) do
+    AccountingEntry
+    |> scope_organisation(scope)
+    |> where([e], e.loan_account_id == ^loan_account_id)
+    |> select([e], coalesce(sum(e.amount), ^Decimal.new("0.00")))
     |> Repo.one()
+  end
+
+  defp scope_organisation(query, %Scope{organisation_id: :all}), do: query
+  defp scope_organisation(query, %Scope{organisation_id: organisation_id}) do
+    where(query, organisation_id: ^organisation_id)
   end
 end

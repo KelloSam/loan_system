@@ -4,6 +4,7 @@ defmodule MiwayCreditCoreWeb.CustomerLoanControllerTest do
   import MiwayCreditCore.CustomersFixtures
   import MiwayCreditCore.LoansFixtures
   import MiwayCreditCore.AccountsFixtures
+  import MiwayCreditCore.OrganisationsFixtures
 
   test "index lists only the current customer's applications", %{conn: conn} do
     customer = customer_fixture()
@@ -26,10 +27,12 @@ defmodule MiwayCreditCoreWeb.CustomerLoanControllerTest do
     assert html_response(conn, 200)
   end
 
-  test "show refuses an application belonging to a different customer", %{conn: conn} do
-    customer = customer_fixture()
+  test "show refuses an application belonging to a different customer in the same organisation", %{conn: conn} do
+    organisation = organisation_fixture()
+    customer = customer_fixture_in_organisation(organisation)
+    other_customer = customer_fixture_in_organisation(organisation)
     user = customer_user_fixture(customer)
-    other_application = application_fixture()
+    other_application = application_fixture(%{"customer_id" => other_customer.id})
 
     conn = conn |> login(user) |> get(~p"/client/loans/#{other_application.id}")
     assert redirected_to(conn) == ~p"/client/loans"

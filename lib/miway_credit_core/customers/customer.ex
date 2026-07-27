@@ -27,6 +27,8 @@ defmodule MiwayCreditCore.Customers.Customer do
     field :total_loans, :integer, default: 0
     field :current_balance, :decimal, default: Decimal.new("0.00")
 
+    belongs_to :organisation, MiwayCreditCore.Organisations.Organisation, type: :binary_id
+
     has_many :loan_applications, MiwayCreditCore.Applications.LoanApplication
     has_many :loan_accounts, MiwayCreditCore.Lending.LoanAccount
 
@@ -43,6 +45,7 @@ defmodule MiwayCreditCore.Customers.Customer do
   # Define a type for our customer struct
   @type t() :: %__MODULE__{
     id: binary(),
+    organisation_id: binary(),
     name: String.t(),
     phone: String.t(),
     id_number: String.t(),
@@ -122,13 +125,24 @@ defmodule MiwayCreditCore.Customers.Customer do
   """
   def changeset(customer, attrs) do
     customer
-    |> cast(attrs, [:name, :phone, :id_number, :email, :address, :active, :total_loans, :current_balance])
-    |> validate_required([:name, :phone, :id_number])
+    |> cast(attrs, [
+      :organisation_id,
+      :name,
+      :phone,
+      :id_number,
+      :email,
+      :address,
+      :active,
+      :total_loans,
+      :current_balance
+    ])
+    |> validate_required([:organisation_id, :name, :phone, :id_number])
     |> validate_phone_format()
     |> validate_format(:email, ~r/^[^@\s]+@[^@\s]+\.[^@\s]+$/, message: "must have a valid format")
     |> unique_constraint(:phone)
     |> unique_constraint(:id_number)
     |> unique_constraint(:email)
+    |> foreign_key_constraint(:organisation_id)
   end
   
   # Custom validator for phone format

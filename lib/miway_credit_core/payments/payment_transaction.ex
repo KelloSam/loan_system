@@ -24,6 +24,7 @@ defmodule MiwayCreditCore.Payments.PaymentTransaction do
     field :voided_at, :utc_datetime
     field :void_reason, :string
 
+    belongs_to :organisation, MiwayCreditCore.Organisations.Organisation, type: :binary_id
     belongs_to :loan_account, MiwayCreditCore.Lending.LoanAccount, type: :binary_id
     belongs_to :recorded_by, MiwayCreditCore.Accounts.User
     belongs_to :voided_by, MiwayCreditCore.Accounts.User
@@ -35,11 +36,12 @@ defmodule MiwayCreditCore.Payments.PaymentTransaction do
 
   def changeset(payment_transaction, attrs) do
     payment_transaction
-    |> cast(attrs, [:loan_account_id, :amount, :received_at, :method, :reference,
+    |> cast(attrs, [:organisation_id, :loan_account_id, :amount, :received_at, :method, :reference,
                    :recorded_by_id, :notes])
-    |> validate_required([:loan_account_id, :amount, :received_at, :method, :recorded_by_id])
+    |> validate_required([:organisation_id, :loan_account_id, :amount, :received_at, :method, :recorded_by_id])
     |> validate_inclusion(:method, @methods)
     |> validate_number(:amount, greater_than: 0)
+    |> foreign_key_constraint(:organisation_id)
     |> foreign_key_constraint(:loan_account_id)
     |> foreign_key_constraint(:recorded_by_id)
   end

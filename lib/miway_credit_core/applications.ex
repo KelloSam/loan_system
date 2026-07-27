@@ -16,9 +16,11 @@ defmodule MiwayCreditCore.Applications do
   import Ecto.Query
   alias MiwayCreditCore.Repo
   alias MiwayCreditCore.Applications.{LoanApplication, Collateral}
+  alias MiwayCreditCore.Customers
   alias MiwayCreditCore.Customers.CustomerStats
   alias MiwayCreditCore.Lending.{LoanAccount, RepaymentScheduleInstallment, InterestCalculator}
   alias MiwayCreditCore.Accounting.AccountingEntry
+  alias MiwayCreditCore.Accounts.Scope
   alias MiwayCreditCore.Risk
 
   # ---------------------------------------------------------------------------
@@ -26,12 +28,13 @@ defmodule MiwayCreditCore.Applications do
   # ---------------------------------------------------------------------------
 
   @doc "Paginated applications, newest first, customer preloaded. Accepts page:/per_page:."
-  def list_applications(opts \\ []) do
+  def list_applications(%Scope{} = scope, opts \\ []) do
     page     = Keyword.get(opts, :page, 1)
     per_page = Keyword.get(opts, :per_page, 50)
     offset   = (page - 1) * per_page
 
     LoanApplication
+    |> scope_organisation(scope)
     |> preload(:customer)
     |> order_by([a], desc: a.inserted_at)
     |> limit(^per_page)
@@ -40,20 +43,33 @@ defmodule MiwayCreditCore.Applications do
   end
 
   @doc "Applications for a customer, newest first, loan_account preloaded."
-  def get_applications_for_customer(customer_id) do
+  def get_applications_for_customer(%Scope{} = scope, customer_id) do
     LoanApplication
+    |> scope_organisation(scope)
     |> where([a], a.customer_id == ^customer_id)
     |> order_by([a], desc: a.inserted_at)
     |> preload(:loan_account)
     |> Repo.all()
   end
 
-  def get_application!(id), do: Repo.get!(LoanApplication, id) |> Repo.preload([:customer, :loan_account])
+  @doc "Fetches an application by id, scoped — one belonging to a different organisation raises the same NoResultsError as an unknown id."
+  def get_application!(%Scope{} = scope, id) do
+    LoanApplication
+    |> scope_organisation(scope)
+    |> Repo.get!(id)
+    |> Repo.preload([:customer, :loan_account])
+  end
 
-  def count_applications, do: Repo.aggregate(LoanApplication, :count)
+  def count_applications(%Scope{} = scope) do
+    LoanApplication
+    |> scope_organisation(scope)
+    |> Repo.aggregate(:count)
+  end
 
-  def count_active_applications do
-    from(a in LoanApplication, where: a.status == "pending")
+  def count_active_applications(%Scope{} = scope) do
+    LoanApplication
+    |> scope_organisation(scope)
+    |> where([a], a.status == "pending")
     |> Repo.aggregate(:count)
   end
 
@@ -63,15 +79,27 @@ defmodule MiwayCreditCore.Applications do
 
   @doc """
   Submits a loan application and atomically recalculates the owning
-  customer's stats (total_loans).
+  customer's stats (total_loans). organisation_id is never taken from
+  attrs — it's derived from the customer being applied for
+  (Customers.get_customer!/2, itself scoped), so an application can
+  only ever be filed for a customer already within the caller's
+  organisation.
   """
-  def create_application(attrs \\ %{}) do
-    with :ok <- check_pending_application(attrs),
-         :ok <- check_rejection_cooldown(attrs) do
-      customer_id = Map.get(attrs, :customer_id) || Map.get(attrs, "customer_id")
-      amount    = Map.get(attrs, :requested_amount) || Map.get(attrs, "requested_amount")
+  def create_application(%Scope{} = scope, attrs \\ %{}) do
+    attrs = stringify_keys(attrs)
+    customer_id = attrs["customer_id"]
+
+    with :ok <- check_pending_application(customer_id),
+         :ok <- check_rejection_cooldown(customer_id) do
+      customer = customer_id && Customers.get_customer!(scope, customer_id)
+      amount = attrs["requested_amount"]
       {risk_level, risk_score, _signals} = Risk.evaluate(customer_id, amount)
-      attrs = attrs |> Map.put("risk_level", risk_level) |> Map.put("risk_score", risk_score)
+
+      attrs =
+        attrs
+        |> Map.put("risk_level", risk_level)
+        |> Map.put("risk_score", risk_score)
+        |> Map.put("organisation_id", customer && customer.organisation_id)
 
       Ecto.Multi.new()
       |> Ecto.Multi.insert(:application, LoanApplication.changeset(%LoanApplication{}, attrs))
@@ -123,7 +151,11 @@ defmodule MiwayCreditCore.Applications do
   @doc """
   Approves a pending application: creates its LoanAccount, generates the
   repayment schedule, posts the opening disbursement ledger entry, and
-  recalculates customer stats — all in one transaction.
+  recalculates customer stats — all in one transaction. `application`
+  must already be a caller-scoped struct (fetched via get_application!/2)
+  — every record this creates derives organisation_id from it directly,
+  not from a fresh scope, so approval can't cross an organisation
+  boundary even if called with a stale reference.
   """
   def approve_application(%LoanApplication{} = application, admin_id) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
@@ -145,6 +177,7 @@ defmodule MiwayCreditCore.Applications do
     }))
     |> Ecto.Multi.insert(:account, fn %{application: application} ->
       LoanAccount.changeset(%LoanAccount{}, %{
+        organisation_id: application.organisation_id,
         loan_application_id: application.id,
         customer_id: application.customer_id,
         principal_amount: application.requested_amount,
@@ -161,6 +194,7 @@ defmodule MiwayCreditCore.Applications do
     end)
     |> Ecto.Multi.insert(:disbursement, fn %{account: account} ->
       AccountingEntry.changeset(%AccountingEntry{}, %{
+        organisation_id: account.organisation_id,
         loan_account_id: account.id,
         entry_type: "disbursement",
         amount: total_repayment,
@@ -209,16 +243,28 @@ defmodule MiwayCreditCore.Applications do
   # Collateral — attaches only to an approved LoanAccount
   # ---------------------------------------------------------------------------
 
-  def list_collaterals_for_account(loan_account_id) do
+  def list_collaterals_for_account(%Scope{} = scope, loan_account_id) do
     Collateral
+    |> scope_organisation(scope)
     |> where([c], c.loan_account_id == ^loan_account_id)
     |> order_by([c], asc: c.inserted_at)
     |> Repo.all()
   end
 
-  def get_collateral!(id), do: Repo.get!(Collateral, id)
+  def get_collateral!(%Scope{} = scope, id) do
+    Collateral
+    |> scope_organisation(scope)
+    |> Repo.get!(id)
+  end
 
-  def create_collateral(attrs \\ %{}) do
+  @doc "organisation_id derives from the LoanAccount it secures, never from attrs."
+  def create_collateral(%LoanAccount{} = account, attrs) do
+    attrs =
+      attrs
+      |> stringify_keys()
+      |> Map.put("loan_account_id", account.id)
+      |> Map.put("organisation_id", account.organisation_id)
+
     %Collateral{}
     |> Collateral.changeset(attrs)
     |> Repo.insert()
@@ -226,17 +272,24 @@ defmodule MiwayCreditCore.Applications do
 
   def delete_collateral(%Collateral{} = collateral), do: Repo.delete(collateral)
 
-  def total_collateral_value(loan_account_id) do
-    from(c in Collateral,
-      where: c.loan_account_id == ^loan_account_id,
-      select: coalesce(sum(c.estimated_value), ^Decimal.new("0.00"))
-    )
+  def total_collateral_value(%Scope{} = scope, loan_account_id) do
+    Collateral
+    |> scope_organisation(scope)
+    |> where([c], c.loan_account_id == ^loan_account_id)
+    |> select([c], coalesce(sum(c.estimated_value), ^Decimal.new("0.00")))
     |> Repo.one()
   end
 
   # ---------------------------------------------------------------------------
   # Private helpers
   # ---------------------------------------------------------------------------
+
+  defp scope_organisation(query, %Scope{organisation_id: :all}), do: query
+  defp scope_organisation(query, %Scope{organisation_id: organisation_id}) do
+    where(query, organisation_id: ^organisation_id)
+  end
+
+  defp stringify_keys(attrs), do: Map.new(attrs, fn {k, v} -> {to_string(k), v} end)
 
   # Interest rate isn't collected on the application form today (the old
   # Loan schema took it directly from admin input on create) — kept as a
@@ -270,6 +323,7 @@ defmodule MiwayCreditCore.Applications do
 
         row = %{
           id: Ecto.UUID.generate(),
+          organisation_id: account.organisation_id,
           loan_account_id: account.id,
           installment_number: n,
           due_date: Timex.shift(DateTime.to_date(account.opened_at), months: n),
@@ -289,45 +343,37 @@ defmodule MiwayCreditCore.Applications do
     {:ok, :scheduled}
   end
 
-  defp check_pending_application(attrs) do
-    customer_id = Map.get(attrs, :customer_id) || Map.get(attrs, "customer_id")
+  defp check_pending_application(nil), do: :ok
 
-    if is_nil(customer_id) do
-      :ok
-    else
-      count =
-        from(a in LoanApplication,
-          where: a.customer_id == ^customer_id and a.status == "pending",
-          select: count(a.id)
-        )
-        |> Repo.one()
+  defp check_pending_application(customer_id) do
+    count =
+      from(a in LoanApplication,
+        where: a.customer_id == ^customer_id and a.status == "pending",
+        select: count(a.id)
+      )
+      |> Repo.one()
 
-      if count > 0, do: {:error, :pending_application_exists}, else: :ok
-    end
+    if count > 0, do: {:error, :pending_application_exists}, else: :ok
   end
 
-  defp check_rejection_cooldown(attrs) do
-    customer_id = Map.get(attrs, :customer_id) || Map.get(attrs, "customer_id")
+  defp check_rejection_cooldown(nil), do: :ok
 
-    if is_nil(customer_id) do
-      :ok
-    else
-      cutoff =
-        NaiveDateTime.utc_now()
-        |> NaiveDateTime.add(-30 * 24 * 60 * 60, :second)
-        |> NaiveDateTime.truncate(:second)
+  defp check_rejection_cooldown(customer_id) do
+    cutoff =
+      NaiveDateTime.utc_now()
+      |> NaiveDateTime.add(-30 * 24 * 60 * 60, :second)
+      |> NaiveDateTime.truncate(:second)
 
-      count =
-        from(a in LoanApplication,
-          where:
-            a.customer_id == ^customer_id and
-              a.status == "rejected" and
-              a.updated_at >= ^cutoff,
-          select: count(a.id)
-        )
-        |> Repo.one()
+    count =
+      from(a in LoanApplication,
+        where:
+          a.customer_id == ^customer_id and
+            a.status == "rejected" and
+            a.updated_at >= ^cutoff,
+        select: count(a.id)
+      )
+      |> Repo.one()
 
-      if count > 0, do: {:error, :rejection_cooldown}, else: :ok
-    end
+    if count > 0, do: {:error, :rejection_cooldown}, else: :ok
   end
 end

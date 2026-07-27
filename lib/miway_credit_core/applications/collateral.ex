@@ -20,6 +20,7 @@ defmodule MiwayCreditCore.Applications.Collateral do
     field :description, :string
     field :estimated_value, :decimal
 
+    belongs_to :organisation, MiwayCreditCore.Organisations.Organisation, type: :binary_id
     belongs_to :loan_account, MiwayCreditCore.Lending.LoanAccount, type: :binary_id
 
     timestamps()
@@ -27,10 +28,11 @@ defmodule MiwayCreditCore.Applications.Collateral do
 
   def changeset(collateral, attrs) do
     collateral
-    |> cast(attrs, [:type, :description, :estimated_value, :loan_account_id])
-    |> validate_required([:type, :description, :estimated_value, :loan_account_id])
+    |> cast(attrs, [:organisation_id, :type, :description, :estimated_value, :loan_account_id])
+    |> validate_required([:organisation_id, :type, :description, :estimated_value, :loan_account_id])
     |> validate_inclusion(:type, @types)
     |> validate_number(:estimated_value, greater_than: 0)
+    |> foreign_key_constraint(:organisation_id)
     |> foreign_key_constraint(:loan_account_id)
   end
 end

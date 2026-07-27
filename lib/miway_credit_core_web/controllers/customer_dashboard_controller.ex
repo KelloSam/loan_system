@@ -1,14 +1,15 @@
 defmodule MiwayCreditCoreWeb.CustomerDashboardController do
   use MiwayCreditCoreWeb, :controller
 
-  alias MiwayCreditCore.Loans
+  alias MiwayCreditCore.{Applications, Lending}
 
   def index(conn, _params) do
+    scope = conn.assigns.current_scope
     customer = conn.assigns.current_customer
-    applications = Loans.get_applications_for_customer(customer.id)
+    applications = Applications.get_applications_for_customer(scope, customer.id)
 
     {next_payment_date, next_payment_amount} =
-      case Loans.get_upcoming_installments(customer.id) |> List.first() do
+      case Lending.get_upcoming_installments(scope, customer.id) |> List.first() do
         %{due_date: date, scheduled_amount: amount, paid_amount: paid} ->
           {date, Decimal.sub(amount, paid)}
 

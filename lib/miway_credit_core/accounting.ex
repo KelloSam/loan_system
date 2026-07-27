@@ -13,6 +13,6 @@ defmodule MiwayCreditCore.Accounting do
 
   alias MiwayCreditCore.Accounting.Ledger
 
-  defdelegate list_entries_for_account(loan_account_id), to: Ledger
-  defdelegate rebuild_outstanding_balance(loan_account_id), to: Ledger
+  defdelegate list_entries_for_account(scope, loan_account_id), to: Ledger
+  defdelegate rebuild_outstanding_balance(scope, loan_account_id), to: Ledger
 end

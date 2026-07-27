@@ -1,17 +1,17 @@
 defmodule MiwayCreditCoreWeb.CustomerController do
   use MiwayCreditCoreWeb, :controller
 
-  alias MiwayCreditCore.{Customers, Loans, AuditLogs}
+  alias MiwayCreditCore.{Customers, Applications, AuditLogs}
   alias MiwayCreditCore.Customers.Customer
 
   def index(conn, _params) do
-    customers = Customers.list_customers()
+    customers = Customers.list_customers(conn.assigns.current_scope)
     render(conn, :index, customers: customers)
   end
 
   def show(conn, %{"id" => id}) do
-    customer = Customers.get_customer!(id)
-    applications = Loans.get_applications_for_customer(customer.id)
+    customer = Customers.get_customer!(conn.assigns.current_scope, id)
+    applications = Applications.get_applications_for_customer(conn.assigns.current_scope, customer.id)
     render(conn, :show, customer: customer, applications: applications)
   end
 
@@ -21,7 +21,7 @@ defmodule MiwayCreditCoreWeb.CustomerController do
   end
 
   def create(conn, %{"customer" => customer_params}) do
-    case Customers.create_customer(customer_params) do
+    case Customers.create_customer(conn.assigns.current_scope, customer_params) do
       {:ok, customer} ->
         AuditLogs.log("customer_created",
           actor_id: conn.assigns.current_user.id,
@@ -42,13 +42,13 @@ defmodule MiwayCreditCoreWeb.CustomerController do
   end
 
   def edit(conn, %{"id" => id}) do
-    customer = Customers.get_customer!(id)
+    customer = Customers.get_customer!(conn.assigns.current_scope, id)
     changeset = Customer.changeset(customer, %{})
     render(conn, :edit, customer: customer, changeset: changeset)
   end
 
   def update(conn, %{"id" => id, "customer" => customer_params}) do
-    customer = Customers.get_customer!(id)
+    customer = Customers.get_customer!(conn.assigns.current_scope, id)
 
     case Customers.update_customer(customer, customer_params) do
       {:ok, customer} ->
@@ -71,7 +71,7 @@ defmodule MiwayCreditCoreWeb.CustomerController do
   end
 
   def delete(conn, %{"id" => id}) do
-    customer = Customers.get_customer!(id)
+    customer = Customers.get_customer!(conn.assigns.current_scope, id)
 
     case Customers.delete_customer(customer) do
       {:ok, _} ->

@@ -27,6 +27,7 @@ defmodule MiwayCreditCore.Lending.LoanAccount do
     field :outstanding_balance, :decimal
     field :closed_at, :utc_datetime
 
+    belongs_to :organisation, MiwayCreditCore.Organisations.Organisation, type: :binary_id
     belongs_to :loan_application, MiwayCreditCore.Applications.LoanApplication, type: :binary_id
     belongs_to :customer, MiwayCreditCore.Customers.Customer, type: :binary_id
 
@@ -41,15 +42,16 @@ defmodule MiwayCreditCore.Lending.LoanAccount do
 
   def changeset(loan_account, attrs) do
     loan_account
-    |> cast(attrs, [:loan_application_id, :customer_id, :principal_amount, :interest_rate,
+    |> cast(attrs, [:organisation_id, :loan_application_id, :customer_id, :principal_amount, :interest_rate,
                    :term_months, :opened_at, :status, :outstanding_balance, :closed_at])
-    |> validate_required([:loan_application_id, :customer_id, :principal_amount, :interest_rate,
+    |> validate_required([:organisation_id, :loan_application_id, :customer_id, :principal_amount, :interest_rate,
                           :term_months, :opened_at, :status, :outstanding_balance])
     |> validate_inclusion(:status, @statuses)
     |> validate_number(:principal_amount, greater_than: 0)
     |> validate_number(:interest_rate, greater_than: 0)
     |> validate_number(:term_months, greater_than: 0)
     |> validate_number(:outstanding_balance, greater_than_or_equal_to: 0)
+    |> foreign_key_constraint(:organisation_id)
     |> foreign_key_constraint(:loan_application_id)
     |> foreign_key_constraint(:customer_id)
     |> unique_constraint(:loan_application_id)

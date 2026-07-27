@@ -21,12 +21,25 @@ defmodule MiwayCreditCore.AccountsFixtures do
     user
   end
 
-  @doc "A login + StaffMember pair. Returns the User (role \\\\ \"loan_officer\")."
+  @doc """
+  A login + StaffMember pair. Returns the User (role \\\\ "loan_officer").
+
+  Every role except "platform_administrator" also gets an
+  OrganisationMembership in a fresh, throwaway organisation —
+  AuthPlug's scope resolution requires one for any staff member who
+  isn't platform-wide, and the vast majority of tests using this
+  fixture don't care which organisation, just that one exists.
+  """
   def staff_member_fixture(role \\ "loan_officer", attrs \\ %{}) do
-    {:ok, user, _staff_member} =
+    {:ok, user, staff_member} =
       attrs
       |> valid_user_attrs()
       |> MiwayCreditCore.Accounts.register_staff_member(role)
+
+    if role != "platform_administrator" do
+      organisation = MiwayCreditCore.OrganisationsFixtures.organisation_fixture()
+      {:ok, _membership} = MiwayCreditCore.Organisations.add_staff_to_organisation(staff_member.id, organisation.id)
+    end
 
     user
   end

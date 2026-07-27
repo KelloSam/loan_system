@@ -17,26 +17,38 @@ defmodule MiwayCreditCore.Payments do
   alias MiwayCreditCore.Payments.{PaymentTransaction, PaymentAllocation}
   alias MiwayCreditCore.Lending.{LoanAccount, RepaymentScheduleInstallment}
   alias MiwayCreditCore.Accounting.AccountingEntry
+  alias MiwayCreditCore.Accounts.Scope
 
-  def list_transactions_for_account(loan_account_id) do
+  def list_transactions_for_account(%Scope{} = scope, loan_account_id) do
     PaymentTransaction
+    |> scope_organisation(scope)
     |> where([t], t.loan_account_id == ^loan_account_id)
     |> order_by([t], desc: t.received_at)
     |> Repo.all()
   end
 
-  def get_transaction!(id), do: Repo.get!(PaymentTransaction, id)
+  def get_transaction!(%Scope{} = scope, id) do
+    PaymentTransaction
+    |> scope_organisation(scope)
+    |> Repo.get!(id)
+  end
 
   @doc """
   Records a payment: inserts the transaction, allocates it across
   unpaid installments oldest-first, posts a repayment ledger entry, and
   updates the account's cached outstanding_balance (closing the account
   if it reaches zero).
+
+  Looks the account up itself, scoped — loan_account_id comes from
+  submitted form/API params, not a value the caller already had
+  scope-verified, so this can't be used to record a payment against
+  another organisation's account by submitting a foreign id directly.
   """
-  def record_payment(attrs \\ %{}) do
+  def record_payment(%Scope{} = scope, attrs \\ %{}) do
     loan_account_id = Map.get(attrs, :loan_account_id) || Map.get(attrs, "loan_account_id")
     amount           = decimal(Map.get(attrs, :amount) || Map.get(attrs, "amount"))
-    account          = loan_account_id && Repo.get(LoanAccount, loan_account_id)
+    account          = loan_account_id && get_scoped_account(scope, loan_account_id)
+    attrs            = attrs |> stringify_keys() |> Map.put("organisation_id", account && account.organisation_id)
 
     with :ok <- check_amount(account, amount) do
       now = DateTime.utc_now() |> DateTime.truncate(:second)
@@ -60,6 +72,7 @@ defmodule MiwayCreditCore.Payments do
       end)
       |> Ecto.Multi.insert(:ledger_entry, fn %{transaction: transaction, account: account} ->
         AccountingEntry.changeset(%AccountingEntry{}, %{
+          organisation_id: account.organisation_id,
           loan_account_id: account.id,
           entry_type: "repayment",
           amount: Decimal.negate(transaction.amount),
@@ -118,6 +131,7 @@ defmodule MiwayCreditCore.Payments do
     end)
     |> Ecto.Multi.insert(:reversal_entry, fn %{account: account} ->
       AccountingEntry.changeset(%AccountingEntry{}, %{
+        organisation_id: account.organisation_id,
         loan_account_id: account.id,
         entry_type: "reversal",
         amount: transaction.amount,
@@ -155,7 +169,7 @@ defmodule MiwayCreditCore.Payments do
   end
 
   # Oldest-due-date-first allocation across unpaid installments.
-  defp allocate(repo, %LoanAccount{id: loan_account_id}, transaction, amount) do
+  defp allocate(repo, %LoanAccount{id: loan_account_id, organisation_id: organisation_id}, transaction, amount) do
     installments =
       from(i in RepaymentScheduleInstallment,
         where: i.loan_account_id == ^loan_account_id and i.status in ["upcoming", "overdue", "partially_paid"],
@@ -172,6 +186,7 @@ defmodule MiwayCreditCore.Payments do
 
         %PaymentAllocation{}
         |> PaymentAllocation.changeset(%{
+          organisation_id: organisation_id,
           payment_transaction_id: transaction.id,
           repayment_schedule_installment_id: installment.id,
           allocated_amount: take
@@ -232,5 +247,16 @@ defmodule MiwayCreditCore.Payments do
   # normalize so callers can pass either.
   defp stringify_keys(attrs) do
     Map.new(attrs, fn {k, v} -> {to_string(k), v} end)
+  end
+
+  defp get_scoped_account(scope, loan_account_id) do
+    LoanAccount
+    |> scope_organisation(scope)
+    |> Repo.get(loan_account_id)
+  end
+
+  defp scope_organisation(query, %Scope{organisation_id: :all}), do: query
+  defp scope_organisation(query, %Scope{organisation_id: organisation_id}) do
+    where(query, organisation_id: ^organisation_id)
   end
 end

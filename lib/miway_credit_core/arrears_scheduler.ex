@@ -1,7 +1,7 @@
 defmodule MiwayCreditCore.ArrearsScheduler do
   @moduledoc """
   Periodically flips unpaid installments past their due_date to
-  "overdue" (MiwayCreditCore.Loans.mark_overdue_installments/0). Runs once
+  "overdue" (MiwayCreditCore.Lending.mark_overdue_installments/0). Runs once
   shortly after startup, then on a fixed interval — no external job
   library needed at this scale.
 
@@ -28,7 +28,7 @@ defmodule MiwayCreditCore.ArrearsScheduler do
 
   @impl true
   def handle_info(:check_overdue, state) do
-    count = MiwayCreditCore.Loans.mark_overdue_installments()
+    count = MiwayCreditCore.Lending.mark_overdue_installments()
 
     if count > 0 do
       Logger.info("ArrearsScheduler: flipped #{count} installment(s) to overdue")
