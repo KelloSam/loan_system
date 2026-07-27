@@ -1,0 +1,44 @@
+<div style="min-height:100vh; background:#0B1A2E; display:flex; align-items:center; justify-content:center; padding:24px; font-family:'Inter',system-ui,-apple-system,sans-serif; position:relative; overflow:hidden; box-sizing:border-box;">
+
+  <div style="position:absolute; top:-140px; right:-140px; width:360px; height:360px; border-radius:50%; background:#0F2040; opacity:0.7; pointer-events:none;"></div>
+  <div style="position:absolute; bottom:-160px; left:-160px; width:400px; height:400px; border-radius:50%; background:#0F2040; opacity:0.5; pointer-events:none;"></div>
+
+  <div style="position:relative; width:100%; max-width:420px;">
+
+    <div style="text-align:center; margin-bottom:32px;">
+      <h1 style="color:#FFFFFF; font-size:22px; font-weight:700; margin:0; letter-spacing:-0.3px; line-height:1.2;">Reset your password</h1>
+      <p style="color:#7F93B0; font-size:13px; margin:8px 0 0 0;">Enter your account email and we'll send you a reset link</p>
+    </div>
+
+    <div style="background:#FFFFFF; border-radius:16px; overflow:hidden; box-shadow:0 24px 64px rgba(0,0,0,0.55);">
+      <div style="height:4px; background:linear-gradient(90deg, #8A6520 0%, #C8970A 50%, #D4B040 100%);"></div>
+
+      <div style="padding:36px;">
+        <%= if msg = get(@flash, :error) do %>
+          <div style="background:#FEF2F2; border:1px solid #FECACA; border-radius:8px; padding:12px 14px; margin-bottom:20px;">
+            <span style="color:#991B1B; font-size:13px;"><%= msg %></span>
+          </div>
+        <% end %>
+
+        <.form :let={f} for={%{}} action={~p"/password-reset"} as={:password_reset} style="margin:0;">
+          <div style="margin-bottom:24px;">
+            <label style="display:block; font-size:13px; font-weight:500; color:#374151; margin-bottom:6px;">
+              Email Address
+            </label>
+            <%= email_input f, :email,
+                  required: true,
+                  placeholder: "you@example.com",
+                  style: "display:block; width:100%; padding:11px 14px; border:1.5px solid #D1D5DB; border-radius:8px; font-size:14px; color:#111827; background:#FFFFFF; box-sizing:border-box; outline:none; font-family:inherit;" %>
+          </div>
+
+          <%= submit "Send Reset Link",
+                style: "display:block; width:100%; padding:13px 20px; background:#C8970A; color:#0B1A2E; border:none; border-radius:8px; font-size:14px; font-weight:700; cursor:pointer; letter-spacing:0.3px; font-family:inherit; box-sizing:border-box;" %>
+        </.form>
+      </div>
+
+      <div style="background:#F8FAFC; border-top:1px solid #F1F5F9; padding:14px 36px; text-align:center;">
+        <a href={~p"/login"} style="color:#94A3B8; font-size:12px; text-decoration:none;">Back to sign in</a>
+      </div>
+    </div>
+  </div>
+</div>

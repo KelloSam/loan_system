@@ -1,5 +1,8 @@
 import Config
 
+# Delivers to the calling test process instead of sending anything real.
+config :miway_credit_core, :password_reset_notifier, MiwayCreditCore.Accounts.PasswordResetNotifier.Test
+
 # Configure loan system database for test environment
 config :miway_credit_core, MiwayCreditCore.Repo,
   username: "think",

@@ -1,5 +1,9 @@
 import Config
 
+# Password-reset links are logged rather than emailed until Notifications
+# (see docs/architecture/context_boundaries.md) is actually built.
+config :miway_credit_core, :password_reset_notifier, MiwayCreditCore.Accounts.PasswordResetNotifier.Dev
+
 # Configure loan system database
 config :miway_credit_core, MiwayCreditCore.Repo,
   username: "think",

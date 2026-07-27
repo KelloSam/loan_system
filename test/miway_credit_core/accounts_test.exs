@@ -214,4 +214,76 @@ defmodule MiwayCreditCore.AccountsTest do
       refute Accounts.valid_totp_for_secret?(secret, "000000")
     end
   end
+
+  describe "password reset" do
+    test "request_password_reset/2 delivers a link for a known email" do
+      user = user_fixture()
+      assert :ok = Accounts.request_password_reset(user.email, &url_fun/1)
+      assert_receive {:password_reset_link, delivered_user, url}
+      assert delivered_user.id == user.id
+      assert url =~ "https://example.com/password-reset/"
+    end
+
+    test "request_password_reset/2 returns :ok and delivers nothing for an unknown email" do
+      assert :ok = Accounts.request_password_reset("nobody@example.com", &url_fun/1)
+      refute_receive {:password_reset_link, _, _}
+    end
+
+    test "get_valid_reset_token/1 finds the token behind the delivered URL" do
+      user = user_fixture()
+      Accounts.request_password_reset(user.email, &url_fun/1)
+      assert_receive {:password_reset_link, _user, url}
+      raw_token = url |> String.split("/") |> List.last()
+
+      token = Accounts.get_valid_reset_token(raw_token)
+      assert token.user.id == user.id
+    end
+
+    test "get_valid_reset_token/1 returns nil for a garbage token" do
+      assert Accounts.get_valid_reset_token("not-a-real-token") == nil
+    end
+
+    test "get_valid_reset_token/1 returns nil for an expired token" do
+      user = user_fixture()
+      Accounts.request_password_reset(user.email, &url_fun/1)
+      assert_receive {:password_reset_link, _user, url}
+      raw_token = url |> String.split("/") |> List.last()
+
+      # Force-expire it directly, same as time simply passing.
+      past = DateTime.utc_now() |> DateTime.add(-1, :second) |> DateTime.truncate(:second)
+
+      from(t in MiwayCreditCore.Accounts.PasswordResetToken, where: t.user_id == ^user.id)
+      |> MiwayCreditCore.Repo.update_all(set: [expires_at: past])
+
+      assert Accounts.get_valid_reset_token(raw_token) == nil
+    end
+
+    test "reset_password/2 sets the new password, consumes the token, and invalidates sessions" do
+      user = user_fixture()
+      Accounts.request_password_reset(user.email, &url_fun/1)
+      assert_receive {:password_reset_link, _user, url}
+      raw_token = url |> String.split("/") |> List.last()
+      token = Accounts.get_valid_reset_token(raw_token)
+
+      assert {:ok, updated} = Accounts.reset_password(token, %{password: "BrandNewPassword1"})
+      assert updated.sessions_invalidated_at != nil
+      assert {:ok, _} = Accounts.authenticate_user(user.email, "BrandNewPassword1")
+
+      # The token is single-use — it can't be fetched (and therefore not reused) a second time.
+      assert Accounts.get_valid_reset_token(raw_token) == nil
+    end
+
+    test "reset_password/2 rejects a weak new password" do
+      user = user_fixture()
+      Accounts.request_password_reset(user.email, &url_fun/1)
+      assert_receive {:password_reset_link, _user, url}
+      raw_token = url |> String.split("/") |> List.last()
+      token = Accounts.get_valid_reset_token(raw_token)
+
+      assert {:error, changeset} = Accounts.reset_password(token, %{password: "short"})
+      assert errors_on(changeset).password
+    end
+  end
+
+  defp url_fun(raw_token), do: "https://example.com/password-reset/#{raw_token}"
 end

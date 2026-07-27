@@ -1,6 +1,7 @@
 defmodule MiwayCreditCore.Accounts do
+  import Ecto.Query
   alias MiwayCreditCore.Repo
-  alias MiwayCreditCore.Accounts.{User, StaffMember, CustomerUser}
+  alias MiwayCreditCore.Accounts.{User, StaffMember, CustomerUser, PasswordResetToken, PasswordResetNotifier}
 
   def create_user(attrs \\ %{}) do
     %User{}
@@ -179,5 +180,91 @@ defmodule MiwayCreditCore.Accounts do
     user
     |> User.totp_changeset(%{totp_secret: nil, totp_enabled: false})
     |> Repo.update()
+  end
+
+  # ---------------------------------------------------------------------------
+  # Password reset
+  # ---------------------------------------------------------------------------
+
+  @reset_token_bytes 32
+  @reset_token_validity_minutes 60
+
+  @doc """
+  Requests a password reset for the given email. Always returns :ok,
+  whether or not the email matches a user — the response never leaks
+  which is the case.
+
+  `reset_url_fun` receives the raw token and must return the full
+  reset URL (the controller builds it with `~p`, since Accounts
+  doesn't depend on the web layer). The link is handed to the
+  configured PasswordResetNotifier — real delivery is deferred to
+  Notifications; see PasswordResetNotifier's moduledoc.
+  """
+  def request_password_reset(email, reset_url_fun) when is_function(reset_url_fun, 1) do
+    case get_user_by_email(email) do
+      nil ->
+        :ok
+
+      user ->
+        raw_token = :crypto.strong_rand_bytes(@reset_token_bytes) |> Base.url_encode64(padding: false)
+
+        expires_at =
+          DateTime.utc_now()
+          |> DateTime.add(@reset_token_validity_minutes * 60, :second)
+          |> DateTime.truncate(:second)
+
+        %PasswordResetToken{}
+        |> PasswordResetToken.changeset(%{
+          user_id: user.id,
+          token_hash: hash_token(raw_token),
+          expires_at: expires_at
+        })
+        |> Repo.insert()
+        |> case do
+          {:ok, _token} -> PasswordResetNotifier.deliver_reset_link(user, reset_url_fun.(raw_token))
+          {:error, _changeset} -> :ok
+        end
+
+        :ok
+    end
+  end
+
+  @doc "Returns the unexpired, unused PasswordResetToken matching the raw token, with :user preloaded, or nil."
+  def get_valid_reset_token(raw_token) do
+    token_hash = hash_token(raw_token)
+    now = DateTime.utc_now()
+
+    from(t in PasswordResetToken,
+      where: t.token_hash == ^token_hash and is_nil(t.used_at) and t.expires_at > ^now,
+      preload: :user
+    )
+    |> Repo.one()
+  end
+
+  @doc """
+  Sets a new password, consumes the token, and invalidates every
+  existing session for that user — atomically, so a reset can't
+  half-apply.
+  """
+  def reset_password(%PasswordResetToken{} = token, attrs) do
+    used_at = DateTime.utc_now() |> DateTime.truncate(:second)
+    invalidated_at = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+
+    Ecto.Multi.new()
+    |> Ecto.Multi.update(:user, User.password_changeset(token.user, attrs))
+    |> Ecto.Multi.update(:token, PasswordResetToken.use_changeset(token, used_at))
+    |> Ecto.Multi.update(:invalidated_user, fn %{user: user} ->
+      User.session_changeset(user, %{sessions_invalidated_at: invalidated_at})
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{invalidated_user: user}} -> {:ok, user}
+      {:error, :user, changeset, _} -> {:error, changeset}
+      {:error, _step, reason, _} -> {:error, reason}
+    end
+  end
+
+  defp hash_token(raw_token) do
+    :crypto.hash(:sha256, raw_token) |> Base.encode16(case: :lower)
   end
 end
