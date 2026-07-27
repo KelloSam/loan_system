@@ -1,25 +1,19 @@
 defmodule MiwayCreditCoreWeb.CustomerDashboardController do
   use MiwayCreditCoreWeb, :controller
 
-  alias MiwayCreditCore.{Customers, Loans}
+  alias MiwayCreditCore.Loans
 
   def index(conn, _params) do
-    user = conn.assigns.current_user
-    customer = Customers.get_customer_by_email(user.email)
+    customer = conn.assigns.current_customer
+    applications = Loans.get_applications_for_customer(customer.id)
 
-    {applications, next_payment_date, next_payment_amount} =
-      if customer do
-        apps = Loans.get_applications_for_customer(customer.id)
+    {next_payment_date, next_payment_amount} =
+      case Loans.get_upcoming_installments(customer.id) |> List.first() do
+        %{due_date: date, scheduled_amount: amount, paid_amount: paid} ->
+          {date, Decimal.sub(amount, paid)}
 
-        case Loans.get_upcoming_installments(customer.id) |> List.first() do
-          %{due_date: date, scheduled_amount: amount, paid_amount: paid} ->
-            {apps, date, Decimal.sub(amount, paid)}
-
-          nil ->
-            {apps, nil, nil}
-        end
-      else
-        {[], nil, nil}
+        nil ->
+          {nil, nil}
       end
 
     render(conn, :index,

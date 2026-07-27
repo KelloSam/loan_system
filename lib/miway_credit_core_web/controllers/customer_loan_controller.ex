@@ -1,16 +1,16 @@
 defmodule MiwayCreditCoreWeb.CustomerLoanController do
   use MiwayCreditCoreWeb, :controller
 
-  alias MiwayCreditCore.{Loans, Customers}
+  alias MiwayCreditCore.Loans
 
   def index(conn, _params) do
-    customer = customer_for(conn)
+    customer = conn.assigns.current_customer
     applications = Loans.get_applications_for_customer(customer.id)
     render(conn, :index, applications: applications)
   end
 
   def show(conn, %{"id" => id}) do
-    customer = customer_for(conn)
+    customer = conn.assigns.current_customer
     application = Loans.get_application!(id)
 
     # Authorization: ensure this application belongs to the current customer
@@ -31,11 +31,5 @@ defmodule MiwayCreditCoreWeb.CustomerLoanController do
       render(conn, :show, application: application, account: account, interest: interest,
         installments: installments)
     end
-  end
-
-  defp customer_for(conn) do
-    user = conn.assigns.current_user
-    Customers.get_customer_by_email(user.email) ||
-      raise "No customer record found for user #{user.email}"
   end
 end

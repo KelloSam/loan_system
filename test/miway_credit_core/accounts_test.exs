@@ -1,18 +1,19 @@
 defmodule MiwayCreditCore.AccountsTest do
   use MiwayCreditCore.DataCase, async: true
 
+  import MiwayCreditCore.CustomersFixtures
   import MiwayCreditCore.AccountsFixtures
   alias MiwayCreditCore.Accounts
   alias MiwayCreditCore.Accounts.User
 
   describe "create_user/1" do
-    test "creates a user with a hashed password" do
+    test "creates a user with a hashed password and active status" do
       attrs = valid_user_attrs()
       assert {:ok, %User{} = user} = Accounts.create_user(attrs)
       assert user.email == attrs.email
       assert user.password_hash
       assert user.password_hash != attrs.password
-      assert user.role == "client"
+      assert user.status == "active"
     end
 
     test "rejects a duplicate email" do
@@ -41,16 +42,62 @@ defmodule MiwayCreditCore.AccountsTest do
     end
   end
 
-  describe "create_user_with_role/1" do
-    test "creates an admin user" do
-      attrs = valid_user_attrs(%{role: "admin"})
-      assert {:ok, %User{role: "admin"}} = Accounts.create_user_with_role(attrs)
+  describe "register_staff_member/2" do
+    test "creates a User and a StaffMember in one transaction" do
+      attrs = valid_user_attrs()
+      assert {:ok, %User{} = user, staff_member} = Accounts.register_staff_member(attrs, "loan_officer")
+      assert staff_member.user_id == user.id
+      assert staff_member.role == "loan_officer"
+      assert Accounts.get_staff_member(user.id).id == staff_member.id
     end
 
     test "rejects an invalid role" do
-      attrs = valid_user_attrs(%{role: "superuser"})
-      assert {:error, changeset} = Accounts.create_user_with_role(attrs)
+      attrs = valid_user_attrs()
+      assert {:error, changeset} = Accounts.register_staff_member(attrs, "superuser")
       assert errors_on(changeset).role
+    end
+
+    test "get_staff_member/1 returns nil for a login with no StaffMember" do
+      user = user_fixture()
+      assert Accounts.get_staff_member(user.id) == nil
+    end
+  end
+
+  describe "register_customer_user/2" do
+    test "creates a User and links it to an existing Customer" do
+      customer = customer_fixture()
+      attrs = valid_user_attrs()
+
+      assert {:ok, %User{} = user, customer_user} =
+               Accounts.register_customer_user(attrs, customer.id)
+
+      assert customer_user.user_id == user.id
+      assert customer_user.customer_id == customer.id
+
+      fetched = Accounts.get_customer_user(user.id)
+      assert fetched.customer.id == customer.id
+    end
+
+    test "get_customer_user/1 returns nil for a login with no CustomerUser" do
+      user = user_fixture()
+      assert Accounts.get_customer_user(user.id) == nil
+    end
+  end
+
+  describe "update_user_status/2" do
+    test "suspends and reactivates a user" do
+      user = user_fixture()
+      assert {:ok, suspended} = Accounts.update_user_status(user, "suspended")
+      assert suspended.status == "suspended"
+
+      assert {:ok, reactivated} = Accounts.update_user_status(suspended, "active")
+      assert reactivated.status == "active"
+    end
+
+    test "rejects an invalid status" do
+      user = user_fixture()
+      assert {:error, changeset} = Accounts.update_user_status(user, "banned")
+      assert errors_on(changeset).status
     end
   end
 

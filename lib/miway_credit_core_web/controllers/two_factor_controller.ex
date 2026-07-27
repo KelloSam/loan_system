@@ -36,8 +36,8 @@ defmodule MiwayCreditCoreWeb.TwoFactorController do
         conn
         |> delete_session(:pending_2fa_user_id)
         |> put_session(:user_id, user.id)
-        |> put_session(:user_role, user.role)
         |> put_session(:user_email, user.email)
+        |> put_session(:authenticated_at, NaiveDateTime.utc_now())
         |> put_flash(:info, "Welcome back!")
         |> redirect(to: user_redirect_path(user))
       else
@@ -118,8 +118,9 @@ defmodule MiwayCreditCoreWeb.TwoFactorController do
     |> redirect(to: ~p"/admin/settings/2fa")
   end
 
-  defp user_redirect_path(%{role: "admin"}), do: ~p"/admin/dashboard"
-  defp user_redirect_path(_), do: ~p"/client/dashboard"
+  defp user_redirect_path(user) do
+    if Accounts.get_staff_member(user.id), do: ~p"/admin/dashboard", else: ~p"/client/dashboard"
+  end
 
   defp get_ip(conn), do: conn.remote_ip |> :inet.ntoa() |> to_string()
 end

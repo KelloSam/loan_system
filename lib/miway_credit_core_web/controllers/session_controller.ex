@@ -29,8 +29,8 @@ defmodule MiwayCreditCoreWeb.SessionController do
         else
           conn
           |> put_session(:user_id, user.id)
-          |> put_session(:user_role, user.role)
           |> put_session(:user_email, user.email)
+          |> put_session(:authenticated_at, NaiveDateTime.utc_now())
           |> put_flash(:info, "Welcome back!")
           |> redirect(to: user_redirect_path(user))
         end
@@ -77,8 +77,9 @@ defmodule MiwayCreditCoreWeb.SessionController do
     |> redirect(to: ~p"/")
   end
 
-  defp user_redirect_path(%{role: "admin"}), do: ~p"/admin/dashboard"
-  defp user_redirect_path(_user), do: ~p"/client/dashboard"
+  defp user_redirect_path(user) do
+    if Accounts.get_staff_member(user.id), do: ~p"/admin/dashboard", else: ~p"/client/dashboard"
+  end
 
   defp get_ip(conn), do: conn.remote_ip |> :inet.ntoa() |> to_string()
 end

@@ -1,6 +1,6 @@
 defmodule MiwayCreditCore.Accounts do
   alias MiwayCreditCore.Repo
-  alias MiwayCreditCore.Accounts.User
+  alias MiwayCreditCore.Accounts.{User, StaffMember, CustomerUser}
 
   def create_user(attrs \\ %{}) do
     %User{}
@@ -8,15 +8,60 @@ defmodule MiwayCreditCore.Accounts do
     |> Repo.insert()
   end
 
-  def create_user_with_role(attrs \\ %{}) do
-    %User{}
-    |> User.admin_changeset(attrs)
-    |> Repo.insert()
-  end
-
   def get_user_by_email(email), do: Repo.get_by(User, email: email)
 
   def get_user!(id), do: Repo.get!(User, id)
+
+  @doc """
+  Creates a login User and its StaffMember record (employee identity)
+  in one transaction, so a User is never left without a role attached.
+  """
+  def register_staff_member(user_attrs, role) do
+    Ecto.Multi.new()
+    |> Ecto.Multi.insert(:user, User.changeset(%User{}, user_attrs))
+    |> Ecto.Multi.insert(:staff_member, fn %{user: user} ->
+      StaffMember.changeset(%StaffMember{}, %{user_id: user.id, role: role})
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{user: user, staff_member: staff_member}} -> {:ok, user, staff_member}
+      {:error, _step, changeset, _} -> {:error, changeset}
+    end
+  end
+
+  @doc """
+  Creates a login User and links it to an existing Customer via
+  CustomerUser (the customer-portal identity) in one transaction.
+  """
+  def register_customer_user(user_attrs, customer_id) do
+    Ecto.Multi.new()
+    |> Ecto.Multi.insert(:user, User.changeset(%User{}, user_attrs))
+    |> Ecto.Multi.insert(:customer_user, fn %{user: user} ->
+      CustomerUser.changeset(%CustomerUser{}, %{user_id: user.id, customer_id: customer_id})
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{user: user, customer_user: customer_user}} -> {:ok, user, customer_user}
+      {:error, _step, changeset, _} -> {:error, changeset}
+    end
+  end
+
+  @doc "Returns the StaffMember for a user id, or nil if this login isn't staff."
+  def get_staff_member(user_id), do: Repo.get_by(StaffMember, user_id: user_id)
+
+  @doc "Returns the CustomerUser (with :customer preloaded) for a user id, or nil."
+  def get_customer_user(user_id) do
+    CustomerUser
+    |> Repo.get_by(user_id: user_id)
+    |> Repo.preload(:customer)
+  end
+
+  @doc "Admin-driven suspend/reactivate. Suspended users are logged out on their next request."
+  def update_user_status(%User{} = user, status) do
+    user
+    |> User.status_changeset(%{status: status})
+    |> Repo.update()
+  end
 
   # ---------------------------------------------------------------------------
   # Authentication with lockout protection

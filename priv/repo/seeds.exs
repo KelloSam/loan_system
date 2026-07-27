@@ -3,21 +3,34 @@
 #     mix run priv/repo/seeds.exs
 #
 
-alias MiwayCreditCore.Accounts
+alias MiwayCreditCore.{Accounts, Customers}
 
-# Create admin user — create_user_with_role/1 is required here;
-# create_user/1's changeset never casts :role, so it would silently
-# create a "client" regardless of what's passed.
-{:ok, _admin} = Accounts.create_user_with_role(%{
-  email: "admin@example.com",
-  password: "Admin123456!",
-  role: "admin"
-})
+# Create the platform administrator (staff identity)
+{:ok, _admin, _staff_member} = Accounts.register_staff_member(
+  %{email: "admin@example.com", password: "Admin123456!"},
+  "platform_administrator"
+)
 
-# Create a test client user
-{:ok, _client} = Accounts.create_user(%{
-  email: "client@example.com",
-  password: "Client123456!"
-})
+# Create a test customer-portal login — needs a Customer to link to first
+customer =
+  Customers.get_customer_by_email("client@example.com") ||
+    (
+      {:ok, customer} =
+        Customers.create_customer(%{
+          name: "Demo Client",
+          phone: "260970000000",
+          id_number: "999999/99/9",
+          email: "client@example.com",
+          address: "Lusaka",
+          active: true
+        })
+
+      customer
+    )
+
+{:ok, _client, _customer_user} = Accounts.register_customer_user(
+  %{email: "client@example.com", password: "Client123456!"},
+  customer.id
+)
 
 IO.puts "Database seeded successfully!"

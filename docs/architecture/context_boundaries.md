@@ -24,6 +24,7 @@ for the full domain model behind these.
 | `Lending` | Loan accounts, repayment schedules, interest |
 | `Payments` | Payment transactions and their allocation to installments |
 | `Accounting` | The per-account ledger (`AccountingEntry`) |
+| `Accounts` | Login identity (`User`), employee identity (`StaffMember` — `platform_administrator` / `organisation_administrator` / `loan_officer`), the customer-portal login relationship (`CustomerUser`, a real FK join replacing the old email-string match against `Customers`), and password reset (`PasswordResetToken` + a pluggable `PasswordResetNotifier`). `organisation_administrator` exists as a role value only — no real org-scoping until `Organisations` (Step 5) exists. |
 | `Loans` | **Deprecated.** A compatibility facade delegating to the five contexts above — every function is `@deprecated`. Kept only so existing callers (`loan_controller.ex`, `customer_loan_controller.ex`, `arrears_scheduler.ex`) don't break during migration. Delete once they call the real contexts directly. |
 
 `Collateral` is nested under `Applications`, not a top-level context of

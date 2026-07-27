@@ -32,12 +32,12 @@ defmodule MiwayCreditCoreWeb.Router do
     plug MiwayCreditCoreWeb.Plugs.AuthPlug
   end
 
-  pipeline :ensure_admin do
-    plug MiwayCreditCoreWeb.Plugs.EnsureRolePlug, "admin"
+  pipeline :ensure_staff do
+    plug MiwayCreditCoreWeb.Plugs.EnsureStaffPlug
   end
 
-  pipeline :ensure_client do
-    plug MiwayCreditCoreWeb.Plugs.EnsureRolePlug, "client"
+  pipeline :ensure_customer do
+    plug MiwayCreditCoreWeb.Plugs.EnsureCustomerPlug
   end
 
   pipeline :rate_limited do
@@ -65,7 +65,7 @@ defmodule MiwayCreditCoreWeb.Router do
 
   # Admin routes
   scope "/admin", MiwayCreditCoreWeb do
-    pipe_through [:browser, :auth, :ensure_admin]
+    pipe_through [:browser, :auth, :ensure_staff]
 
     get "/dashboard", AdminDashboardController, :index
     get "/reports", ReportController, :index
@@ -84,11 +84,12 @@ defmodule MiwayCreditCoreWeb.Router do
     delete "/loans/:id/collateral/:collateral_id", LoanController, :delete_collateral
   end
 
-  # Customer portal routes — path stays "/client" to match the "client"
-  # auth role (MiwayCreditCore.Accounts concern); the controllers
-  # underneath are Customers-domain, hence the Customer* naming.
+  # Customer portal routes — path stays "/client" (naming predates the
+  # identity split); the controllers underneath are Customers-domain,
+  # hence the Customer* naming. Gated on CustomerUser (a real link to
+  # a Customer record), not a role string.
   scope "/client", MiwayCreditCoreWeb do
-    pipe_through [:browser, :auth, :ensure_client]
+    pipe_through [:browser, :auth, :ensure_customer]
 
     get "/dashboard", CustomerDashboardController, :index
     resources "/loans", CustomerLoanController, only: [:index, :show]
