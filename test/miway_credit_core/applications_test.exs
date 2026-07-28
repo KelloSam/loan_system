@@ -5,9 +5,9 @@ defmodule MiwayCreditCore.ApplicationsTest do
   import MiwayCreditCore.AccountsFixtures
   import MiwayCreditCore.LoansFixtures
   import MiwayCreditCore.OrganisationsFixtures
-  alias MiwayCreditCore.{Applications, Accounting, Lending}
+  alias MiwayCreditCore.{Applications, Accounting, Lending, Products, Customers}
   alias MiwayCreditCore.Applications.LoanApplication
-  alias MiwayCreditCore.Customers
+  alias MiwayCreditCore.CreditReporting.ManualAdapter
   alias MiwayCreditCore.Accounts.Scope
 
   describe "create_application/2" do
@@ -365,5 +365,157 @@ defmodule MiwayCreditCore.ApplicationsTest do
       {:ok, _} = Applications.reject_application(assessed, admin_scope, "Not eligible")
       assert Applications.count_active_applications(scope) == 0
     end
+  end
+
+  describe "approve_application/2 — affordability requirement" do
+    test "blocked with :income_data_missing when the product requires it and the customer has no income on file" do
+      organisation = organisation_fixture()
+      customer = customer_fixture_in_organisation(organisation)
+      {:ok, product} = Products.create_product(%Scope{organisation_id: organisation.id}, valid_product_attrs(%{"requires_affordability_check" => true}))
+
+      admin = admin_fixture()
+      admin_scope = %Scope{user: admin, organisation_id: :all}
+      {:ok, application} =
+        Applications.create_application(
+          %Scope{organisation_id: organisation.id},
+          valid_application_attrs(%{"customer_id" => customer.id, "loan_product_id" => product.id})
+        )
+      {:ok, assessed} = Applications.assess_application(application, admin_scope)
+
+      assert {:error, :income_data_missing} = Applications.approve_application(assessed, admin_scope)
+    end
+
+    test "blocked with :affordability_exceeded when the ratio is too high; passes once income covers it" do
+      organisation = organisation_fixture()
+      customer = customer_fixture_in_organisation(organisation, %{"monthly_income" => "100"})
+
+      {:ok, product} =
+        Products.create_product(
+          %Scope{organisation_id: organisation.id},
+          valid_product_attrs(%{"requires_affordability_check" => true, "interest_rate" => "0"})
+        )
+
+      admin = admin_fixture()
+      admin_scope = %Scope{user: admin, organisation_id: :all}
+      {:ok, application} =
+        Applications.create_application(
+          %Scope{organisation_id: organisation.id},
+          valid_application_attrs(%{
+            "customer_id" => customer.id,
+            "loan_product_id" => product.id,
+            "requested_amount" => "1000",
+            "requested_term_months" => "12"
+          })
+        )
+      {:ok, assessed} = Applications.assess_application(application, admin_scope)
+
+      assert {:error, :affordability_exceeded} = Applications.approve_application(assessed, admin_scope)
+    end
+  end
+
+  describe "approve_application/2 — CRB requirement" do
+    test "blocked with :crb_check_required when the product requires it and no report is on file" do
+      organisation = organisation_fixture()
+      customer = customer_fixture_in_organisation(organisation)
+      {:ok, product} = Products.create_product(%Scope{organisation_id: organisation.id}, valid_product_attrs(%{"requires_crb_check" => true}))
+
+      admin = admin_fixture()
+      admin_scope = %Scope{user: admin, organisation_id: :all}
+      {:ok, application} =
+        Applications.create_application(
+          %Scope{organisation_id: organisation.id},
+          valid_application_attrs(%{"customer_id" => customer.id, "loan_product_id" => product.id})
+        )
+      {:ok, assessed} = Applications.assess_application(application, admin_scope)
+
+      assert {:error, :crb_check_required} = Applications.approve_application(assessed, admin_scope)
+    end
+
+    test "blocked with :adverse_crb_report when the latest report is adverse" do
+      organisation = organisation_fixture()
+      customer = customer_fixture_in_organisation(organisation)
+      {:ok, product} = Products.create_product(%Scope{organisation_id: organisation.id}, valid_product_attrs(%{"requires_crb_check" => true}))
+
+      admin = admin_fixture()
+      admin_scope = %Scope{user: admin, organisation_id: :all}
+      grant_credit_check_consent(customer, admin.id)
+      {:ok, _report} =
+        ManualAdapter.record_report(admin_scope, customer, %{"outcome" => "adverse", "checked_at" => Date.utc_today()}, admin.id)
+
+      {:ok, application} =
+        Applications.create_application(
+          %Scope{organisation_id: organisation.id},
+          valid_application_attrs(%{"customer_id" => customer.id, "loan_product_id" => product.id})
+        )
+      {:ok, assessed} = Applications.assess_application(application, admin_scope)
+
+      assert {:error, :adverse_crb_report} = Applications.approve_application(assessed, admin_scope)
+    end
+
+    test "blocked with :crb_check_expired when the latest clear report is more than 90 days old" do
+      organisation = organisation_fixture()
+      customer = customer_fixture_in_organisation(organisation)
+      {:ok, product} = Products.create_product(%Scope{organisation_id: organisation.id}, valid_product_attrs(%{"requires_crb_check" => true}))
+
+      admin = admin_fixture()
+      admin_scope = %Scope{user: admin, organisation_id: :all}
+      grant_credit_check_consent(customer, admin.id)
+      stale_date = Date.add(Date.utc_today(), -91)
+      {:ok, _report} =
+        ManualAdapter.record_report(admin_scope, customer, %{"outcome" => "clear", "checked_at" => stale_date}, admin.id)
+
+      {:ok, application} =
+        Applications.create_application(
+          %Scope{organisation_id: organisation.id},
+          valid_application_attrs(%{"customer_id" => customer.id, "loan_product_id" => product.id})
+        )
+      {:ok, assessed} = Applications.assess_application(application, admin_scope)
+
+      assert {:error, :crb_check_expired} = Applications.approve_application(assessed, admin_scope)
+    end
+
+    test "succeeds once a recent clear report is on file" do
+      organisation = organisation_fixture()
+      customer = customer_fixture_in_organisation(organisation)
+      {:ok, product} = Products.create_product(%Scope{organisation_id: organisation.id}, valid_product_attrs(%{"requires_crb_check" => true}))
+
+      admin = admin_fixture()
+      admin_scope = %Scope{user: admin, organisation_id: :all}
+      grant_credit_check_consent(customer, admin.id)
+      {:ok, _report} =
+        ManualAdapter.record_report(admin_scope, customer, %{"outcome" => "clear", "checked_at" => Date.utc_today()}, admin.id)
+
+      {:ok, application} =
+        Applications.create_application(
+          %Scope{organisation_id: organisation.id},
+          valid_application_attrs(%{"customer_id" => customer.id, "loan_product_id" => product.id})
+        )
+      {:ok, assessed} = Applications.assess_application(application, admin_scope)
+
+      assert {:ok, %LoanApplication{status: "approved"}} = Applications.approve_application(assessed, admin_scope)
+    end
+  end
+
+  defp grant_credit_check_consent(customer, recorded_by_id) do
+    {:ok, _consent} =
+      Customers.create_consent(
+        customer,
+        %{"consent_type" => "credit_check", "method" => "signed_form", "granted_at" => DateTime.utc_now()},
+        recorded_by_id
+      )
+  end
+
+  defp valid_product_attrs(attrs \\ %{}) do
+    Enum.into(attrs, %{
+      "name" => "Test Product #{System.unique_integer([:positive])}",
+      "minimum_principal" => "100.00",
+      "maximum_principal" => "50000.00",
+      "interest_method" => "reducing_balance",
+      "interest_rate" => "18.00",
+      "minimum_term_months" => "1",
+      "maximum_term_months" => "24",
+      "repayment_frequency" => "monthly",
+      "effective_from" => Date.utc_today()
+    })
   end
 end

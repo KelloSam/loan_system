@@ -2,8 +2,8 @@ defmodule MiwayCreditCore.Products.LoanProduct do
   @moduledoc """
   A configurable set of lending terms — min/max principal, interest
   method/rate, permitted term, repayment frequency, fees, penalties,
-  grace period, security/guarantor/CRB requirements, minimum approval
-  role, and an effective-date window.
+  grace period, security/guarantor/CRB/affordability requirements,
+  minimum approval role, and an effective-date window.
 
   Never versioned and never hard-deleted. A `LoanAccount` freezes the
   terms it was issued under directly onto itself at approval time
@@ -48,6 +48,8 @@ defmodule MiwayCreditCore.Products.LoanProduct do
     field :requires_guarantor, :boolean, default: false
     field :minimum_guarantors, :integer, default: 0
     field :requires_crb_check, :boolean, default: false
+    field :requires_affordability_check, :boolean, default: false
+    field :max_debt_to_income_percent, :decimal, default: Decimal.new("40.00")
     field :minimum_approval_role, :string
 
     field :status, :string, default: "active"
@@ -71,6 +73,7 @@ defmodule MiwayCreditCore.Products.LoanProduct do
       :repayment_frequency,
       :origination_fee_percent, :late_payment_penalty_percent, :grace_period_days,
       :requires_collateral, :requires_guarantor, :minimum_guarantors, :requires_crb_check,
+      :requires_affordability_check, :max_debt_to_income_percent,
       :minimum_approval_role,
       :effective_from, :effective_until
     ])
@@ -90,6 +93,7 @@ defmodule MiwayCreditCore.Products.LoanProduct do
     |> validate_number(:late_payment_penalty_percent, greater_than_or_equal_to: 0)
     |> validate_number(:grace_period_days, greater_than_or_equal_to: 0)
     |> validate_number(:minimum_guarantors, greater_than_or_equal_to: 0)
+    |> validate_number(:max_debt_to_income_percent, greater_than: 0)
     |> validate_inclusion(:interest_method, @interest_methods)
     |> validate_inclusion(:repayment_frequency, @repayment_frequencies)
     |> validate_inclusion(:minimum_approval_role, @approval_roles ++ [nil])

@@ -28,6 +28,7 @@ defmodule MiwayCreditCore.Applications do
   alias MiwayCreditCore.Accounting.AccountingEntry
   alias MiwayCreditCore.Accounts.Scope
   alias MiwayCreditCore.Authorization
+  alias MiwayCreditCore.CreditReporting
   alias MiwayCreditCore.Products
   alias MiwayCreditCore.Products.LoanProduct
   alias MiwayCreditCore.Risk
@@ -193,13 +194,16 @@ defmodule MiwayCreditCore.Applications do
   already under_review (i.e. already assessed) can be approved —
   `assess_application/3` must run first.
 
-  Four checks happen before the decision is written: maker-checker
+  Six checks happen before the decision is written: maker-checker
   (the approver can't be the same person who submitted the
   application — a nil created_by_id, from before this was tracked,
   never blocks anyone, since there's no maker on record to conflict
   with), the approver's ApprovalLimit for "applications.approve" if
   their role carries one, the product's guarantor requirement (if
-  any), and the product's minimum_approval_role (if any).
+  any), the product's minimum_approval_role (if any), the product's
+  affordability requirement (if any — Risk.assess_affordability/3),
+  and the product's CRB requirement (if any — the customer's latest
+  CreditReporting report must exist, be "clear", and be recent).
   """
   def approve_application(%LoanApplication{status: "under_review"} = application, %Scope{} = scope) do
     product = Products.get_product!(scope, application.loan_product_id)
@@ -207,7 +211,9 @@ defmodule MiwayCreditCore.Applications do
     with :ok <- check_maker_checker(application, scope),
          :ok <- check_approval_limit(application, scope),
          :ok <- check_guarantor_requirement(application, product, scope),
-         :ok <- check_minimum_approval_role(product, scope) do
+         :ok <- check_minimum_approval_role(product, scope),
+         :ok <- check_affordability(application, product, scope),
+         :ok <- check_crb_requirement(application, product, scope) do
       now = DateTime.utc_now() |> DateTime.truncate(:second)
 
       application
@@ -240,6 +246,33 @@ defmodule MiwayCreditCore.Applications do
 
   defp check_minimum_approval_role(%LoanProduct{minimum_approval_role: role}, scope) do
     if Authorization.role_meets_minimum?(scope, role), do: :ok, else: {:error, :insufficient_approval_role}
+  end
+
+  defp check_affordability(_application, %LoanProduct{requires_affordability_check: false}, _scope), do: :ok
+
+  defp check_affordability(application, %LoanProduct{requires_affordability_check: true} = product, scope) do
+    Risk.assess_affordability(scope, application, product)
+  end
+
+  @crb_report_validity_days 90
+
+  defp check_crb_requirement(_application, %LoanProduct{requires_crb_check: false}, _scope), do: :ok
+
+  defp check_crb_requirement(application, %LoanProduct{requires_crb_check: true}, scope) do
+    case CreditReporting.get_latest_report_for_customer(scope, application.customer_id) do
+      nil ->
+        {:error, :crb_check_required}
+
+      %{outcome: "adverse"} ->
+        {:error, :adverse_crb_report}
+
+      %{checked_at: checked_at} ->
+        if Date.diff(Date.utc_today(), checked_at) > @crb_report_validity_days do
+          {:error, :crb_check_expired}
+        else
+          :ok
+        end
+    end
   end
 
   @doc """
