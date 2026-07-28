@@ -1,14 +1,15 @@
 defmodule MiwayCreditCore.OrganisationsFixtures do
   @moduledoc "Test helpers for creating MiwayCreditCore.Organisations entities."
 
-  alias MiwayCreditCore.Organisations
+  alias MiwayCreditCore.{Organisations, Authorization}
 
   def valid_organisation_attrs(attrs \\ %{}) do
     Enum.into(attrs, %{name: "Test Org #{System.unique_integer([:positive])}"})
   end
 
+  @doc "Creates an Organisation with its default Roles already seeded (via Authorization.provision_organisation/1)."
   def organisation_fixture(attrs \\ %{}) do
-    {:ok, organisation} = attrs |> valid_organisation_attrs() |> Organisations.create_organisation()
+    {:ok, organisation} = attrs |> valid_organisation_attrs() |> Authorization.provision_organisation()
     organisation
   end
 
@@ -27,7 +28,8 @@ defmodule MiwayCreditCore.OrganisationsFixtures do
 
   @doc """
   Creates a StaffMember already a member of the given organisation —
-  and only that one. Bypasses AccountsFixtures.staff_member_fixture/2,
+  and only that one — with the RoleAssignment matching their role
+  already granted. Bypasses AccountsFixtures.staff_member_fixture/2,
   which would otherwise also enroll the staff member in its own
   throwaway organisation, leaving two memberships and an
   indeterminate "active" one.
@@ -37,7 +39,7 @@ defmodule MiwayCreditCore.OrganisationsFixtures do
       MiwayCreditCore.AccountsFixtures.valid_user_attrs()
       |> MiwayCreditCore.Accounts.register_staff_member(role)
 
-    {:ok, _membership} = Organisations.add_staff_to_organisation(staff_member.id, organisation.id)
+    {:ok, _membership} = Authorization.enroll_staff_member(staff_member, organisation.id)
     user
   end
 end

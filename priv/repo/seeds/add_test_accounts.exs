@@ -1,5 +1,5 @@
 defmodule MiwayCreditCore.Seeds.AddTestAccounts do
-  alias MiwayCreditCore.{Accounts, Customers, Organisations}
+  alias MiwayCreditCore.{Accounts, Customers, Organisations, Authorization}
   alias MiwayCreditCore.Organisations.Organisation
   alias MiwayCreditCore.Accounts.Scope
   alias MiwayCreditCore.Repo
@@ -8,7 +8,7 @@ defmodule MiwayCreditCore.Seeds.AddTestAccounts do
     organisation =
       Repo.get_by(Organisation, name: "Miway") ||
         (
-          {:ok, organisation} = Organisations.create_organisation(%{name: "Miway"})
+          {:ok, organisation} = Authorization.provision_organisation(%{name: "Miway"})
           organisation
         )
 
@@ -66,15 +66,15 @@ defmodule MiwayCreditCore.Seeds.AddTestAccounts do
     case Accounts.get_user_by_email(email) do
       nil ->
         {:ok, user, staff_member} = Accounts.register_staff_member(%{email: email, password: password}, role)
-        {:ok, _membership} = Organisations.add_staff_to_organisation(staff_member.id, organisation.id)
-        IO.puts("#{role} account created: #{user.email}, linked to #{organisation.name}")
+        {:ok, _membership} = Authorization.enroll_staff_member(staff_member, organisation.id)
+        IO.puts("#{role} account created: #{user.email}, linked to #{organisation.name} with matching permissions")
 
       user ->
         staff_member = Accounts.get_staff_member(user.id)
 
         unless Organisations.get_active_membership_for_staff_member(staff_member.id) do
-          {:ok, _membership} = Organisations.add_staff_to_organisation(staff_member.id, organisation.id)
-          IO.puts("#{email} existed without a membership — linked to #{organisation.name}")
+          {:ok, _membership} = Authorization.enroll_staff_member(staff_member, organisation.id)
+          IO.puts("#{email} existed without a membership — linked to #{organisation.name} with matching permissions")
         else
           IO.puts("#{role} account already exists: #{user.email}")
         end

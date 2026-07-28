@@ -3,7 +3,7 @@
 #     mix run priv/repo/seeds.exs
 #
 
-alias MiwayCreditCore.{Accounts, Customers, Organisations}
+alias MiwayCreditCore.{Accounts, Customers, Authorization}
 alias MiwayCreditCore.Organisations.Organisation
 alias MiwayCreditCore.Accounts.Scope
 alias MiwayCreditCore.Repo
@@ -11,7 +11,7 @@ alias MiwayCreditCore.Repo
 organisation =
   Repo.get_by(Organisation, name: "Miway") ||
     (
-      {:ok, organisation} = Organisations.create_organisation(%{name: "Miway"})
+      {:ok, organisation} = Authorization.provision_organisation(%{name: "Miway"})
       organisation
     )
 

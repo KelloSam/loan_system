@@ -25,10 +25,13 @@ defmodule MiwayCreditCore.AccountsFixtures do
   A login + StaffMember pair. Returns the User (role \\\\ "loan_officer").
 
   Every role except "platform_administrator" also gets an
-  OrganisationMembership in a fresh, throwaway organisation —
-  AuthPlug's scope resolution requires one for any staff member who
-  isn't platform-wide, and the vast majority of tests using this
-  fixture don't care which organisation, just that one exists.
+  OrganisationMembership (with its matching RoleAssignment already
+  granted) in a fresh, throwaway organisation — AuthPlug's scope
+  resolution requires a membership for any staff member who isn't
+  platform-wide, and Authorization.authorized?/2 requires a
+  RoleAssignment for any permission check to pass. The vast majority
+  of tests using this fixture don't care which organisation, just
+  that one exists with real permissions attached.
   """
   def staff_member_fixture(role \\ "loan_officer", attrs \\ %{}) do
     {:ok, user, staff_member} =
@@ -38,7 +41,7 @@ defmodule MiwayCreditCore.AccountsFixtures do
 
     if role != "platform_administrator" do
       organisation = MiwayCreditCore.OrganisationsFixtures.organisation_fixture()
-      {:ok, _membership} = MiwayCreditCore.Organisations.add_staff_to_organisation(staff_member.id, organisation.id)
+      {:ok, _membership} = MiwayCreditCore.Authorization.enroll_staff_member(staff_member, organisation.id)
     end
 
     user

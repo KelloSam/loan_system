@@ -26,6 +26,7 @@ defmodule MiwayCreditCore.Applications.LoanApplication do
     belongs_to :organisation, MiwayCreditCore.Organisations.Organisation, type: :binary_id
     belongs_to :customer, MiwayCreditCore.Customers.Customer, type: :binary_id
     belongs_to :decided_by, MiwayCreditCore.Accounts.User
+    belongs_to :created_by, MiwayCreditCore.Accounts.User
     has_one :loan_account, MiwayCreditCore.Lending.LoanAccount
 
     timestamps()
@@ -37,12 +38,15 @@ defmodule MiwayCreditCore.Applications.LoanApplication do
   always computes and overwrites it from the customer being applied for
   before this ever runs — never taken as-is from raw caller input, so
   an application can't be filed under a different organisation than
-  its own customer.
+  its own customer. `created_by_id` records who submitted it, checked
+  against the deciding user at approve/reject time (maker-checker) —
+  nullable, since it's optional information about the past, not a
+  structural invariant.
   """
   def changeset(loan_application, attrs) do
     loan_application
-    |> cast(attrs, [:organisation_id, :customer_id, :requested_amount, :requested_term_months, :purpose,
-                   :risk_level, :risk_score])
+    |> cast(attrs, [:organisation_id, :customer_id, :created_by_id, :requested_amount, :requested_term_months,
+                   :purpose, :risk_level, :risk_score])
     |> validate_required([:organisation_id, :customer_id, :requested_amount, :requested_term_months])
     |> validate_inclusion(:risk_level, @risk_levels)
     |> validate_number(:requested_amount, greater_than: 0)
@@ -50,6 +54,7 @@ defmodule MiwayCreditCore.Applications.LoanApplication do
     |> validate_length(:purpose, max: 500, message: "must be less than 500 characters")
     |> foreign_key_constraint(:customer_id)
     |> foreign_key_constraint(:organisation_id)
+    |> foreign_key_constraint(:created_by_id)
   end
 
   @doc "Changeset for deciding a pending application (approve/reject/withdraw)."
