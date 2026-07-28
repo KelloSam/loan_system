@@ -71,7 +71,7 @@ defmodule MiwayCreditCore.LoansFixtures do
     admin_scope = %Scope{user: admin, organisation_id: :all}
 
     {:ok, assessed} = MiwayCreditCore.Applications.assess_application(application, admin_scope)
-    {:ok, approved} = MiwayCreditCore.Applications.approve_application(assessed, admin_scope)
+    {:ok, approved} = MiwayCreditCore.Applications.approve_application(assessed, admin_scope, true)
     {:ok, disbursed, account} = MiwayCreditCore.Applications.disburse_application(approved, admin_scope)
     %{disbursed | loan_account: account}
   end

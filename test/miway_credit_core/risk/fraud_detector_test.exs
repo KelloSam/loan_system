@@ -44,7 +44,7 @@ defmodule MiwayCreditCore.Risk.FraudDetectorTest do
       admin = admin_fixture()
       admin_scope = %Scope{user: admin, organisation_id: :all}
       {:ok, assessed} = Applications.assess_application(application, admin_scope)
-      {:ok, approved} = Applications.approve_application(assessed, admin_scope)
+      {:ok, approved} = Applications.approve_application(assessed, admin_scope, true)
       {:ok, _disbursed, _account} = Applications.disburse_application(approved, admin_scope)
 
       {_level, _score, signals} = FraudDetector.evaluate(customer.id, "1234.56")
@@ -58,7 +58,7 @@ defmodule MiwayCreditCore.Risk.FraudDetectorTest do
 
       prior = application_fixture(%{"customer_id" => customer.id, "requested_amount" => "1000.50"})
       {:ok, assessed} = Applications.assess_application(prior, admin_scope)
-      {:ok, approved} = Applications.approve_application(assessed, admin_scope)
+      {:ok, approved} = Applications.approve_application(assessed, admin_scope, true)
       {:ok, _disbursed, _account} = Applications.disburse_application(approved, admin_scope)
 
       {_level, _score, signals} = FraudDetector.evaluate(customer.id, "5000")
@@ -83,7 +83,7 @@ defmodule MiwayCreditCore.Risk.FraudDetectorTest do
       admin = admin_fixture()
       admin_scope = %Scope{user: admin, organisation_id: :all}
       {:ok, assessed} = Applications.assess_application(application, admin_scope)
-      {:ok, approved0} = Applications.approve_application(assessed, admin_scope)
+      {:ok, approved0} = Applications.approve_application(assessed, admin_scope, true)
       {:ok, approved, _account} = Applications.disburse_application(approved0, admin_scope)
 
       # Without excluding: the application counts as its own repayment history.

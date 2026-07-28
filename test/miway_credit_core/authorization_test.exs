@@ -123,7 +123,7 @@ defmodule MiwayCreditCore.AuthorizationTest do
       {:ok, application} = Applications.assess_application(application, scope)
 
       assert Authorization.approval_limit(scope, "applications.approve") == Decimal.new("500.00")
-      assert {:error, :exceeds_approval_limit} = Applications.approve_application(application, scope)
+      assert {:error, :exceeds_approval_limit} = Applications.approve_application(application, scope, true)
     end
 
     test "allows approval within the limit" do
@@ -138,7 +138,7 @@ defmodule MiwayCreditCore.AuthorizationTest do
       application = application_fixture(%{"customer_id" => customer.id, "requested_amount" => "1000.00"})
       {:ok, application} = Applications.assess_application(application, scope)
 
-      assert {:ok, _approved} = Applications.approve_application(application, scope)
+      assert {:ok, _approved} = Applications.approve_application(application, scope, true)
     end
 
     test "no ApprovalLimit set means unlimited" do
@@ -163,7 +163,7 @@ defmodule MiwayCreditCore.AuthorizationTest do
         Applications.create_application(scope, valid_application_attrs(%{"customer_id" => customer.id}))
       {:ok, application} = Applications.assess_application(application, scope)
 
-      assert {:error, :maker_checker_violation} = Applications.approve_application(application, scope)
+      assert {:error, :maker_checker_violation} = Applications.approve_application(application, scope, true)
     end
 
     test "the submitter cannot reject their own application either" do
@@ -195,7 +195,7 @@ defmodule MiwayCreditCore.AuthorizationTest do
         Applications.create_application(maker_scope, valid_application_attrs(%{"customer_id" => customer.id}))
       {:ok, application} = Applications.assess_application(application, checker_scope)
 
-      assert {:ok, approved} = Applications.approve_application(application, checker_scope)
+      assert {:ok, approved} = Applications.approve_application(application, checker_scope, true)
       assert approved.decided_by_id == checker.id
       assert application.created_by_id == maker.id
     end
@@ -207,7 +207,7 @@ defmodule MiwayCreditCore.AuthorizationTest do
       admin = admin_fixture()
       scope = %Scope{user: admin, staff_member: Accounts.get_staff_member(admin.id), organisation_id: :all}
       {:ok, application} = Applications.assess_application(application, scope)
-      assert {:ok, _approved} = Applications.approve_application(application, scope)
+      assert {:ok, _approved} = Applications.approve_application(application, scope, true)
     end
   end
 end

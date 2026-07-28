@@ -7,7 +7,7 @@ defmodule MiwayCreditCore.Applications.LoanApplication do
   use Ecto.Schema
   import Ecto.Changeset
 
-  @statuses ~w(pending under_review approved rejected disbursed withdrawn)
+  @statuses ~w(pending under_review approved rejected disbursed withdrawn referred)
   @risk_levels ~w(low medium high)
 
   @primary_key {:id, :binary_id, autogenerate: true}
@@ -27,6 +27,9 @@ defmodule MiwayCreditCore.Applications.LoanApplication do
     field :assessment_notes, :string
     field :disbursed_at, :utc_datetime
 
+    field :conditions, :string
+    field :conditions_cleared_at, :utc_datetime
+
     belongs_to :organisation, MiwayCreditCore.Organisations.Organisation, type: :binary_id
     belongs_to :customer, MiwayCreditCore.Customers.Customer, type: :binary_id
     belongs_to :decided_by, MiwayCreditCore.Accounts.User
@@ -35,6 +38,7 @@ defmodule MiwayCreditCore.Applications.LoanApplication do
     belongs_to :disbursed_by, MiwayCreditCore.Accounts.User
     belongs_to :loan_product, MiwayCreditCore.Products.LoanProduct, type: :binary_id
     has_one :loan_account, MiwayCreditCore.Lending.LoanAccount
+    has_many :approval_decisions, MiwayCreditCore.Applications.ApprovalDecision, preload_order: [asc: :level, asc: :inserted_at]
 
     timestamps()
   end
@@ -67,16 +71,18 @@ defmodule MiwayCreditCore.Applications.LoanApplication do
 
   @doc """
   Changeset for a lifecycle transition — assess, approve, reject,
-  disburse, or withdraw. Each caller casts only the fields relevant to
-  its own transition (e.g. assess sets assessed_at/assessed_by_id,
-  not decided_at), so only :status is universally required.
+  conditionally approve, disburse, withdraw, refer, or clear
+  conditions. Each caller casts only the fields relevant to its own
+  transition (e.g. assess sets assessed_at/assessed_by_id, not
+  decided_at), so only :status is universally required.
   """
   def decision_changeset(loan_application, attrs) do
     loan_application
     |> cast(attrs, [
       :status, :decided_at, :decided_by_id, :rejection_reason,
       :assessed_at, :assessed_by_id, :assessment_notes,
-      :disbursed_at, :disbursed_by_id
+      :disbursed_at, :disbursed_by_id,
+      :conditions, :conditions_cleared_at
     ])
     |> validate_required([:status])
     |> validate_inclusion(:status, @statuses)

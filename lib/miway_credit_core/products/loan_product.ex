@@ -2,8 +2,9 @@ defmodule MiwayCreditCore.Products.LoanProduct do
   @moduledoc """
   A configurable set of lending terms — min/max principal, interest
   method/rate, permitted term, repayment frequency, fees, penalties,
-  grace period, security/guarantor/CRB/affordability requirements,
-  minimum approval role, and an effective-date window.
+  grace period, security/guarantor/CRB/affordability requirements, the
+  approval workflow (levels, committee decision, separation of
+  duties), and an effective-date window.
 
   Never versioned and never hard-deleted. A `LoanAccount` freezes the
   terms it was issued under directly onto itself at approval time
@@ -52,6 +53,13 @@ defmodule MiwayCreditCore.Products.LoanProduct do
     field :max_debt_to_income_percent, :decimal, default: Decimal.new("40.00")
     field :minimum_approval_role, :string
 
+    field :requires_second_level_approval, :boolean, default: false
+    field :second_level_minimum_role, :string
+    field :requires_committee_decision, :boolean, default: false
+    field :committee_size, :integer, default: 3
+    field :committee_quorum, :integer, default: 2
+    field :requires_separation_of_duties, :boolean, default: true
+
     field :status, :string, default: "active"
     field :effective_from, :date
     field :effective_until, :date
@@ -75,6 +83,9 @@ defmodule MiwayCreditCore.Products.LoanProduct do
       :requires_collateral, :requires_guarantor, :minimum_guarantors, :requires_crb_check,
       :requires_affordability_check, :max_debt_to_income_percent,
       :minimum_approval_role,
+      :requires_second_level_approval, :second_level_minimum_role,
+      :requires_committee_decision, :committee_size, :committee_quorum,
+      :requires_separation_of_duties,
       :effective_from, :effective_until
     ])
     |> validate_required([
@@ -94,11 +105,15 @@ defmodule MiwayCreditCore.Products.LoanProduct do
     |> validate_number(:grace_period_days, greater_than_or_equal_to: 0)
     |> validate_number(:minimum_guarantors, greater_than_or_equal_to: 0)
     |> validate_number(:max_debt_to_income_percent, greater_than: 0)
+    |> validate_number(:committee_size, greater_than: 0)
+    |> validate_number(:committee_quorum, greater_than: 0)
     |> validate_inclusion(:interest_method, @interest_methods)
     |> validate_inclusion(:repayment_frequency, @repayment_frequencies)
     |> validate_inclusion(:minimum_approval_role, @approval_roles ++ [nil])
+    |> validate_inclusion(:second_level_minimum_role, @approval_roles ++ [nil])
     |> validate_principal_range()
     |> validate_term_range()
+    |> validate_committee_quorum()
     |> validate_effective_range()
     |> unique_constraint([:organisation_id, :name])
     |> foreign_key_constraint(:organisation_id)
@@ -114,6 +129,17 @@ defmodule MiwayCreditCore.Products.LoanProduct do
 
   defp validate_term_range(changeset) do
     validate_range(changeset, :minimum_term_months, :maximum_term_months)
+  end
+
+  defp validate_committee_quorum(changeset) do
+    size = get_field(changeset, :committee_size)
+    quorum = get_field(changeset, :committee_quorum)
+
+    if size && quorum && quorum > size do
+      add_error(changeset, :committee_quorum, "cannot exceed committee_size")
+    else
+      changeset
+    end
   end
 
   defp validate_range(changeset, min_field, max_field) do
