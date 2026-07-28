@@ -1,4 +1,4 @@
-# Miway CreditCore — Loan Management System Constitution
+# Miway CreditCore — Loan Management System Architecture
 
 This document defines the five bounded concepts that make up the lending domain, their fields, relationships, state machines, and the invariant that ties them together. It is the backbone every future schema or feature decision should be checked against.
 

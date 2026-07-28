@@ -18,7 +18,7 @@ app fit in the roadmap — see
 
 ## Built Contexts
 
-See [`MIWAY_CREDITCORE_CONSTITUTION.md`](../MIWAY_CREDITCORE_CONSTITUTION.md)
+See [`MIWAY_CREDITCORE_ARCHITECTURE.md`](../MIWAY_CREDITCORE_ARCHITECTURE.md)
 for the full domain model behind these.
 
 | Context | Owns |
