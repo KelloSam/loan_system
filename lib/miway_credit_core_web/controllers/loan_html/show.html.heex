@@ -688,3 +688,257 @@
     <% end %>
   </div>
 <% end %>
+
+<%# Collections — shown once there's any collections history for this account %>
+<%= if @account && (@collection_case || @restructuring_requests != [] || @write_off_requests != []) do %>
+  <div class="card p-6 mt-8">
+    <h2 class="section-title mb-4">Collections</h2>
+
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <div class="card p-4">
+        <p class="text-xs text-gray-400 uppercase tracking-wide font-medium">Arrears</p>
+        <span class={"badge badge-#{@arrears_bucket} mt-2"}><%= @arrears_bucket |> String.replace("_", " ") |> String.capitalize() %></span>
+      </div>
+      <%= if @collection_case do %>
+        <div class="card p-4">
+          <p class="text-xs text-gray-400 uppercase tracking-wide font-medium">Case Status</p>
+          <span class={"badge badge-#{@collection_case.status} mt-2"}><%= @collection_case.status |> String.replace("_", " ") |> String.capitalize() %></span>
+        </div>
+        <div class="card p-4">
+          <p class="text-xs text-gray-400 uppercase tracking-wide font-medium">Recovery Status</p>
+          <span class={"badge badge-#{@collection_case.recovery_status} mt-2"}><%= @collection_case.recovery_status |> String.replace("_", " ") |> String.capitalize() %></span>
+        </div>
+      <% end %>
+    </div>
+
+    <%= if @collection_case && @collection_case.status != "closed" do %>
+      <div class="flex flex-wrap gap-2 mb-6">
+        <details class="void-disclosure">
+          <summary class="btn-outline void-toggle">Log Activity</summary>
+          <div class="card p-4 mt-2">
+            <.form :let={f} for={%{}} as={:activity} action={~p"/admin/loans/#{@application}/collections/activities"}
+                   class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="form-label">Type</label>
+                <%= select f, :activity_type, [{"Call", "call"}, {"SMS", "sms"}, {"Email", "email"}, {"Visit", "visit"}, {"Letter", "letter"}, {"Other", "other"}],
+                      class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+              </div>
+              <div>
+                <label class="form-label">Outcome</label>
+                <%= select f, :outcome, [{"Reached", "reached"}, {"No Answer", "no_answer"}, {"Promised Payment", "promised_payment"}, {"Disputed", "disputed"}, {"Refused", "refused"}, {"Other", "other"}],
+                      class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+              </div>
+              <div>
+                <label class="form-label">Follow-up Date <span class="text-gray-400 font-normal">(optional)</span></label>
+                <%= date_input f, :follow_up_date, class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+              </div>
+              <div class="sm:col-span-2">
+                <label class="form-label">Notes</label>
+                <textarea name="activity[notes]" rows="2" class="block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600"></textarea>
+              </div>
+              <div class="sm:col-span-2 flex justify-end">
+                <button type="submit" class="btn-primary">Log Activity</button>
+              </div>
+            </.form>
+          </div>
+        </details>
+
+        <details class="void-disclosure">
+          <summary class="btn-outline void-toggle">Record Promise to Pay</summary>
+          <div class="card p-4 mt-2">
+            <.form :let={f} for={%{}} as={:promise} action={~p"/admin/loans/#{@application}/collections/promises"}
+                   class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="form-label">Amount (ZMW)</label>
+                <%= number_input f, :promised_amount, step: "0.01", min: "0.01",
+                      class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+              </div>
+              <div>
+                <label class="form-label">By Date</label>
+                <%= date_input f, :promised_date, class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+              </div>
+              <div class="sm:col-span-2 flex justify-end">
+                <button type="submit" class="btn-primary">Record Promise</button>
+              </div>
+            </.form>
+          </div>
+        </details>
+
+        <details class="void-disclosure">
+          <summary class="btn-outline void-toggle">Recovery Status</summary>
+          <div class="card p-4 mt-2">
+            <.form :let={f} for={%{}} as={:recovery} action={~p"/admin/loans/#{@application}/collections/recovery_status"} method="patch"
+                   class="flex items-end gap-3">
+              <div class="flex-1">
+                <label class="form-label">Status</label>
+                <%= select f, :recovery_status, [{"None", "none"}, {"In Recovery", "in_recovery"}, {"Legal Action", "legal_action"}, {"Recovered", "recovered"}, {"Abandoned", "abandoned"}],
+                      class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+              </div>
+              <button type="submit" class="btn-primary">Update</button>
+            </.form>
+          </div>
+        </details>
+
+        <%= link "Escalate", to: ~p"/admin/loans/#{@application}/collections/escalate", method: :patch, class: "btn-outline" %>
+
+        <details class="reject-disclosure">
+          <summary class="btn-danger reject-toggle">Close Case</summary>
+          <div class="card p-4 mt-2">
+            <.form :let={_f} for={%{}} as={:close} action={~p"/admin/loans/#{@application}/collections/close"} method="patch">
+              <label class="form-label" for="close_reason">Reason</label>
+              <textarea id="close_reason" name="reason" rows="2" required placeholder="e.g. account brought current"></textarea>
+              <div class="flex justify-end gap-2 mt-2">
+                <button type="submit" class="btn-danger">Confirm Close</button>
+              </div>
+            </.form>
+          </div>
+        </details>
+      </div>
+    <% end %>
+
+    <%# Activity / promise history %>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <div>
+        <h3 class="text-sm font-semibold text-navy-900 mb-2">Communication History</h3>
+        <%= if @collection_activities == [] do %>
+          <p class="text-sm text-gray-400">No activity logged yet.</p>
+        <% else %>
+          <ul class="space-y-2">
+            <%= for activity <- @collection_activities do %>
+              <li class="text-sm border-b border-gray-100 pb-2">
+                <div class="flex justify-between">
+                  <span class="font-medium text-navy-900"><%= activity.activity_type |> String.capitalize() %> — <%= activity.outcome |> String.replace("_", " ") |> String.capitalize() %></span>
+                  <span class="text-gray-400 text-xs"><%= Calendar.strftime(activity.occurred_at, "%d %b %Y") %></span>
+                </div>
+                <%= if activity.notes do %><p class="text-gray-600 mt-0.5"><%= activity.notes %></p><% end %>
+                <%= if activity.follow_up_date do %><p class="text-xs text-amber-600 mt-0.5">Follow up by <%= activity.follow_up_date %></p><% end %>
+              </li>
+            <% end %>
+          </ul>
+        <% end %>
+      </div>
+      <div>
+        <h3 class="text-sm font-semibold text-navy-900 mb-2">Promises to Pay</h3>
+        <%= if @promises_to_pay == [] do %>
+          <p class="text-sm text-gray-400">No promises recorded yet.</p>
+        <% else %>
+          <ul class="space-y-2">
+            <%= for promise <- @promises_to_pay do %>
+              <li class="text-sm border-b border-gray-100 pb-2 flex justify-between items-center">
+                <span>ZMW <%= promise.promised_amount %> by <%= promise.promised_date %></span>
+                <span class={"badge badge-#{promise.status}"}><%= String.capitalize(promise.status) %></span>
+              </li>
+            <% end %>
+          </ul>
+        <% end %>
+      </div>
+    </div>
+
+    <%# Restructuring %>
+    <div class="pt-4 border-t border-gray-100 mb-6">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-sm font-semibold text-navy-900">Restructuring Requests</h3>
+        <%= if @account.status == "active" do %>
+          <details class="void-disclosure">
+            <summary class="btn-outline void-toggle">Request Restructuring</summary>
+            <div class="card p-4 mt-2">
+              <.form :let={f} for={%{}} as={:restructuring_request} action={~p"/admin/loans/#{@application}/restructuring_requests"}
+                     class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="form-label">Additional Months</label>
+                  <%= number_input f, :additional_term_months, step: "1", min: "1",
+                        class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+                </div>
+                <div class="sm:col-span-2">
+                  <label class="form-label">Reason</label>
+                  <textarea name="restructuring_request[reason]" rows="2" required class="block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600"></textarea>
+                </div>
+                <div class="sm:col-span-2 flex justify-end">
+                  <button type="submit" class="btn-primary">Submit Request</button>
+                </div>
+              </.form>
+            </div>
+          </details>
+        <% end %>
+      </div>
+      <%= if @restructuring_requests == [] do %>
+        <p class="text-sm text-gray-400">No restructuring requests.</p>
+      <% else %>
+        <ul class="space-y-2">
+          <%= for request <- @restructuring_requests do %>
+            <li class="text-sm border-b border-gray-100 pb-2">
+              <div class="flex justify-between items-center">
+                <span>+<%= request.additional_term_months %> months — <%= request.reason %></span>
+                <span class={"badge badge-#{request.status}"}><%= String.capitalize(request.status) %></span>
+              </div>
+              <%= if request.status == "pending" do %>
+                <div class="flex gap-2 mt-2">
+                  <%= link "Approve", to: ~p"/admin/loans/#{@application}/restructuring_requests/#{request}/approve", method: :patch, class: "btn-primary text-xs", data: [confirm: "Approve this restructuring? A new repayment schedule will be generated."] %>
+                  <details class="reject-disclosure inline-block">
+                    <summary class="btn-outline reject-toggle text-xs">Reject</summary>
+                    <div class="card p-3 mt-2">
+                      <.form :let={_f} for={%{}} as={:reject} action={~p"/admin/loans/#{@application}/restructuring_requests/#{request}/reject"} method="patch">
+                        <textarea name="notes" rows="2" placeholder="Why reject?"></textarea>
+                        <button type="submit" class="btn-danger text-xs mt-2">Confirm Reject</button>
+                      </.form>
+                    </div>
+                  </details>
+                </div>
+              <% end %>
+            </li>
+          <% end %>
+        </ul>
+      <% end %>
+    </div>
+
+    <%# Write-off %>
+    <div class="pt-4 border-t border-gray-100">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-sm font-semibold text-navy-900">Write-Off Requests</h3>
+        <%= if @account.status == "active" do %>
+          <details class="void-disclosure">
+            <summary class="btn-outline void-toggle">Request Write-Off</summary>
+            <div class="card p-4 mt-2">
+              <.form :let={_f} for={%{}} as={:write_off_request} action={~p"/admin/loans/#{@application}/write_off_requests"}>
+                <label class="form-label">Reason</label>
+                <textarea name="write_off_request[reason]" rows="2" required class="block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600"></textarea>
+                <p class="form-hint mt-1">Requests writing off the current outstanding balance: ZMW <%= @account.outstanding_balance %></p>
+                <div class="flex justify-end mt-2">
+                  <button type="submit" class="btn-primary">Submit Request</button>
+                </div>
+              </.form>
+            </div>
+          </details>
+        <% end %>
+      </div>
+      <%= if @write_off_requests == [] do %>
+        <p class="text-sm text-gray-400">No write-off requests.</p>
+      <% else %>
+        <ul class="space-y-2">
+          <%= for request <- @write_off_requests do %>
+            <li class="text-sm border-b border-gray-100 pb-2">
+              <div class="flex justify-between items-center">
+                <span>ZMW <%= request.requested_amount %> — <%= request.reason %></span>
+                <span class={"badge badge-#{request.status}"}><%= String.capitalize(request.status) %></span>
+              </div>
+              <%= if request.status == "pending" do %>
+                <div class="flex gap-2 mt-2">
+                  <%= link "Approve", to: ~p"/admin/loans/#{@application}/write_off_requests/#{request}/approve", method: :patch, class: "btn-primary text-xs", data: [confirm: "Approve this write-off? This zeroes the outstanding balance and cannot be undone."] %>
+                  <details class="reject-disclosure inline-block">
+                    <summary class="btn-outline reject-toggle text-xs">Reject</summary>
+                    <div class="card p-3 mt-2">
+                      <.form :let={_f} for={%{}} as={:reject} action={~p"/admin/loans/#{@application}/write_off_requests/#{request}/reject"} method="patch">
+                        <textarea name="notes" rows="2" placeholder="Why reject?"></textarea>
+                        <button type="submit" class="btn-danger text-xs mt-2">Confirm Reject</button>
+                      </.form>
+                    </div>
+                  </details>
+                </div>
+              <% end %>
+            </li>
+          <% end %>
+        </ul>
+      <% end %>
+    </div>
+  </div>
+<% end %>

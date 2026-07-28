@@ -1,7 +1,7 @@
 defmodule MiwayCreditCoreWeb.LoanController do
   use MiwayCreditCoreWeb, :controller
 
-  alias MiwayCreditCore.{Applications, Lending, Payments, Customers, Products, AuditLogs, Organisations, Repo}
+  alias MiwayCreditCore.{Applications, Lending, Payments, Customers, Products, AuditLogs, Organisations, Repo, Collections}
   alias MiwayCreditCore.Applications.{LoanApplication, Collateral}
   alias MiwayCreditCore.Payments.PaymentTransaction
   alias MiwayCreditCoreWeb.Plugs.RequirePermissionPlug
@@ -48,17 +48,19 @@ defmodule MiwayCreditCoreWeb.LoanController do
       end
 
     render(conn, :show,
-      application: application,
-      account: account,
-      interest: interest,
-      installments: installments,
-      transactions: transactions,
-      payment_changeset: payment_changeset,
-      failed_payment_changeset: failed_payment_changeset,
-      collateral_changeset: collateral_changeset,
-      collaterals: collaterals,
-      fraud_signals: fraud_signals,
-      days_past_due: days_past_due
+      [
+        application: application,
+        account: account,
+        interest: interest,
+        installments: installments,
+        transactions: transactions,
+        payment_changeset: payment_changeset,
+        failed_payment_changeset: failed_payment_changeset,
+        collateral_changeset: collateral_changeset,
+        collaterals: collaterals,
+        fraud_signals: fraud_signals,
+        days_past_due: days_past_due
+      ] ++ collections_assigns(scope, account)
     )
   end
 
@@ -724,9 +726,31 @@ defmodule MiwayCreditCoreWeb.LoanController do
         fraud_signals: fraud_signals,
         days_past_due: days_past_due
       ]
+      |> Kernel.++(collections_assigns(scope, account))
       |> Keyword.merge(overrides)
 
     render(conn, :show, assigns)
+  end
+
+  # Shared by show/2 and render_show_with_errors/2 — the Collections
+  # card needs the open case (if any), its activity/promise history,
+  # and every restructuring/write-off request ever filed for this
+  # account, regardless of loan_account presence.
+  defp collections_assigns(_scope, nil) do
+    [collection_case: nil, collection_activities: [], promises_to_pay: [], restructuring_requests: [], write_off_requests: [], arrears_bucket: "current"]
+  end
+
+  defp collections_assigns(scope, account) do
+    collection_case = Collections.get_open_case_for_account(scope, account.id)
+
+    [
+      collection_case: collection_case,
+      collection_activities: collection_case && Collections.list_activities_for_case(scope, collection_case.id) || [],
+      promises_to_pay: collection_case && Collections.list_promises_for_case(scope, collection_case.id) || [],
+      restructuring_requests: Collections.list_restructuring_requests_for_account(scope, account.id),
+      write_off_requests: Collections.list_write_off_requests_for_account(scope, account.id),
+      arrears_bucket: Collections.classify_arrears(Lending.days_past_due(account))
+    ]
   end
 
   # The payment form submits a plain date (<input type="date">); the

@@ -11,7 +11,7 @@ defmodule MiwayCreditCoreWeb.PermissionEnforcementTest do
 
   import MiwayCreditCore.{CustomersFixtures, LoansFixtures, OrganisationsFixtures}
 
-  alias MiwayCreditCore.{Applications, Payments, Lending}
+  alias MiwayCreditCore.{Applications, Payments, Lending, Collections}
   alias MiwayCreditCore.Accounts.Scope
 
   setup do
@@ -188,6 +188,74 @@ defmodule MiwayCreditCoreWeb.PermissionEnforcementTest do
       conn = conn |> login(loan_officer) |> get(~p"/admin/audit-logs")
       assert conn.status == 403
     end
+
+    test "Collections: log activity and record promise granted (collections.manage)", %{
+      conn: conn, loan_officer: loan_officer, organisation: organisation, customer: customer
+    } do
+      application = approved_application_fixture(%{"customer_id" => customer.id})
+      {:ok, _case} = Collections.ensure_case_opened(application.loan_account)
+
+      conn = conn |> login(loan_officer)
+
+      conn1 =
+        post(conn, ~p"/admin/loans/#{application.id}/collections/activities", activity: %{
+          "activity_type" => "call",
+          "outcome" => "reached",
+          "notes" => "Spoke with customer"
+        })
+
+      assert redirected_to(conn1) == ~p"/admin/loans/#{application.id}"
+
+      conn2 =
+        post(conn, ~p"/admin/loans/#{application.id}/collections/promises", promise: %{
+          "promised_amount" => "50.00",
+          "promised_date" => Date.add(Date.utc_today(), 7) |> Date.to_iso8601()
+        })
+
+      assert redirected_to(conn2) == ~p"/admin/loans/#{application.id}"
+
+      scope = %Scope{organisation_id: organisation.id}
+      collection_case = Collections.get_open_case_for_account(scope, application.loan_account.id)
+      assert length(Collections.list_activities_for_case(scope, collection_case.id)) == 1
+      assert length(Collections.list_promises_for_case(scope, collection_case.id)) == 1
+    end
+
+    test "Restructuring: can request, refused with a real 403 trying to approve", %{
+      conn: conn, loan_officer: loan_officer, customer: customer
+    } do
+      application = approved_application_fixture(%{"customer_id" => customer.id})
+      conn = conn |> login(loan_officer)
+
+      conn1 =
+        post(conn, ~p"/admin/loans/#{application.id}/restructuring_requests", restructuring_request: %{
+          "additional_term_months" => "3",
+          "reason" => "Reduced income"
+        })
+
+      assert redirected_to(conn1) == ~p"/admin/loans/#{application.id}"
+
+      [request] = Collections.list_restructuring_requests_for_account(%Scope{organisation_id: :all}, application.loan_account.id)
+
+      conn2 = patch(conn, ~p"/admin/loans/#{application.id}/restructuring_requests/#{request.id}/approve")
+      assert conn2.status == 403
+    end
+
+    test "Write-off: can request, refused with a real 403 trying to approve", %{
+      conn: conn, loan_officer: loan_officer, customer: customer
+    } do
+      application = approved_application_fixture(%{"customer_id" => customer.id})
+      conn = conn |> login(loan_officer)
+
+      conn1 =
+        post(conn, ~p"/admin/loans/#{application.id}/write_off_requests", write_off_request: %{"reason" => "Uncollectable"})
+
+      assert redirected_to(conn1) == ~p"/admin/loans/#{application.id}"
+
+      [request] = Collections.list_write_off_requests_for_account(%Scope{organisation_id: :all}, application.loan_account.id)
+
+      conn2 = patch(conn, ~p"/admin/loans/#{application.id}/write_off_requests/#{request.id}/approve")
+      assert conn2.status == 403
+    end
   end
 
   describe "organisation_administrator — Approve, Disburse, and Reverse all granted" do
@@ -284,6 +352,45 @@ defmodule MiwayCreditCoreWeb.PermissionEnforcementTest do
     test "audit log: granted", %{conn: conn, org_admin: org_admin} do
       conn = conn |> login(org_admin)
       assert conn |> get(~p"/admin/audit-logs") |> html_response(200)
+    end
+
+    test "Restructuring: can approve a request filed by a different officer", %{
+      conn: conn, org_admin: org_admin, loan_officer: loan_officer, customer: customer
+    } do
+      application = approved_application_fixture(%{"customer_id" => customer.id})
+
+      {:ok, request} =
+        Collections.request_restructuring(application.loan_account, %{
+          "additional_term_months" => 3,
+          "reason" => "Reduced income",
+          "requested_by_id" => loan_officer.id
+        })
+
+      conn = conn |> login(org_admin)
+      conn = patch(conn, ~p"/admin/loans/#{application.id}/restructuring_requests/#{request.id}/approve")
+
+      assert redirected_to(conn) == ~p"/admin/loans/#{application.id}"
+      reloaded = Collections.get_restructuring_request!(%Scope{organisation_id: :all}, request.id)
+      assert reloaded.status == "approved"
+    end
+
+    test "Write-off: can approve a request filed by a different officer", %{
+      conn: conn, org_admin: org_admin, loan_officer: loan_officer, customer: customer
+    } do
+      application = approved_application_fixture(%{"customer_id" => customer.id})
+
+      {:ok, request} =
+        Collections.request_write_off(application.loan_account, %{
+          "reason" => "Uncollectable",
+          "requested_by_id" => loan_officer.id
+        })
+
+      conn = conn |> login(org_admin)
+      conn = patch(conn, ~p"/admin/loans/#{application.id}/write_off_requests/#{request.id}/approve")
+
+      assert redirected_to(conn) == ~p"/admin/loans/#{application.id}"
+      reloaded = Lending.get_account!(%Scope{organisation_id: :all}, application.loan_account.id)
+      assert reloaded.status == "written_off"
     end
   end
 

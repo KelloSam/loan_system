@@ -113,6 +113,18 @@ defmodule MiwayCreditCoreWeb.Router do
     get "/loans/:id/payments/:transaction_id/receipt", LoanController, :receipt
     post "/loans/:id/collateral", LoanController, :create_collateral
     delete "/loans/:id/collateral/:collateral_id", LoanController, :delete_collateral
+
+    post "/loans/:id/collections/activities", CollectionController, :create_activity
+    post "/loans/:id/collections/promises", CollectionController, :create_promise
+    patch "/loans/:id/collections/escalate", CollectionController, :escalate_case
+    patch "/loans/:id/collections/close", CollectionController, :close_case
+    patch "/loans/:id/collections/recovery_status", CollectionController, :set_recovery_status
+    post "/loans/:id/restructuring_requests", CollectionController, :create_restructuring_request
+    patch "/loans/:id/restructuring_requests/:request_id/approve", CollectionController, :approve_restructuring
+    patch "/loans/:id/restructuring_requests/:request_id/reject", CollectionController, :reject_restructuring
+    post "/loans/:id/write_off_requests", CollectionController, :create_write_off_request
+    patch "/loans/:id/write_off_requests/:request_id/approve", CollectionController, :approve_write_off
+    patch "/loans/:id/write_off_requests/:request_id/reject", CollectionController, :reject_write_off
   end
 
   # Customer portal routes — path stays "/client" (naming predates the

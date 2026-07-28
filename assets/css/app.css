@@ -110,3 +110,21 @@
 .badge-not_started   { @apply bg-gray-100 text-gray-600; }
 .badge-pending_review{ @apply bg-amber-100 text-amber-800; }
 .badge-verified      { @apply bg-emerald-100 text-emerald-800; }
+
+/* Collections (Step 15) */
+.badge-open          { @apply bg-amber-100 text-amber-800; }
+.badge-in_progress   { @apply bg-blue-100 text-blue-800; }
+.badge-resolved      { @apply bg-emerald-100 text-emerald-800; }
+.badge-escalated     { @apply bg-red-100 text-red-800; }
+.badge-none          { @apply bg-gray-100 text-gray-600; }
+.badge-in_recovery   { @apply bg-amber-100 text-amber-800; }
+.badge-legal_action  { @apply bg-red-100 text-red-800; }
+.badge-recovered     { @apply bg-emerald-100 text-emerald-800; }
+.badge-abandoned     { @apply bg-gray-100 text-gray-600; }
+.badge-kept          { @apply bg-emerald-100 text-emerald-800; }
+.badge-broken        { @apply bg-red-100 text-red-800; }
+.badge-current       { @apply bg-emerald-100 text-emerald-800; }
+.badge-1_30_days     { @apply bg-amber-100 text-amber-800; }
+.badge-31_60_days    { @apply bg-orange-100 text-orange-800; }
+.badge-61_90_days    { @apply bg-red-100 text-red-800; }
+.badge-over_90_days  { @apply bg-red-200 text-red-900; }
