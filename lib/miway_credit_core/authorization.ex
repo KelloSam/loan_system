@@ -23,6 +23,7 @@ defmodule MiwayCreditCore.Authorization do
   alias MiwayCreditCore.Organisations
   alias MiwayCreditCore.Organisations.OrganisationMembership
   alias MiwayCreditCore.Products
+  alias MiwayCreditCore.Accounting.GeneralLedger
   alias MiwayCreditCore.Accounts.Scope
 
   @permission_keys ~w(
@@ -83,7 +84,8 @@ defmodule MiwayCreditCore.Authorization do
     Repo.transaction(fn ->
       with {:ok, organisation} <- Organisations.create_organisation(attrs),
            {:ok, _roles} <- seed_default_roles(Repo, organisation.id),
-           {:ok, _product} <- seed_default_product(organisation.id) do
+           {:ok, _product} <- seed_default_product(organisation.id),
+           {:ok, _accounts} <- GeneralLedger.seed_chart_of_accounts(organisation.id) do
         organisation
       else
         {:error, reason} -> Repo.rollback(reason)

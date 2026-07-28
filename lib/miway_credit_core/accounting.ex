@@ -9,10 +9,21 @@ defmodule MiwayCreditCore.Accounting do
   function is exposed here, so entries can't drift once written.
 
   Single import site for ledger reads (`alias MiwayCreditCore.Accounting`).
+
+  `Accounting.GeneralLedger` (Step 14) is the real double-entry general
+  ledger sitting alongside this per-account subledger — chart of
+  accounts, balanced journal entries/lines, `total_debits == total_credits`
+  as a checkable invariant. Its write functions
+  (`post_journal_entry/3`, `post_reversal/3`) are called directly by
+  callers building an `Ecto.Multi`, same as `AccountingEntry` itself;
+  only its read functions are delegated here.
   """
 
-  alias MiwayCreditCore.Accounting.Ledger
+  alias MiwayCreditCore.Accounting.{Ledger, GeneralLedger}
 
   defdelegate list_entries_for_account(scope, loan_account_id), to: Ledger
   defdelegate rebuild_outstanding_balance(scope, loan_account_id), to: Ledger
+
+  defdelegate trial_balance(scope), to: GeneralLedger
+  defdelegate cash_position(scope), to: GeneralLedger
 end
