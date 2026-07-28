@@ -9,8 +9,11 @@ defmodule MiwayCreditCoreWeb.LoanController do
   plug RequirePermissionPlug, "applications.view" when action in [:index, :show]
   plug RequirePermissionPlug, "applications.create" when action in [:new, :create]
   plug RequirePermissionPlug, "applications.edit" when action in [:edit, :update, :delete]
+  plug RequirePermissionPlug, "applications.assess" when action == :assess
   plug RequirePermissionPlug, "applications.approve" when action == :approve
   plug RequirePermissionPlug, "applications.reject" when action == :reject
+  plug RequirePermissionPlug, "loans.disburse" when action == :disburse
+  plug RequirePermissionPlug, "applications.withdraw" when action == :withdraw
   plug RequirePermissionPlug, "payments.receive" when action == :create_payment
   plug RequirePermissionPlug, "payments.reverse" when action == :void_payment
   plug RequirePermissionPlug, "collateral.manage" when action in [:create_collateral, :delete_collateral]
@@ -161,23 +164,59 @@ defmodule MiwayCreditCoreWeb.LoanController do
     end
   end
 
+  def assess(conn, %{"id" => id} = params) do
+    application = Applications.get_application!(conn.assigns.current_scope, id)
+    notes = Map.get(params, "notes")
+
+    case Applications.assess_application(application, conn.assigns.current_scope, notes) do
+      {:ok, application} ->
+        AuditLogs.log("loan_application_assessed",
+          actor_id: conn.assigns.current_user.id,
+          actor_email: conn.assigns.current_user.email,
+          target_type: "loan_application",
+          target_id: application.id,
+          ip_address: get_ip(conn),
+          metadata: %{customer_id: application.customer_id}
+        )
+
+        conn
+        |> put_flash(:info, "Application assessed — ready for a decision.")
+        |> redirect(to: ~p"/admin/loans/#{application}")
+
+      {:error, :invalid_status} ->
+        conn
+        |> put_flash(:error, "This application isn't pending — it can't be assessed.")
+        |> redirect(to: ~p"/admin/loans/#{id}")
+
+      {:error, _} ->
+        conn
+        |> put_flash(:error, "Could not assess application.")
+        |> redirect(to: ~p"/admin/loans/#{id}")
+    end
+  end
+
   def approve(conn, %{"id" => id}) do
     application = Applications.get_application!(conn.assigns.current_scope, id)
 
     case Applications.approve_application(application, conn.assigns.current_scope) do
-      {:ok, application, account} ->
+      {:ok, application} ->
         AuditLogs.log("loan_application_approved",
           actor_id: conn.assigns.current_user.id,
           actor_email: conn.assigns.current_user.email,
-          target_type: "loan_account",
-          target_id: account.id,
+          target_type: "loan_application",
+          target_id: application.id,
           ip_address: get_ip(conn),
-          metadata: %{principal_amount: account.principal_amount, customer_id: account.customer_id}
+          metadata: %{requested_amount: application.requested_amount, customer_id: application.customer_id}
         )
 
         conn
-        |> put_flash(:info, "Application approved — account opened.")
+        |> put_flash(:info, "Application approved — ready to disburse.")
         |> redirect(to: ~p"/admin/loans/#{application}")
+
+      {:error, :invalid_status} ->
+        conn
+        |> put_flash(:error, "This application hasn't been assessed yet — it can't be approved.")
+        |> redirect(to: ~p"/admin/loans/#{id}")
 
       {:error, :maker_checker_violation} ->
         conn
@@ -225,6 +264,11 @@ defmodule MiwayCreditCoreWeb.LoanController do
         |> put_flash(:info, "Application rejected.")
         |> redirect(to: ~p"/admin/loans/#{application}")
 
+      {:error, :invalid_status} ->
+        conn
+        |> put_flash(:error, "This application hasn't been assessed yet — it can't be rejected.")
+        |> redirect(to: ~p"/admin/loans/#{id}")
+
       {:error, :maker_checker_violation} ->
         conn
         |> put_flash(:error, "You submitted this application — someone else must decide it.")
@@ -233,6 +277,66 @@ defmodule MiwayCreditCoreWeb.LoanController do
       {:error, _} ->
         conn
         |> put_flash(:error, "Could not reject application.")
+        |> redirect(to: ~p"/admin/loans/#{id}")
+    end
+  end
+
+  def disburse(conn, %{"id" => id}) do
+    application = Applications.get_application!(conn.assigns.current_scope, id)
+
+    case Applications.disburse_application(application, conn.assigns.current_scope) do
+      {:ok, application, account} ->
+        AuditLogs.log("loan_application_disbursed",
+          actor_id: conn.assigns.current_user.id,
+          actor_email: conn.assigns.current_user.email,
+          target_type: "loan_account",
+          target_id: account.id,
+          ip_address: get_ip(conn),
+          metadata: %{principal_amount: account.principal_amount, customer_id: account.customer_id}
+        )
+
+        conn
+        |> put_flash(:info, "Application disbursed — account opened.")
+        |> redirect(to: ~p"/admin/loans/#{application}")
+
+      {:error, :invalid_status} ->
+        conn
+        |> put_flash(:error, "This application isn't approved yet — it can't be disbursed.")
+        |> redirect(to: ~p"/admin/loans/#{id}")
+
+      {:error, _} ->
+        conn
+        |> put_flash(:error, "Could not disburse application.")
+        |> redirect(to: ~p"/admin/loans/#{id}")
+    end
+  end
+
+  def withdraw(conn, %{"id" => id}) do
+    application = Applications.get_application!(conn.assigns.current_scope, id)
+
+    case Applications.withdraw_application(application, conn.assigns.current_scope) do
+      {:ok, application} ->
+        AuditLogs.log("loan_application_withdrawn",
+          actor_id: conn.assigns.current_user.id,
+          actor_email: conn.assigns.current_user.email,
+          target_type: "loan_application",
+          target_id: application.id,
+          ip_address: get_ip(conn),
+          metadata: %{customer_id: application.customer_id}
+        )
+
+        conn
+        |> put_flash(:info, "Application withdrawn.")
+        |> redirect(to: ~p"/admin/loans/#{application}")
+
+      {:error, :invalid_status} ->
+        conn
+        |> put_flash(:error, "This application has already been decided — it can't be withdrawn.")
+        |> redirect(to: ~p"/admin/loans/#{id}")
+
+      {:error, _} ->
+        conn
+        |> put_flash(:error, "Could not withdraw application.")
         |> redirect(to: ~p"/admin/loans/#{id}")
     end
   end

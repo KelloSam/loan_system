@@ -23,7 +23,7 @@ defmodule MiwayCreditCoreWeb.PermissionEnforcementTest do
     %{organisation: organisation, loan_officer: loan_officer, org_admin: org_admin, customer: customer}
   end
 
-  describe "loan_officer — See, Create, Edit granted; Approve, Reverse refused" do
+  describe "loan_officer — See, Create, Edit, Assess, Withdraw granted; Approve, Reject, Disburse, Reverse refused" do
     test "See: can list and view applications", %{conn: conn, loan_officer: loan_officer, customer: customer} do
       application = application_fixture(%{"customer_id" => customer.id})
 
@@ -59,6 +59,20 @@ defmodule MiwayCreditCoreWeb.PermissionEnforcementTest do
       assert redirected_to(conn) == ~p"/admin/loans/#{application.id}"
     end
 
+    test "Assess: granted", %{conn: conn, loan_officer: loan_officer, customer: customer} do
+      application = application_fixture(%{"customer_id" => customer.id})
+      conn = conn |> login(loan_officer) |> patch(~p"/admin/loans/#{application.id}/assess")
+
+      assert redirected_to(conn) == ~p"/admin/loans/#{application.id}"
+    end
+
+    test "Withdraw: granted", %{conn: conn, loan_officer: loan_officer, customer: customer} do
+      application = application_fixture(%{"customer_id" => customer.id})
+      conn = conn |> login(loan_officer) |> patch(~p"/admin/loans/#{application.id}/withdraw")
+
+      assert redirected_to(conn) == ~p"/admin/loans/#{application.id}"
+    end
+
     test "Approve: refused with a real 403, not hidden", %{conn: conn, loan_officer: loan_officer, customer: customer} do
       application = application_fixture(%{"customer_id" => customer.id})
       conn = conn |> login(loan_officer) |> patch(~p"/admin/loans/#{application.id}/approve")
@@ -69,6 +83,22 @@ defmodule MiwayCreditCoreWeb.PermissionEnforcementTest do
     test "Reject: refused with a real 403", %{conn: conn, loan_officer: loan_officer, customer: customer} do
       application = application_fixture(%{"customer_id" => customer.id})
       conn = conn |> login(loan_officer) |> patch(~p"/admin/loans/#{application.id}/reject", %{"reason" => "no"})
+
+      assert conn.status == 403
+    end
+
+    test "Disburse: refused with a real 403", %{conn: conn, loan_officer: loan_officer, org_admin: org_admin, customer: customer} do
+      application = application_fixture(%{"customer_id" => customer.id})
+
+      admin_conn = conn |> login(org_admin)
+      admin_conn = patch(admin_conn, ~p"/admin/loans/#{application.id}/assess")
+      _admin_conn = patch(admin_conn, ~p"/admin/loans/#{application.id}/approve")
+
+      conn =
+        build_conn()
+        |> Plug.Test.init_test_session(%{})
+        |> login(loan_officer)
+        |> patch(~p"/admin/loans/#{application.id}/disburse")
 
       assert conn.status == 403
     end
@@ -97,16 +127,34 @@ defmodule MiwayCreditCoreWeb.PermissionEnforcementTest do
     end
   end
 
-  describe "organisation_administrator — Approve and Reverse both granted" do
-    test "Approve: succeeds, disbursing the loan", %{conn: conn, org_admin: org_admin, customer: customer} do
+  describe "organisation_administrator — Approve, Disburse, and Reverse all granted" do
+    test "Assess then Approve: succeeds, decision recorded but no account yet", %{conn: conn, org_admin: org_admin, customer: customer} do
       application = application_fixture(%{"customer_id" => customer.id})
       conn = conn |> login(org_admin)
+
+      conn = patch(conn, ~p"/admin/loans/#{application.id}/assess")
+      assert redirected_to(conn) == ~p"/admin/loans/#{application.id}"
 
       conn = patch(conn, ~p"/admin/loans/#{application.id}/approve")
       assert redirected_to(conn) == ~p"/admin/loans/#{application.id}"
 
       reloaded = Applications.get_application!(%Scope{organisation_id: :all}, application.id)
       assert reloaded.status == "approved"
+      assert reloaded.loan_account == nil
+    end
+
+    test "Disburse: succeeds, opening the account — only reachable after approval", %{conn: conn, org_admin: org_admin, customer: customer} do
+      application = application_fixture(%{"customer_id" => customer.id})
+      conn = conn |> login(org_admin)
+
+      conn = patch(conn, ~p"/admin/loans/#{application.id}/assess")
+      conn = patch(conn, ~p"/admin/loans/#{application.id}/approve")
+
+      conn = patch(conn, ~p"/admin/loans/#{application.id}/disburse")
+      assert redirected_to(conn) == ~p"/admin/loans/#{application.id}"
+
+      reloaded = Applications.get_application!(%Scope{organisation_id: :all}, application.id)
+      assert reloaded.status == "disbursed"
       assert reloaded.loan_account != nil
     end
 
@@ -140,6 +188,7 @@ defmodule MiwayCreditCoreWeb.PermissionEnforcementTest do
       application_path = redirected_to(conn)
       application_id = application_path |> String.split("/") |> List.last()
 
+      conn = patch(conn, ~p"/admin/loans/#{application_id}/assess")
       conn2 = patch(conn, ~p"/admin/loans/#{application_id}/approve")
       assert Phoenix.Flash.get(conn2.assigns.flash, :error) =~ "submitted this application"
     end

@@ -96,8 +96,11 @@ defmodule MiwayCreditCoreWeb.Router do
     patch "/products/:id/retire", ProductController, :retire
     patch "/products/:id/activate", ProductController, :activate
     resources "/loans", LoanController
+    patch "/loans/:id/assess", LoanController, :assess
     patch "/loans/:id/approve", LoanController, :approve
     patch "/loans/:id/reject", LoanController, :reject
+    patch "/loans/:id/disburse", LoanController, :disburse
+    patch "/loans/:id/withdraw", LoanController, :withdraw
     post "/loans/:id/payments", LoanController, :create_payment
     patch "/loans/:id/payments/:transaction_id/void", LoanController, :void_payment
     post "/loans/:id/collateral", LoanController, :create_collateral

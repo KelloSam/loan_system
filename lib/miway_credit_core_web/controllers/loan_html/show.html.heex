@@ -14,6 +14,31 @@
   <div class="flex flex-wrap gap-2">
     <%= if @application.status == "pending" do %>
       <%= link "Edit", to: ~p"/admin/loans/#{@application}/edit", class: "btn-outline" %>
+      <details class="reject-disclosure">
+        <summary class="btn-gold reject-toggle">Assess</summary>
+        <div class="card p-4 mt-2">
+          <.form :let={_f} for={%{}} as={:assess} action={~p"/admin/loans/#{@application}/assess"} method="patch">
+            <label class="form-label" for="assess_notes">Assessment notes <span class="text-gray-400 font-normal">(optional)</span></label>
+            <textarea
+              id="assess_notes"
+              name="notes"
+              rows="3"
+              placeholder="What did you find reviewing this application?"
+            ></textarea>
+            <div class="flex justify-end gap-2 mt-2">
+              <button type="submit" class="btn-gold">Confirm Assess</button>
+            </div>
+          </.form>
+        </div>
+      </details>
+      <%= link "Withdraw",
+            to: ~p"/admin/loans/#{@application}/withdraw",
+            method: :patch,
+            data: [confirm: "Withdraw this application?"],
+            class: "btn-outline" %>
+    <% end %>
+    <%= if @application.status == "under_review" do %>
+      <%= link "Edit", to: ~p"/admin/loans/#{@application}/edit", class: "btn-outline" %>
       <%= link "Approve",
             to: ~p"/admin/loans/#{@application}/approve",
             method: :patch,
@@ -37,13 +62,25 @@
           </.form>
         </div>
       </details>
+      <%= link "Withdraw",
+            to: ~p"/admin/loans/#{@application}/withdraw",
+            method: :patch,
+            data: [confirm: "Withdraw this application?"],
+            class: "btn-outline" %>
+    <% end %>
+    <%= if @application.status == "approved" do %>
+      <%= link "Disburse",
+            to: ~p"/admin/loans/#{@application}/disburse",
+            method: :patch,
+            data: [confirm: "Disburse this loan? This creates the account and generates the repayment schedule."],
+            class: "btn-gold" %>
     <% end %>
     <%= link "All Loans", to: ~p"/admin/loans", class: "text-sm font-medium text-gray-400 hover:text-navy-600 self-center" %>
   </div>
 </div>
 
-<%# Fraud risk warning — shown only when signals are detected on a pending application %>
-<%= if @fraud_signals != [] and @application.status == "pending" do %>
+<%# Fraud risk warning — shown while a decision is still pending (pending or under_review) %>
+<%= if @fraud_signals != [] and @application.status in ["pending", "under_review"] do %>
   <div class="mb-6 rounded-xl border border-amber-300 bg-amber-50 p-4">
     <div class="flex items-start gap-3">
       <svg class="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
@@ -118,10 +155,28 @@
           <dd class="font-medium text-navy-900"><%= @application.requested_term_months %> months</dd>
         </div>
       <% end %>
+      <%= if @application.assessed_at do %>
+        <div class="flex justify-between text-sm">
+          <dt class="text-gray-500">Assessed</dt>
+          <dd class="font-medium text-navy-900"><%= Calendar.strftime(@application.assessed_at, "%d %b %Y") %></dd>
+        </div>
+      <% end %>
       <%= if @application.decided_at do %>
         <div class="flex justify-between text-sm">
           <dt class="text-gray-500">Decided</dt>
           <dd class="font-medium text-navy-900"><%= Calendar.strftime(@application.decided_at, "%d %b %Y") %></dd>
+        </div>
+      <% end %>
+      <%= if @application.disbursed_at do %>
+        <div class="flex justify-between text-sm">
+          <dt class="text-gray-500">Disbursed</dt>
+          <dd class="font-medium text-navy-900"><%= Calendar.strftime(@application.disbursed_at, "%d %b %Y") %></dd>
+        </div>
+      <% end %>
+      <%= if @application.assessment_notes do %>
+        <div class="pt-2 border-t border-gray-100 text-sm">
+          <dt class="text-gray-500 mb-1">Assessment Notes</dt>
+          <dd class="text-navy-900"><%= @application.assessment_notes %></dd>
         </div>
       <% end %>
       <%= if @application.rejection_reason do %>
