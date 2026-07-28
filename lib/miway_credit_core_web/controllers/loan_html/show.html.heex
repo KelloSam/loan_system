@@ -253,6 +253,12 @@
             <% end %>
           </dd>
         </div>
+        <%= if @days_past_due > 0 do %>
+          <div class="flex justify-between text-sm">
+            <dt class="text-gray-500">Days Past Due</dt>
+            <dd class="font-medium text-red-600"><%= @days_past_due %> days</dd>
+          </div>
+        <% end %>
         <%= if @account.status == "reversed" do %>
           <div class="pt-2 border-t border-gray-100 text-sm">
             <dt class="text-gray-500 mb-1">Reversal Reason</dt>
@@ -492,7 +498,7 @@
       </div>
       <div>
         <label class="form-label">Method</label>
-        <%= select f, :method, [{"Cash", "cash"}, {"Bank Transfer", "bank_transfer"}, {"Mobile Money", "mobile_money"}, {"Cheque", "cheque"}, {"Other", "other"}],
+        <%= select f, :method, [{"Cash", "cash"}, {"Bank Transfer", "bank_transfer"}, {"Mobile Money", "mobile_money"}, {"Cheque", "cheque"}, {"Payroll Deduction", "payroll_deduction"}, {"Other", "other"}],
               class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
         <%= error_tag f, :method %>
       </div>
@@ -506,6 +512,45 @@
         <%= submit "Record Payment", class: "btn-primary w-full" %>
       </div>
     </.form>
+    <p class="form-hint mt-3">
+      Paying more than the outstanding balance is allowed — the excess is recorded as an overpayment, not applied.
+    </p>
+
+    <details class="void-disclosure mt-4 pt-4 border-t border-gray-100">
+      <summary class="btn-outline void-toggle">Log Failed Payment Attempt</summary>
+      <div class="card p-4 mt-2">
+        <.form :let={f} for={@failed_payment_changeset} action={~p"/admin/loans/#{@application}/payments/failed"}
+               class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="form-label">Amount (ZMW)</label>
+            <%= number_input f, :amount, step: "0.01", min: "0.01", placeholder: "0.00",
+                  class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+            <%= error_tag f, :amount %>
+          </div>
+          <div>
+            <label class="form-label">Method</label>
+            <%= select f, :method, [{"Cash", "cash"}, {"Bank Transfer", "bank_transfer"}, {"Mobile Money", "mobile_money"}, {"Cheque", "cheque"}, {"Payroll Deduction", "payroll_deduction"}, {"Other", "other"}],
+                  class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+            <%= error_tag f, :method %>
+          </div>
+          <div>
+            <label class="form-label">Date Received</label>
+            <%= date_input f, :received_at,
+                  class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+            <%= error_tag f, :received_at %>
+          </div>
+          <div class="sm:col-span-2">
+            <label class="form-label">Why did this attempt fail?</label>
+            <textarea name="payment[fail_reason]" rows="2" required
+                      placeholder="e.g. customer claims mobile money payment, no matching funds received"
+                      class="block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600"></textarea>
+          </div>
+          <div class="sm:col-span-2 flex justify-end">
+            <button type="submit" class="btn-outline">Log Failed Attempt</button>
+          </div>
+        </.form>
+      </div>
+    </details>
   </div>
 <% end %>
 
@@ -533,8 +578,18 @@
           <tr class="hover:bg-gray-50">
             <td class="td"><%= installment.installment_number %></td>
             <td class="td"><%= installment.due_date %></td>
-            <td class="td font-medium">ZMW <%= installment.scheduled_amount %></td>
-            <td class="td">ZMW <%= installment.paid_amount %></td>
+            <td class="td font-medium">
+              ZMW <%= installment.scheduled_amount %>
+              <%= if Decimal.compare(installment.penalty_amount, Decimal.new("0")) == :gt do %>
+                <span class="block text-xs text-red-600 font-normal">+ ZMW <%= installment.penalty_amount %> penalty</span>
+              <% end %>
+            </td>
+            <td class="td">
+              ZMW <%= installment.paid_amount %>
+              <%= if Decimal.compare(installment.penalty_paid, Decimal.new("0")) == :gt do %>
+                <span class="block text-xs text-gray-400 font-normal">(+ ZMW <%= installment.penalty_paid %> penalty paid)</span>
+              <% end %>
+            </td>
             <td class="td">
               <span class={"badge badge-#{installment.status}"}><%= String.capitalize(installment.status) %></span>
             </td>
@@ -569,17 +624,26 @@
           <%= for transaction <- @transactions do %>
             <tr class="hover:bg-gray-50">
               <td class="td"><%= Calendar.strftime(transaction.received_at, "%d %b %Y") %></td>
-              <td class="td font-medium">ZMW <%= transaction.amount %></td>
+              <td class="td font-medium">
+                ZMW <%= transaction.amount %>
+                <%= if transaction.overpayment_amount && Decimal.compare(transaction.overpayment_amount, Decimal.new("0")) == :gt do %>
+                  <span class="block text-xs text-amber-600 font-normal">ZMW <%= transaction.overpayment_amount %> overpaid, not applied</span>
+                <% end %>
+              </td>
               <td class="td"><%= String.capitalize(String.replace(transaction.method, "_", " ")) %></td>
               <td class="td">
                 <span class={"badge badge-#{transaction.status}"}><%= String.capitalize(transaction.status) %></span>
                 <%= if transaction.status == "voided" and transaction.void_reason do %>
                   <span class="form-hint"><%= transaction.void_reason %></span>
                 <% end %>
+                <%= if transaction.status == "failed" and transaction.fail_reason do %>
+                  <span class="form-hint"><%= transaction.fail_reason %></span>
+                <% end %>
               </td>
-              <td class="td text-right">
+              <td class="td text-right whitespace-nowrap">
+                <%= link "Receipt", to: ~p"/admin/loans/#{@application}/payments/#{transaction}/receipt", class: "btn-outline" %>
                 <%= if transaction.status == "posted" do %>
-                  <details class="void-disclosure">
+                  <details class="void-disclosure inline-block">
                     <summary class="btn-outline void-toggle">Void</summary>
                     <div class="card p-4 mt-2">
                       <.form :let={_f} for={%{}} as={:void} action={~p"/admin/loans/#{@application}/payments/#{transaction}/void"} method="patch">
@@ -593,6 +657,24 @@
                         ></textarea>
                         <div class="flex justify-end gap-2 mt-2">
                           <button type="submit" class="btn-danger">Confirm Void</button>
+                        </div>
+                      </.form>
+                    </div>
+                  </details>
+                  <details class="void-disclosure inline-block">
+                    <summary class="btn-danger void-toggle">Mark Failed</summary>
+                    <div class="card p-4 mt-2">
+                      <.form :let={_f} for={%{}} as={:fail} action={~p"/admin/loans/#{@application}/payments/#{transaction}/fail"} method="patch">
+                        <label class="form-label" for={"fail_reason_#{transaction.id}"}>Why did this payment fail?</label>
+                        <textarea
+                          id={"fail_reason_#{transaction.id}"}
+                          name="reason"
+                          rows="3"
+                          required
+                          placeholder="e.g. cheque bounced"
+                        ></textarea>
+                        <div class="flex justify-end gap-2 mt-2">
+                          <button type="submit" class="btn-danger">Confirm Failed</button>
                         </div>
                       </.form>
                     </div>

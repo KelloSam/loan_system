@@ -1,12 +1,12 @@
 defmodule MiwayCreditCoreWeb.LoanController do
   use MiwayCreditCoreWeb, :controller
 
-  alias MiwayCreditCore.{Applications, Lending, Payments, Customers, Products, AuditLogs}
+  alias MiwayCreditCore.{Applications, Lending, Payments, Customers, Products, AuditLogs, Organisations, Repo}
   alias MiwayCreditCore.Applications.{LoanApplication, Collateral}
   alias MiwayCreditCore.Payments.PaymentTransaction
   alias MiwayCreditCoreWeb.Plugs.RequirePermissionPlug
 
-  plug RequirePermissionPlug, "applications.view" when action in [:index, :show]
+  plug RequirePermissionPlug, "applications.view" when action in [:index, :show, :receipt]
   plug RequirePermissionPlug, "applications.create" when action in [:new, :create]
   plug RequirePermissionPlug, "applications.edit" when action in [:edit, :update, :delete]
   plug RequirePermissionPlug, "applications.assess" when action == :assess
@@ -14,8 +14,8 @@ defmodule MiwayCreditCoreWeb.LoanController do
   plug RequirePermissionPlug, "applications.reject" when action in [:reject, :refer]
   plug RequirePermissionPlug, "loans.disburse" when action in [:disburse, :reverse_disbursement]
   plug RequirePermissionPlug, "applications.withdraw" when action == :withdraw
-  plug RequirePermissionPlug, "payments.receive" when action == :create_payment
-  plug RequirePermissionPlug, "payments.reverse" when action == :void_payment
+  plug RequirePermissionPlug, "payments.receive" when action in [:create_payment, :record_failed_payment]
+  plug RequirePermissionPlug, "payments.reverse" when action in [:void_payment, :fail_payment]
   plug RequirePermissionPlug, "collateral.manage" when action in [:create_collateral, :delete_collateral]
 
   def index(conn, _params) do
@@ -28,12 +28,13 @@ defmodule MiwayCreditCoreWeb.LoanController do
     application = Applications.get_application!(scope, id)
     fraud_signals = Applications.fraud_signals(application)
     payment_changeset = PaymentTransaction.changeset(%PaymentTransaction{}, %{})
+    failed_payment_changeset = PaymentTransaction.failed_attempt_changeset(%PaymentTransaction{}, %{})
     collateral_changeset = Collateral.changeset(%Collateral{}, %{})
 
-    {account, interest, installments, transactions, collaterals} =
+    {account, interest, installments, transactions, collaterals, days_past_due} =
       case application.loan_account do
         nil ->
-          {nil, nil, [], [], []}
+          {nil, nil, [], [], [], 0}
 
         account ->
           {
@@ -41,7 +42,8 @@ defmodule MiwayCreditCoreWeb.LoanController do
             Lending.compound_interest_details(account),
             Lending.list_installments_for_account(scope, account.id),
             Payments.list_transactions_for_account(scope, account.id),
-            Applications.list_collaterals_for_account(scope, account.id)
+            Applications.list_collaterals_for_account(scope, account.id),
+            Lending.days_past_due(account)
           }
       end
 
@@ -52,9 +54,11 @@ defmodule MiwayCreditCoreWeb.LoanController do
       installments: installments,
       transactions: transactions,
       payment_changeset: payment_changeset,
+      failed_payment_changeset: failed_payment_changeset,
       collateral_changeset: collateral_changeset,
       collaterals: collaterals,
-      fraud_signals: fraud_signals
+      fraud_signals: fraud_signals,
+      days_past_due: days_past_due
     )
   end
 
@@ -477,34 +481,80 @@ defmodule MiwayCreditCoreWeb.LoanController do
     application = Applications.get_application!(scope, id)
     account = application.loan_account
 
-    params =
-      payment_params
-      |> Map.put("received_at", date_param_to_datetime(payment_params["received_at"]))
-      |> Map.put("loan_account_id", account.id)
-      |> Map.put("recorded_by_id", conn.assigns.current_user.id)
+    if is_nil(account) do
+      conn
+      |> put_flash(:error, "This application has no loan account yet — disburse it first.")
+      |> redirect(to: ~p"/admin/loans/#{application}")
+    else
+      params =
+        payment_params
+        |> Map.put("received_at", date_param_to_datetime(payment_params["received_at"]))
+        |> Map.put("loan_account_id", account.id)
+        |> Map.put("recorded_by_id", conn.assigns.current_user.id)
 
-    case Payments.record_payment(scope, params) do
-      {:ok, transaction} ->
-        AuditLogs.log("payment_recorded",
-          actor_id: conn.assigns.current_user.id,
-          actor_email: conn.assigns.current_user.email,
-          target_type: "payment_transaction",
-          target_id: transaction.id,
-          ip_address: get_ip(conn),
-          metadata: %{amount: transaction.amount, loan_account_id: account.id}
-        )
+      case Payments.record_payment(scope, params) do
+        {:ok, transaction} ->
+          AuditLogs.log("payment_recorded",
+            actor_id: conn.assigns.current_user.id,
+            actor_email: conn.assigns.current_user.email,
+            target_type: "payment_transaction",
+            target_id: transaction.id,
+            ip_address: get_ip(conn),
+            metadata: %{amount: transaction.amount, loan_account_id: account.id}
+          )
 
-        conn
-        |> put_flash(:info, "Payment recorded successfully.")
-        |> redirect(to: ~p"/admin/loans/#{application}")
+          conn
+          |> put_flash(:info, payment_recorded_message(transaction))
+          |> redirect(to: ~p"/admin/loans/#{application}")
 
-      {:error, :amount_exceeds_balance} ->
-        conn
-        |> put_flash(:error, "Payment amount exceeds the outstanding balance.")
-        |> redirect(to: ~p"/admin/loans/#{application}")
+        {:error, changeset} ->
+          render_show_with_errors(conn, application, payment_changeset: changeset)
+      end
+    end
+  end
 
-      {:error, changeset} ->
-        render_show_with_errors(conn, application, payment_changeset: changeset)
+  defp payment_recorded_message(%{overpayment_amount: overpayment}) do
+    if overpayment && Decimal.compare(overpayment, Decimal.new("0")) == :gt do
+      "Payment recorded — ZMW #{overpayment} was in excess of the outstanding balance and was not applied."
+    else
+      "Payment recorded successfully."
+    end
+  end
+
+  def record_failed_payment(conn, %{"id" => id, "payment" => payment_params}) do
+    scope = conn.assigns.current_scope
+    application = Applications.get_application!(scope, id)
+    account = application.loan_account
+
+    if is_nil(account) do
+      conn
+      |> put_flash(:error, "This application has no loan account yet — disburse it first.")
+      |> redirect(to: ~p"/admin/loans/#{application}")
+    else
+      params =
+        payment_params
+        |> Map.put("received_at", date_param_to_datetime(payment_params["received_at"]))
+        |> Map.put("loan_account_id", account.id)
+        |> Map.put("recorded_by_id", conn.assigns.current_user.id)
+
+      case Payments.record_failed_payment(scope, params) do
+        {:ok, transaction} ->
+          AuditLogs.log("payment_failed",
+            actor_id: conn.assigns.current_user.id,
+            actor_email: conn.assigns.current_user.email,
+            target_type: "payment_transaction",
+            target_id: transaction.id,
+            ip_address: get_ip(conn),
+            metadata: %{amount: transaction.amount, loan_account_id: account.id, fail_reason: transaction.fail_reason}
+          )
+
+          conn
+          |> put_flash(:info, "Failed payment attempt logged.")
+          |> redirect(to: ~p"/admin/loans/#{application}")
+
+        {:error, changeset} ->
+          render_show_with_errors(conn, application, failed_payment_changeset: changeset)
+      end
     end
   end
 
@@ -541,9 +591,58 @@ defmodule MiwayCreditCoreWeb.LoanController do
 
       _ ->
         conn
-        |> put_flash(:error, "This payment has already been voided.")
+        |> put_flash(:error, "This payment is no longer posted (already voided or failed).")
         |> redirect(to: ~p"/admin/loans/#{application}")
     end
+  end
+
+  def fail_payment(conn, %{"id" => id, "transaction_id" => transaction_id} = params) do
+    scope = conn.assigns.current_scope
+    application = Applications.get_application!(scope, id)
+    transaction = Payments.get_transaction!(scope, transaction_id)
+    reason = Map.get(params, "reason", "Not specified")
+
+    case transaction.status do
+      "posted" ->
+        attrs = %{"failed_by_id" => conn.assigns.current_user.id, "fail_reason" => reason}
+
+        case Payments.fail_payment(transaction, attrs) do
+          {:ok, failed} ->
+            AuditLogs.log("payment_marked_failed",
+              actor_id: conn.assigns.current_user.id,
+              actor_email: conn.assigns.current_user.email,
+              target_type: "payment_transaction",
+              target_id: failed.id,
+              ip_address: get_ip(conn),
+              metadata: %{amount: failed.amount, fail_reason: reason}
+            )
+
+            conn
+            |> put_flash(:info, "Payment marked as failed.")
+            |> redirect(to: ~p"/admin/loans/#{application}")
+
+          {:error, _} ->
+            conn
+            |> put_flash(:error, "Could not mark payment as failed.")
+            |> redirect(to: ~p"/admin/loans/#{application}")
+        end
+
+      _ ->
+        conn
+        |> put_flash(:error, "This payment is no longer posted (already voided or failed).")
+        |> redirect(to: ~p"/admin/loans/#{application}")
+    end
+  end
+
+  def receipt(conn, %{"id" => id, "transaction_id" => transaction_id}) do
+    scope = conn.assigns.current_scope
+    application = Applications.get_application!(scope, id)
+    transaction = Payments.get_transaction!(scope, transaction_id) |> Repo.preload(:recorded_by)
+    organisation = Organisations.get_organisation!(application.organisation_id)
+
+    conn
+    |> put_layout(html: false)
+    |> render(:receipt, application: application, transaction: transaction, organisation: organisation)
   end
 
   def create_collateral(conn, %{"id" => id, "collateral" => collateral_params}) do
@@ -600,14 +699,15 @@ defmodule MiwayCreditCoreWeb.LoanController do
     application = Applications.get_application!(scope, application.id)
     fraud_signals = Applications.fraud_signals(application)
 
-    {account, interest, installments, transactions, collaterals} =
+    {account, interest, installments, transactions, collaterals, days_past_due} =
       case application.loan_account do
-        nil -> {nil, nil, [], [], []}
+        nil -> {nil, nil, [], [], [], 0}
         account ->
           {account, Lending.compound_interest_details(account),
            Lending.list_installments_for_account(scope, account.id),
            Payments.list_transactions_for_account(scope, account.id),
-           Applications.list_collaterals_for_account(scope, account.id)}
+           Applications.list_collaterals_for_account(scope, account.id),
+           Lending.days_past_due(account)}
       end
 
     assigns =
@@ -618,9 +718,11 @@ defmodule MiwayCreditCoreWeb.LoanController do
         installments: installments,
         transactions: transactions,
         payment_changeset: PaymentTransaction.changeset(%PaymentTransaction{}, %{}),
+        failed_payment_changeset: PaymentTransaction.failed_attempt_changeset(%PaymentTransaction{}, %{}),
         collateral_changeset: Collateral.changeset(%Collateral{}, %{}),
         collaterals: collaterals,
-        fraud_signals: fraud_signals
+        fraud_signals: fraud_signals,
+        days_past_due: days_past_due
       ]
       |> Keyword.merge(overrides)
 

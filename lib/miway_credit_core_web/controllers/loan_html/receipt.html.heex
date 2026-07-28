@@ -1,0 +1,78 @@
+<div class="max-w-xl mx-auto p-8 font-sans text-navy-900">
+  <div class="flex justify-between items-start mb-6 no-print">
+    <button onclick="window.print()" class="btn-primary">Print</button>
+    <%= link "Back to Loan", to: ~p"/admin/loans/#{@application}", class: "btn-outline" %>
+  </div>
+
+  <div class="border-2 border-navy-900 rounded-xl p-8">
+    <div class="text-center mb-6 pb-6 border-b border-gray-200">
+      <h1 class="text-xl font-bold"><%= @organisation.name %></h1>
+      <p class="text-sm text-gray-500 mt-1">Payment Receipt</p>
+    </div>
+
+    <dl class="space-y-3 text-sm">
+      <div class="flex justify-between">
+        <dt class="text-gray-500">Receipt No.</dt>
+        <dd class="font-mono font-medium"><%= String.slice(to_string(@transaction.id), 0, 8) |> String.upcase() %></dd>
+      </div>
+      <div class="flex justify-between">
+        <dt class="text-gray-500">Date</dt>
+        <dd class="font-medium"><%= Calendar.strftime(@transaction.received_at, "%d %b %Y, %H:%M") %></dd>
+      </div>
+      <div class="flex justify-between">
+        <dt class="text-gray-500">Customer</dt>
+        <dd class="font-medium"><%= @application.customer.name %></dd>
+      </div>
+      <div class="flex justify-between">
+        <dt class="text-gray-500">Contract Reference</dt>
+        <dd class="font-mono font-medium"><%= @application.loan_account.contract_reference %></dd>
+      </div>
+      <div class="flex justify-between pt-3 border-t border-gray-200">
+        <dt class="text-gray-500">Amount Received</dt>
+        <dd class="font-bold text-lg">ZMW <%= @transaction.amount %></dd>
+      </div>
+      <%= if @transaction.overpayment_amount && Decimal.compare(@transaction.overpayment_amount, Decimal.new("0")) == :gt do %>
+        <div class="flex justify-between">
+          <dt class="text-gray-500">Applied to Balance</dt>
+          <dd class="font-medium">ZMW <%= @transaction.payable_amount %></dd>
+        </div>
+        <div class="flex justify-between">
+          <dt class="text-amber-600">Overpaid (not applied)</dt>
+          <dd class="font-medium text-amber-600">ZMW <%= @transaction.overpayment_amount %></dd>
+        </div>
+      <% end %>
+      <div class="flex justify-between">
+        <dt class="text-gray-500">Method</dt>
+        <dd class="font-medium"><%= String.capitalize(String.replace(@transaction.method, "_", " ")) %></dd>
+      </div>
+      <%= if @transaction.reference do %>
+        <div class="flex justify-between">
+          <dt class="text-gray-500">Channel Reference</dt>
+          <dd class="font-mono font-medium"><%= @transaction.reference %></dd>
+        </div>
+      <% end %>
+      <div class="flex justify-between">
+        <dt class="text-gray-500">Status</dt>
+        <dd>
+          <span class={"badge badge-#{@transaction.status}"}><%= String.capitalize(@transaction.status) %></span>
+        </dd>
+      </div>
+      <%= if @transaction.recorded_by do %>
+        <div class="flex justify-between pt-3 border-t border-gray-200">
+          <dt class="text-gray-500">Recorded By</dt>
+          <dd class="font-medium"><%= @transaction.recorded_by.email %></dd>
+        </div>
+      <% end %>
+    </dl>
+  </div>
+
+  <p class="text-center text-xs text-gray-400 mt-6">
+    This receipt is a record of a payment transaction in <%= @organisation.name %>'s Miway CreditCore system.
+  </p>
+</div>
+
+<style>
+  @media print {
+    .no-print { display: none; }
+  }
+</style>

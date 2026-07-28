@@ -97,6 +97,7 @@
 .badge-paid          { @apply bg-emerald-100 text-emerald-800; }
 .badge-posted        { @apply bg-emerald-100 text-emerald-800; }
 .badge-voided        { @apply bg-gray-100 text-gray-600; }
+.badge-failed        { @apply bg-red-100 text-red-800; }
 .badge-overdue       { @apply bg-red-100 text-red-800; }
 .badge-upcoming      { @apply bg-amber-100 text-amber-800; }
 .badge-partially_paid{ @apply bg-blue-100 text-blue-800; }

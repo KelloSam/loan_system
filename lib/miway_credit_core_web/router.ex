@@ -107,7 +107,10 @@ defmodule MiwayCreditCoreWeb.Router do
     patch "/loans/:id/reverse_disbursement", LoanController, :reverse_disbursement
     patch "/loans/:id/withdraw", LoanController, :withdraw
     post "/loans/:id/payments", LoanController, :create_payment
+    post "/loans/:id/payments/failed", LoanController, :record_failed_payment
     patch "/loans/:id/payments/:transaction_id/void", LoanController, :void_payment
+    patch "/loans/:id/payments/:transaction_id/fail", LoanController, :fail_payment
+    get "/loans/:id/payments/:transaction_id/receipt", LoanController, :receipt
     post "/loans/:id/collateral", LoanController, :create_collateral
     delete "/loans/:id/collateral/:collateral_id", LoanController, :delete_collateral
   end

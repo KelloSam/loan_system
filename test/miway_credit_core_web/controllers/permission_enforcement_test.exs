@@ -132,6 +132,58 @@ defmodule MiwayCreditCoreWeb.PermissionEnforcementTest do
       assert conn.status == 403
     end
 
+    test "Log Failed Payment Attempt: granted (same tier as recording a real payment)", %{
+      conn: conn,
+      loan_officer: loan_officer,
+      customer: customer
+    } do
+      application = approved_application_fixture(%{"customer_id" => customer.id})
+      conn = conn |> login(loan_officer)
+
+      conn =
+        post(conn, ~p"/admin/loans/#{application.id}/payments/failed", payment: %{
+          "amount" => "50.00",
+          "method" => "mobile_money",
+          "received_at" => Date.utc_today() |> Date.to_iso8601(),
+          "fail_reason" => "No matching funds received"
+        })
+
+      assert redirected_to(conn) == ~p"/admin/loans/#{application.id}"
+    end
+
+    test "Mark Payment Failed: refused with a real 403", %{
+      conn: conn,
+      loan_officer: loan_officer,
+      organisation: organisation,
+      customer: customer
+    } do
+      application = approved_application_fixture(%{"customer_id" => customer.id})
+      scope = %Scope{organisation_id: organisation.id}
+      {:ok, transaction} = Payments.record_payment(scope, valid_payment_attrs(application.loan_account, %{"amount" => "50.00"}))
+
+      conn =
+        conn
+        |> login(loan_officer)
+        |> patch(~p"/admin/loans/#{application.id}/payments/#{transaction.id}/fail", %{"reason" => "Cheque bounced"})
+
+      assert conn.status == 403
+    end
+
+    test "Receipt: can view (same tier as viewing the application)", %{
+      conn: conn,
+      loan_officer: loan_officer,
+      organisation: organisation,
+      customer: customer
+    } do
+      application = approved_application_fixture(%{"customer_id" => customer.id})
+      scope = %Scope{organisation_id: organisation.id}
+      {:ok, transaction} = Payments.record_payment(scope, valid_payment_attrs(application.loan_account, %{"amount" => "50.00"}))
+
+      conn = conn |> login(loan_officer) |> get(~p"/admin/loans/#{application.id}/payments/#{transaction.id}/receipt")
+
+      assert html_response(conn, 200)
+    end
+
     test "audit log: refused with a real 403", %{conn: conn, loan_officer: loan_officer} do
       conn = conn |> login(loan_officer) |> get(~p"/admin/audit-logs")
       assert conn.status == 403
@@ -189,6 +241,20 @@ defmodule MiwayCreditCoreWeb.PermissionEnforcementTest do
       conn = patch(conn, ~p"/admin/loans/#{application.id}/payments/#{transaction.id}/void", %{"reason" => "test"})
 
       assert redirected_to(conn) == ~p"/admin/loans/#{application.id}"
+    end
+
+    test "Mark Payment Failed: succeeds", %{conn: conn, org_admin: org_admin, organisation: organisation, customer: customer} do
+      application = approved_application_fixture(%{"customer_id" => customer.id})
+      scope = %Scope{organisation_id: organisation.id}
+      {:ok, transaction} = Payments.record_payment(scope, valid_payment_attrs(application.loan_account, %{"amount" => "50.00"}))
+
+      conn = conn |> login(org_admin)
+      conn = patch(conn, ~p"/admin/loans/#{application.id}/payments/#{transaction.id}/fail", %{"reason" => "Cheque bounced"})
+
+      assert redirected_to(conn) == ~p"/admin/loans/#{application.id}"
+
+      reloaded = Payments.get_transaction!(scope, transaction.id)
+      assert reloaded.status == "failed"
     end
 
     test "maker-checker still applies even to an organisation_administrator", %{
