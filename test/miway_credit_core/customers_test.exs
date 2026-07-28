@@ -115,9 +115,9 @@ defmodule MiwayCreditCore.CustomersTest do
   describe "update_customer/2" do
     test "updates allowed fields" do
       customer = customer_fixture()
-      assert {:ok, updated} = Customers.update_customer(customer, %{name: "Renamed", address: "Lusaka"})
+      assert {:ok, updated} = Customers.update_customer(customer, %{name: "Renamed", address_line: "Lusaka"})
       assert updated.name == "Renamed"
-      assert updated.address == "Lusaka"
+      assert updated.address_line == "Lusaka"
     end
 
     test "re-validates phone format on update" do

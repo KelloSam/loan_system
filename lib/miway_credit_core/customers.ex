@@ -1,7 +1,7 @@
 defmodule MiwayCreditCore.Customers do
   import Ecto.Query
   alias MiwayCreditCore.Repo
-  alias MiwayCreditCore.Customers.Customer
+  alias MiwayCreditCore.Customers.{Customer, NextOfKin, Guarantor, KycDocument, Consent, DocumentStorage}
   alias MiwayCreditCore.Accounts.Scope
 
   @doc """
@@ -72,6 +72,264 @@ defmodule MiwayCreditCore.Customers do
     |> scope_organisation(scope)
     |> Repo.aggregate(:count)
   end
+
+  @doc """
+  Masks all but the last few characters of an identity number for
+  display in list views — e.g. `index.html.heex` shows this, while
+  `show.html.heex`/`edit.html.heex` (already gated behind
+  `customers.manage`) show the real `id_number`.
+  """
+  def mask_id_number(nil), do: nil
+
+  def mask_id_number(id_number) when byte_size(id_number) <= 4 do
+    String.duplicate("*", byte_size(id_number))
+  end
+
+  def mask_id_number(id_number) do
+    visible = String.slice(id_number, -4, 4)
+    String.duplicate("*", byte_size(id_number) - 4) <> visible
+  end
+
+  @doc """
+  Exact-match check for an existing customer in the *same organisation*
+  sharing an id_number or phone with `attrs` — a soft pre-submission
+  warning on top of the hard org-scoped unique constraint, not a
+  replacement for it. No fuzzy matching: exact match only.
+  """
+  def find_potential_duplicates(%Scope{organisation_id: organisation_id}, attrs)
+      when organisation_id != :all do
+    attrs = Map.new(attrs, fn {k, v} -> {to_string(k), v} end)
+    id_number = attrs["id_number"]
+    phone = attrs["phone"]
+
+    # Ecto forbids comparing a field to a pinned value that's nil at
+    # runtime (raises, doesn't just no-op) — so each clause is only
+    # added when its value is actually present, via dynamic/2, rather
+    # than guarding nils inside the query itself.
+    conditions =
+      [
+        id_number && dynamic([c], c.id_number == ^id_number),
+        phone && dynamic([c], c.phone == ^phone)
+      ]
+      |> Enum.reject(&is_nil/1)
+
+    case conditions do
+      [] ->
+        []
+
+      _ ->
+        combined = Enum.reduce(conditions, fn condition, acc -> dynamic(^acc or ^condition) end)
+
+        Customer
+        |> where([c], c.organisation_id == ^organisation_id)
+        |> where(^combined)
+        |> Repo.all()
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # KYC verification status — changed only through these, never through
+  # update_customer/2, so every transition is deliberate and auditable.
+  # ---------------------------------------------------------------------------
+
+  def submit_for_kyc_review(%Customer{} = customer, %Scope{}) do
+    customer
+    |> Customer.kyc_status_changeset(%{"kyc_status" => "pending_review"})
+    |> Repo.update()
+  end
+
+  def mark_kyc_verified(%Customer{} = customer, %Scope{user: user}) do
+    customer
+    |> Customer.kyc_status_changeset(%{
+      "kyc_status" => "verified",
+      "kyc_verified_at" => DateTime.utc_now() |> DateTime.truncate(:second),
+      "kyc_verified_by_id" => user.id,
+      "kyc_rejection_reason" => nil
+    })
+    |> Repo.update()
+  end
+
+  def mark_kyc_rejected(%Customer{} = customer, %Scope{user: user}, reason) do
+    customer
+    |> Customer.kyc_status_changeset(%{
+      "kyc_status" => "rejected",
+      "kyc_verified_at" => DateTime.utc_now() |> DateTime.truncate(:second),
+      "kyc_verified_by_id" => user.id,
+      "kyc_rejection_reason" => reason
+    })
+    |> Repo.update()
+  end
+
+  # ---------------------------------------------------------------------------
+  # Next of kin — hard-deletable contact info, no evidentiary weight
+  # ---------------------------------------------------------------------------
+
+  def list_next_of_kins_for_customer(%Scope{} = scope, customer_id) do
+    NextOfKin
+    |> scope_organisation(scope)
+    |> where([n], n.customer_id == ^customer_id)
+    |> order_by([n], asc: n.inserted_at)
+    |> Repo.all()
+  end
+
+  def get_next_of_kin!(%Scope{} = scope, id) do
+    NextOfKin
+    |> scope_organisation(scope)
+    |> Repo.get!(id)
+  end
+
+  @doc "organisation_id derives from the Customer, never from attrs."
+  def create_next_of_kin(%Customer{} = customer, attrs) do
+    attrs =
+      attrs
+      |> stringify_keys()
+      |> Map.put("customer_id", customer.id)
+      |> Map.put("organisation_id", customer.organisation_id)
+
+    %NextOfKin{}
+    |> NextOfKin.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  def delete_next_of_kin(%NextOfKin{} = next_of_kin), do: Repo.delete(next_of_kin)
+
+  # ---------------------------------------------------------------------------
+  # Guarantors — customer-level records, reusable across future applications
+  # ---------------------------------------------------------------------------
+
+  def list_guarantors_for_customer(%Scope{} = scope, customer_id) do
+    Guarantor
+    |> scope_organisation(scope)
+    |> where([g], g.customer_id == ^customer_id)
+    |> order_by([g], asc: g.inserted_at)
+    |> Repo.all()
+  end
+
+  def get_guarantor!(%Scope{} = scope, id) do
+    Guarantor
+    |> scope_organisation(scope)
+    |> Repo.get!(id)
+  end
+
+  @doc "organisation_id derives from the Customer, never from attrs."
+  def create_guarantor(%Customer{} = customer, attrs) do
+    attrs =
+      attrs
+      |> stringify_keys()
+      |> Map.put("customer_id", customer.id)
+      |> Map.put("organisation_id", customer.organisation_id)
+
+    %Guarantor{}
+    |> Guarantor.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  def delete_guarantor(%Guarantor{} = guarantor), do: Repo.delete(guarantor)
+
+  # ---------------------------------------------------------------------------
+  # KYC documents — file bytes on disk via DocumentStorage, metadata here.
+  # Never hard-deleted: remove_kyc_document/1 marks status "removed".
+  # ---------------------------------------------------------------------------
+
+  def list_kyc_documents_for_customer(%Scope{} = scope, customer_id) do
+    KycDocument
+    |> scope_organisation(scope)
+    |> where([d], d.customer_id == ^customer_id)
+    |> order_by([d], desc: d.inserted_at)
+    |> Repo.all()
+  end
+
+  def get_kyc_document!(%Scope{} = scope, id) do
+    KycDocument
+    |> scope_organisation(scope)
+    |> Repo.get!(id)
+  end
+
+  @doc "organisation_id derives from the Customer, never from attrs. Stores the file on disk first, then its metadata."
+  def create_kyc_document(%Customer{} = customer, %Plug.Upload{} = upload, document_type, uploaded_by_id) do
+    {stored_filename, size_bytes} = DocumentStorage.store(upload, customer.organisation_id, customer.id)
+
+    attrs = %{
+      "organisation_id" => customer.organisation_id,
+      "customer_id" => customer.id,
+      "document_type" => document_type,
+      "stored_filename" => stored_filename,
+      "original_filename" => upload.filename,
+      "content_type" => upload.content_type,
+      "size_bytes" => size_bytes,
+      "uploaded_by_id" => uploaded_by_id,
+      "uploaded_at" => DateTime.utc_now() |> DateTime.truncate(:second)
+    }
+
+    case %KycDocument{} |> KycDocument.changeset(attrs) |> Repo.insert() do
+      {:ok, document} ->
+        {:ok, document}
+
+      {:error, changeset} ->
+        DocumentStorage.delete(customer.organisation_id, customer.id, stored_filename)
+        {:error, changeset}
+    end
+  end
+
+  @doc "The on-disk path to stream for download — callers must check scope/permission before calling this."
+  def kyc_document_path(%KycDocument{} = document) do
+    DocumentStorage.read_path(document.organisation_id, document.customer_id, document.stored_filename)
+  end
+
+  def remove_kyc_document(%KycDocument{} = document) do
+    document
+    |> KycDocument.void_changeset()
+    |> Repo.update()
+  end
+
+  # ---------------------------------------------------------------------------
+  # Consent — never hard-deleted: revoke_consent/1 sets revoked_at.
+  # ---------------------------------------------------------------------------
+
+  def list_consents_for_customer(%Scope{} = scope, customer_id) do
+    Consent
+    |> scope_organisation(scope)
+    |> where([c], c.customer_id == ^customer_id)
+    |> order_by([c], desc: c.inserted_at)
+    |> Repo.all()
+  end
+
+  def get_consent!(%Scope{} = scope, id) do
+    Consent
+    |> scope_organisation(scope)
+    |> Repo.get!(id)
+  end
+
+  @doc "organisation_id derives from the Customer, never from attrs."
+  def create_consent(%Customer{} = customer, attrs, recorded_by_id) do
+    attrs =
+      attrs
+      |> stringify_keys()
+      |> Map.put("customer_id", customer.id)
+      |> Map.put("organisation_id", customer.organisation_id)
+      |> Map.put("recorded_by_id", recorded_by_id)
+      |> Map.put_new("granted_at", DateTime.utc_now() |> DateTime.truncate(:second))
+
+    %Consent{}
+    |> Consent.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  def revoke_consent(%Consent{} = consent) do
+    consent
+    |> Consent.revoke_changeset()
+    |> Repo.update()
+  end
+
+  @doc "Whether the customer currently has an active (granted, not revoked) consent of this type."
+  def has_active_consent?(%Scope{} = scope, customer_id, consent_type) do
+    Consent
+    |> scope_organisation(scope)
+    |> where([c], c.customer_id == ^customer_id and c.consent_type == ^consent_type and is_nil(c.revoked_at))
+    |> Repo.exists?()
+  end
+
+  defp stringify_keys(attrs), do: Map.new(attrs, fn {k, v} -> {to_string(k), v} end)
 
   defp scope_organisation(query, %Scope{organisation_id: :all}), do: query
   defp scope_organisation(query, %Scope{organisation_id: organisation_id}) do

@@ -16,21 +16,50 @@ defmodule MiwayCreditCore.Customers.Customer do
       "John Doe"
   """
 
+  @customer_types ~w(individual business)
+  @id_types ~w(nrc passport company_registration)
+  @kyc_statuses ~w(not_started pending_review verified rejected)
+
   @primary_key {:id, :binary_id, autogenerate: true}
   schema "customers" do
     field :name, :string
     field :phone, :string
     field :id_number, :string
     field :email, :string
-    field :address, :string
     field :active, :boolean, default: true
     field :total_loans, :integer, default: 0
     field :current_balance, :decimal, default: Decimal.new("0.00")
 
+    field :customer_type, :string
+    field :id_type, :string
+
+    field :address_line, :string
+    field :city, :string
+    field :province, :string
+    field :postal_code, :string
+
+    field :employment_status, :string
+    field :employer_name, :string
+    field :occupation, :string
+    field :monthly_income, :decimal
+
+    field :business_type, :string
+    field :annual_turnover, :decimal
+    field :years_in_operation, :integer
+
+    field :kyc_status, :string, default: "not_started"
+    field :kyc_verified_at, :utc_datetime
+    field :kyc_rejection_reason, :string
+
     belongs_to :organisation, MiwayCreditCore.Organisations.Organisation, type: :binary_id
+    belongs_to :kyc_verified_by, MiwayCreditCore.Accounts.User
 
     has_many :loan_applications, MiwayCreditCore.Applications.LoanApplication
     has_many :loan_accounts, MiwayCreditCore.Lending.LoanAccount
+    has_many :next_of_kins, MiwayCreditCore.Customers.NextOfKin
+    has_many :guarantors, MiwayCreditCore.Customers.Guarantor
+    has_many :kyc_documents, MiwayCreditCore.Customers.KycDocument
+    has_many :consents, MiwayCreditCore.Customers.Consent
 
     timestamps()
   end
@@ -50,12 +79,15 @@ defmodule MiwayCreditCore.Customers.Customer do
     phone: String.t(),
     id_number: String.t(),
     email: String.t() | nil,
-    address: String.t() | nil,
     inserted_at: DateTime.t() | nil,
     updated_at: DateTime.t() | nil,
     active: boolean(),
     total_loans: non_neg_integer(),
     current_balance: Decimal.t() | nil,
+    customer_type: String.t(),
+    id_type: String.t(),
+    address_line: String.t() | nil,
+    kyc_status: String.t(),
     loan_applications: [MiwayCreditCore.Applications.LoanApplication.t()] | Ecto.Association.NotLoaded.t(),
     loan_accounts: [MiwayCreditCore.Lending.LoanAccount.t()] | Ecto.Association.NotLoaded.t()
   }
@@ -131,18 +163,63 @@ defmodule MiwayCreditCore.Customers.Customer do
       :phone,
       :id_number,
       :email,
-      :address,
       :active,
       :total_loans,
-      :current_balance
+      :current_balance,
+      :customer_type,
+      :id_type,
+      :address_line,
+      :city,
+      :province,
+      :postal_code,
+      :employment_status,
+      :employer_name,
+      :occupation,
+      :monthly_income,
+      :business_type,
+      :annual_turnover,
+      :years_in_operation
     ])
-    |> validate_required([:organisation_id, :name, :phone, :id_number])
+    |> validate_required([:organisation_id, :name, :phone, :id_number, :customer_type, :id_type])
     |> validate_phone_format()
     |> validate_format(:email, ~r/^[^@\s]+@[^@\s]+\.[^@\s]+$/, message: "must have a valid format")
-    |> unique_constraint(:phone)
-    |> unique_constraint(:id_number)
-    |> unique_constraint(:email)
+    |> validate_inclusion(:customer_type, @customer_types)
+    |> validate_inclusion(:id_type, @id_types)
+    |> validate_id_type_matches_customer_type()
+    |> unique_constraint(:phone, name: :customers_organisation_id_phone_index)
+    |> unique_constraint(:id_number, name: :customers_organisation_id_id_number_index)
+    |> unique_constraint(:email, name: :customers_organisation_id_email_index)
     |> foreign_key_constraint(:organisation_id)
+  end
+
+  @doc """
+  Deliberately separate from `changeset/2` and never exposed to
+  `update_customer/2` — KYC status only moves through
+  `Customers.submit_for_kyc_review/2`, `mark_kyc_verified/2`, and
+  `mark_kyc_rejected/3`, so every transition is a controlled, audited
+  action rather than an incidental side effect of an unrelated edit.
+  """
+  def kyc_status_changeset(customer, attrs) do
+    customer
+    |> cast(attrs, [:kyc_status, :kyc_verified_at, :kyc_verified_by_id, :kyc_rejection_reason])
+    |> validate_required([:kyc_status])
+    |> validate_inclusion(:kyc_status, @kyc_statuses)
+    |> foreign_key_constraint(:kyc_verified_by_id)
+  end
+
+  # An individual is identified by an NRC or passport; a business by its
+  # registration number — the two vocabularies don't mix.
+  defp validate_id_type_matches_customer_type(changeset) do
+    customer_type = get_field(changeset, :customer_type)
+    id_type = get_field(changeset, :id_type)
+
+    case {customer_type, id_type} do
+      {"individual", type} when type in ["nrc", "passport"] -> changeset
+      {"business", "company_registration"} -> changeset
+      {nil, _} -> changeset
+      {_, nil} -> changeset
+      _ -> add_error(changeset, :id_type, "does not match customer_type")
+    end
   end
   
   # Custom validator for phone format

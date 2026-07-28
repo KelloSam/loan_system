@@ -19,7 +19,9 @@ defmodule MiwayCreditCore.CustomersFixtures do
     Enum.into(attrs, %{
       name: "Test Customer #{System.unique_integer([:positive])}",
       phone: valid_customer_phone(),
-      id_number: valid_customer_id_number()
+      id_number: valid_customer_id_number(),
+      customer_type: "individual",
+      id_type: "nrc"
     })
   end
 
