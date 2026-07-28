@@ -17,10 +17,17 @@ defmodule MiwayCreditCore.CrossOrganisationIsolationTest do
   alias MiwayCreditCore.{Applications, Lending, Payments, Customers}
   alias MiwayCreditCore.Accounts.Scope
 
+  defp build_upload(content) do
+    path = Path.join(System.tmp_dir!(), "isolation_test_upload_#{System.unique_integer([:positive])}")
+    File.write!(path, content)
+    %Plug.Upload{path: path, filename: "id.jpg", content_type: "image/jpeg"}
+  end
+
   # Builds a full "world" for one organisation: a loan_officer staff
   # member, a customer, an approved application with its account,
-  # a posted payment, and a piece of collateral — one instance of
-  # every org-owned resource type this retrofit added scoping to.
+  # a posted payment, a piece of collateral, and a KYC document — one
+  # instance of every org-owned resource type this retrofit added
+  # scoping to.
   defp build_world do
     organisation = organisation_fixture()
     scope = %Scope{organisation_id: organisation.id}
@@ -34,6 +41,7 @@ defmodule MiwayCreditCore.CrossOrganisationIsolationTest do
     {:ok, transaction} = Payments.record_payment(scope, valid_payment_attrs(account, %{"amount" => "50.00"}))
     {:ok, collateral} = Applications.create_collateral(account, %{"type" => "vehicle", "description" => "Car", "estimated_value" => "10000.00"})
     [installment | _] = Lending.list_installments_for_account(scope, account.id)
+    {:ok, kyc_document} = Customers.create_kyc_document(customer, build_upload("secret bytes"), "nrc_copy", admin.id)
 
     %{
       organisation: organisation,
@@ -44,7 +52,8 @@ defmodule MiwayCreditCore.CrossOrganisationIsolationTest do
       account: account,
       transaction: transaction,
       collateral: collateral,
-      installment: installment
+      installment: installment,
+      kyc_document: kyc_document
     }
   end
 
@@ -75,6 +84,10 @@ defmodule MiwayCreditCore.CrossOrganisationIsolationTest do
 
     test "Payments.get_transaction!/2 refuses another organisation's payment transaction", %{org_a: a, org_b: b} do
       assert_raise Ecto.NoResultsError, fn -> Payments.get_transaction!(a.scope, b.transaction.id) end
+    end
+
+    test "Customers.get_kyc_document!/2 refuses another organisation's KYC document", %{org_a: a, org_b: b} do
+      assert_raise Ecto.NoResultsError, fn -> Customers.get_kyc_document!(a.scope, b.kyc_document.id) end
     end
 
     test "list/aggregate functions never include another organisation's rows", %{org_a: a, org_b: b} do
@@ -129,6 +142,25 @@ defmodule MiwayCreditCore.CrossOrganisationIsolationTest do
 
       conn2 = conn |> login(a.staff_user) |> get(~p"/admin/loans/#{a.application.id}")
       assert html_response(conn2, 200)
+    end
+
+    test "GET a KYC document download for another organisation's customer is refused, not served", %{
+      conn: conn,
+      org_a: a,
+      org_b: b
+    } do
+      conn = login(conn, a.staff_user)
+
+      assert_error_sent 404, fn ->
+        get(conn, ~p"/admin/customers/#{b.customer.id}/kyc_documents/#{b.kyc_document.id}/download")
+      end
+    end
+
+    test "the same staff session can download its own organisation's KYC document", %{conn: conn, org_a: a} do
+      conn = conn |> login(a.staff_user) |> get(~p"/admin/customers/#{a.customer.id}/kyc_documents/#{a.kyc_document.id}/download")
+
+      assert conn.status == 200
+      assert response(conn, 200) == "secret bytes"
     end
   end
 

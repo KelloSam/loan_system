@@ -138,6 +138,65 @@ defmodule MiwayCreditCoreWeb.PermissionEnforcementTest do
     end
   end
 
+  describe "customers.manage — required for every KYC write action; a staff member with no permissions is refused" do
+    test "loan_officer (granted customers.manage by default) can add a next of kin", %{
+      conn: conn,
+      loan_officer: loan_officer,
+      customer: customer
+    } do
+      conn = conn |> login(loan_officer)
+
+      conn =
+        post(conn, ~p"/admin/customers/#{customer.id}/next_of_kin",
+          next_of_kin: %{"name" => "Jane", "relationship" => "Sister", "phone" => "260971111111"}
+        )
+
+      assert redirected_to(conn) == ~p"/admin/customers/#{customer.id}"
+    end
+
+    test "org_admin can submit and verify KYC", %{conn: conn, org_admin: org_admin, customer: customer} do
+      conn = conn |> login(org_admin)
+      conn = patch(conn, ~p"/admin/customers/#{customer.id}/kyc/submit")
+      assert redirected_to(conn) == ~p"/admin/customers/#{customer.id}"
+
+      conn = conn |> patch(~p"/admin/customers/#{customer.id}/kyc/verify")
+      assert redirected_to(conn) == ~p"/admin/customers/#{customer.id}"
+    end
+
+    test "a staff member with no RoleAssignment at all is refused a real 403 on every KYC write action", %{
+      conn: conn,
+      organisation: organisation,
+      customer: customer
+    } do
+      {:ok, user, staff_member} =
+        MiwayCreditCore.AccountsFixtures.valid_user_attrs()
+        |> MiwayCreditCore.Accounts.register_staff_member("loan_officer")
+
+      {:ok, _membership} = MiwayCreditCore.Organisations.add_staff_to_organisation(staff_member.id, organisation.id)
+
+      conn = conn |> login(user)
+
+      assert conn |> post(~p"/admin/customers/#{customer.id}/next_of_kin", next_of_kin: %{}) |> Map.fetch!(:status) == 403
+      assert conn |> post(~p"/admin/customers/#{customer.id}/guarantors", guarantor: %{}) |> Map.fetch!(:status) == 403
+      assert conn |> post(~p"/admin/customers/#{customer.id}/consents", consent: %{}) |> Map.fetch!(:status) == 403
+      assert conn |> patch(~p"/admin/customers/#{customer.id}/kyc/submit") |> Map.fetch!(:status) == 403
+    end
+
+    test "a staff member with no RoleAssignment at all is refused even read access", %{
+      conn: conn,
+      organisation: organisation
+    } do
+      {:ok, user, staff_member} =
+        MiwayCreditCore.AccountsFixtures.valid_user_attrs()
+        |> MiwayCreditCore.Accounts.register_staff_member("loan_officer")
+
+      {:ok, _membership} = MiwayCreditCore.Organisations.add_staff_to_organisation(staff_member.id, organisation.id)
+
+      conn = conn |> login(user)
+      assert conn |> get(~p"/admin/customers") |> Map.fetch!(:status) == 403
+    end
+  end
+
   defp login(conn, user) do
     conn
     |> Plug.Conn.put_session(:user_id, user.id)
