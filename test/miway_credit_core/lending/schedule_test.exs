@@ -4,7 +4,7 @@ defmodule MiwayCreditCore.Lending.ScheduleTest do
   import MiwayCreditCore.LoansFixtures
   import MiwayCreditCore.CustomersFixtures
   import MiwayCreditCore.OrganisationsFixtures
-  alias MiwayCreditCore.Lending
+  alias MiwayCreditCore.{Lending, Accounting}
   alias MiwayCreditCore.Accounts.Scope
 
   describe "mark_overdue_installments/0" do
@@ -77,6 +77,7 @@ defmodule MiwayCreditCore.Lending.ScheduleTest do
       penalty_entry = Enum.find(entries, &(&1.entry_type == "penalty"))
       assert penalty_entry
       assert Decimal.equal?(penalty_entry.amount, expected_penalty)
+      assert Accounting.trial_balance(scope).balanced?
     end
 
     test "zero-penalty products post no penalty entry" do

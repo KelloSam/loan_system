@@ -18,6 +18,7 @@ defmodule MiwayCreditCore.PaymentsTest do
       reloaded = Lending.get_account!(scope, account.id)
       assert Decimal.equal?(reloaded.outstanding_balance, Decimal.sub(account.outstanding_balance, "234.56"))
       assert reloaded.status == "active"
+      assert Accounting.trial_balance(scope).balanced?
     end
 
     test "allocates oldest-due-date-first, partially paying the earliest installment" do
@@ -206,6 +207,7 @@ defmodule MiwayCreditCore.PaymentsTest do
       assert Enum.all?(installments, &Decimal.equal?(&1.paid_amount, Decimal.new("0.00")))
 
       assert Decimal.equal?(Accounting.rebuild_outstanding_balance(scope, account.id), reloaded_account.outstanding_balance)
+      assert Accounting.trial_balance(scope).balanced?
     end
 
     test "does not touch an already-voided transaction's status via a second void" do

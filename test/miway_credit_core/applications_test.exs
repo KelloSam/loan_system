@@ -183,6 +183,7 @@ defmodule MiwayCreditCore.ApplicationsTest do
       assert account.organisation_id == disbursed.organisation_id
       assert account.status == "active"
       assert Decimal.compare(account.outstanding_balance, Decimal.new("0")) == :gt
+      assert Accounting.trial_balance(%Scope{organisation_id: account.organisation_id}).balanced?
     end
 
     test "generates a unique contract_reference and defaults disbursement_method when not specified" do

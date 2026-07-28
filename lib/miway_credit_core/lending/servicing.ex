@@ -11,7 +11,7 @@ defmodule MiwayCreditCore.Lending.Servicing do
   alias MiwayCreditCore.Repo
   alias MiwayCreditCore.Customers.CustomerStats
   alias MiwayCreditCore.Lending.LoanAccount
-  alias MiwayCreditCore.Accounting.AccountingEntry
+  alias MiwayCreditCore.Accounting.{AccountingEntry, GeneralLedger}
   alias MiwayCreditCore.Payments.PaymentTransaction
   alias MiwayCreditCore.Accounts.Scope
 
@@ -81,6 +81,17 @@ defmodule MiwayCreditCore.Lending.Servicing do
       recorded_by_id: admin_id,
       occurred_at: now
     }))
+    |> GeneralLedger.post_journal_entry(:write_off_gl, %{
+      organisation_id: account.organisation_id,
+      description: "Balance written off",
+      source_type: "manual_adjustment",
+      occurred_at: now,
+      recorded_by_id: admin_id,
+      lines: [
+        %{account_code: "5000", debit: account.outstanding_balance},
+        %{account_code: "1100", credit: account.outstanding_balance}
+      ]
+    })
     |> Ecto.Multi.run(:update_customer_stats, fn repo, %{account: account} ->
       CustomerStats.recalculate(repo, account.customer_id)
     end)
@@ -132,6 +143,14 @@ defmodule MiwayCreditCore.Lending.Servicing do
         recorded_by_id: admin_id,
         occurred_at: now
       }))
+      |> GeneralLedger.post_reversal(:reversal_gl, %{
+        organisation_id: account.organisation_id,
+        description: "Disbursement reversed: #{reason}",
+        source_type: "loan_account",
+        source_id: account.id,
+        occurred_at: now,
+        recorded_by_id: admin_id
+      })
       |> Ecto.Multi.run(:update_customer_stats, fn repo, %{account: account} ->
         CustomerStats.recalculate(repo, account.customer_id)
       end)

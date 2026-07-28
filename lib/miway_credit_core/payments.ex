@@ -24,7 +24,7 @@ defmodule MiwayCreditCore.Payments do
   alias MiwayCreditCore.Customers.CustomerStats
   alias MiwayCreditCore.Payments.{PaymentTransaction, PaymentAllocation}
   alias MiwayCreditCore.Lending.{LoanAccount, RepaymentScheduleInstallment}
-  alias MiwayCreditCore.Accounting.AccountingEntry
+  alias MiwayCreditCore.Accounting.{AccountingEntry, GeneralLedger}
   alias MiwayCreditCore.Accounts.Scope
 
   @default_allocation_order ~w(penalty interest principal)
@@ -101,6 +101,20 @@ defmodule MiwayCreditCore.Payments do
         description: "Payment received",
         recorded_by_id: transaction.recorded_by_id,
         occurred_at: now
+      })
+    end)
+    |> Ecto.Multi.merge(fn %{transaction: transaction, account: account} ->
+      GeneralLedger.post_journal_entry(Ecto.Multi.new(), :repayment_gl, %{
+        organisation_id: account.organisation_id,
+        description: "Payment received",
+        source_type: "payment_transaction",
+        source_id: transaction.id,
+        occurred_at: now,
+        recorded_by_id: transaction.recorded_by_id,
+        lines: [
+          %{account_code: GeneralLedger.cash_account_code(transaction.method), debit: transaction.payable_amount},
+          %{account_code: "1100", credit: transaction.payable_amount}
+        ]
       })
     end)
     |> Ecto.Multi.run(:update_customer_stats, fn repo, %{account: account} ->
@@ -222,6 +236,14 @@ defmodule MiwayCreditCore.Payments do
         occurred_at: now
       })
     end)
+    |> GeneralLedger.post_reversal(:reversal_gl, %{
+      organisation_id: account.organisation_id,
+      description: "#{opts.description}: #{Map.get(attrs, opts.reason_field)}",
+      source_type: "payment_transaction",
+      source_id: transaction.id,
+      occurred_at: now,
+      recorded_by_id: Map.get(attrs, opts.actor_field)
+    })
     |> Ecto.Multi.run(:update_customer_stats, fn repo, %{account: account} ->
       CustomerStats.recalculate(repo, account.customer_id)
     end)

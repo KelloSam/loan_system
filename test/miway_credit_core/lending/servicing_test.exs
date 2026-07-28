@@ -53,6 +53,7 @@ defmodule MiwayCreditCore.Lending.ServicingTest do
 
       reloaded_customer = Customers.get_customer!(scope, application.customer_id)
       assert Decimal.equal?(reloaded_customer.current_balance, Decimal.new("0.00"))
+      assert Accounting.trial_balance(scope).balanced?
     end
   end
 
@@ -75,6 +76,7 @@ defmodule MiwayCreditCore.Lending.ServicingTest do
 
       reloaded_customer = Customers.get_customer!(scope, application.customer_id)
       assert Decimal.equal?(reloaded_customer.current_balance, Decimal.new("0.00"))
+      assert Accounting.trial_balance(scope).balanced?
     end
 
     test "excludes a reversed account from count_active_accounts/1 and total_outstanding_balance/1" do

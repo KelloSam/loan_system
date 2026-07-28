@@ -25,7 +25,7 @@ defmodule MiwayCreditCore.Applications do
   alias MiwayCreditCore.Customers
   alias MiwayCreditCore.Customers.CustomerStats
   alias MiwayCreditCore.Lending.{LoanAccount, RepaymentScheduleInstallment, InterestCalculator}
-  alias MiwayCreditCore.Accounting.AccountingEntry
+  alias MiwayCreditCore.Accounting.{AccountingEntry, GeneralLedger}
   alias MiwayCreditCore.Accounts.Scope
   alias MiwayCreditCore.Authorization
   alias MiwayCreditCore.CreditReporting
@@ -550,6 +550,9 @@ defmodule MiwayCreditCore.Applications do
       |> Decimal.div(Decimal.new("100"))
       |> Decimal.round(2)
 
+    cash_account_code = GeneralLedger.cash_account_code(disbursement_details["method"])
+    interest_amount = Decimal.sub(total_repayment, application.requested_amount)
+
     Ecto.Multi.new()
     |> Ecto.Multi.update(:application, LoanApplication.decision_changeset(application, %{
       status: "disbursed",
@@ -592,7 +595,19 @@ defmodule MiwayCreditCore.Applications do
         occurred_at: now
       })
     end)
-    |> maybe_insert_origination_fee(origination_fee, now)
+    |> GeneralLedger.post_journal_entry(:disbursement_gl, %{
+      organisation_id: application.organisation_id,
+      description: "Loan disbursed (principal + scheduled interest)",
+      source_type: "loan_account",
+      source_id: account_id,
+      occurred_at: now,
+      lines: [
+        %{account_code: "1100", debit: total_repayment},
+        %{account_code: cash_account_code, credit: application.requested_amount},
+        %{account_code: "4000", credit: interest_amount}
+      ]
+    })
+    |> maybe_insert_origination_fee(origination_fee, now, application.organisation_id, account_id)
     |> Ecto.Multi.run(:schedule, fn repo, %{account: account} ->
       generate_repayment_schedule(repo, account, product.grace_period_days)
     end)
@@ -608,10 +623,13 @@ defmodule MiwayCreditCore.Applications do
   end
 
   # Zero-fee products skip this step entirely rather than posting a
-  # $0.00 no-op ledger entry.
-  defp maybe_insert_origination_fee(multi, origination_fee, now) do
+  # $0.00 no-op ledger entry. post_journal_entry/3 has the same
+  # zero-line skip built in, so the GL call below is safe even when
+  # this branch's own check is somehow bypassed.
+  defp maybe_insert_origination_fee(multi, origination_fee, now, organisation_id, account_id) do
     if Decimal.compare(origination_fee, Decimal.new("0")) == :gt do
-      Ecto.Multi.insert(multi, :origination_fee, fn %{account: account, disbursement: disbursement} ->
+      multi
+      |> Ecto.Multi.insert(:origination_fee, fn %{account: account, disbursement: disbursement} ->
         AccountingEntry.changeset(%AccountingEntry{}, %{
           organisation_id: account.organisation_id,
           loan_account_id: account.id,
@@ -624,6 +642,17 @@ defmodule MiwayCreditCore.Applications do
           occurred_at: now
         })
       end)
+      |> GeneralLedger.post_journal_entry(:origination_fee_gl, %{
+        organisation_id: organisation_id,
+        description: "Origination fee",
+        source_type: "loan_account",
+        source_id: account_id,
+        occurred_at: now,
+        lines: [
+          %{account_code: "1100", debit: origination_fee},
+          %{account_code: "4100", credit: origination_fee}
+        ]
+      })
     else
       multi
     end

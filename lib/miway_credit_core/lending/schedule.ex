@@ -9,7 +9,7 @@ defmodule MiwayCreditCore.Lending.Schedule do
   import Ecto.Query
   alias MiwayCreditCore.Repo
   alias MiwayCreditCore.Lending.{RepaymentScheduleInstallment, LoanAccount}
-  alias MiwayCreditCore.Accounting.AccountingEntry
+  alias MiwayCreditCore.Accounting.{AccountingEntry, GeneralLedger}
   alias MiwayCreditCore.Accounts.Scope
 
   def list_installments_for_account(%Scope{} = scope, loan_account_id) do
@@ -112,6 +112,17 @@ defmodule MiwayCreditCore.Lending.Schedule do
           occurred_at: now
         })
       end)
+      |> GeneralLedger.post_journal_entry(:penalty_gl, %{
+        organisation_id: account.organisation_id,
+        description: "Late payment penalty accrued",
+        source_type: "loan_account",
+        source_id: account.id,
+        occurred_at: now,
+        lines: [
+          %{account_code: "1100", debit: penalty},
+          %{account_code: "4200", credit: penalty}
+        ]
+      })
     else
       multi
     end
