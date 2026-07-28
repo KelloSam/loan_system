@@ -22,6 +22,8 @@ defmodule MiwayCreditCore.Applications do
   alias MiwayCreditCore.Accounting.AccountingEntry
   alias MiwayCreditCore.Accounts.Scope
   alias MiwayCreditCore.Authorization
+  alias MiwayCreditCore.Products
+  alias MiwayCreditCore.Products.LoanProduct
   alias MiwayCreditCore.Risk
 
   # ---------------------------------------------------------------------------
@@ -91,11 +93,14 @@ defmodule MiwayCreditCore.Applications do
   def create_application(%Scope{} = scope, attrs \\ %{}) do
     attrs = stringify_keys(attrs)
     customer_id = attrs["customer_id"]
+    amount = to_decimal(attrs["requested_amount"])
+    term_months = to_integer(attrs["requested_term_months"])
 
     with :ok <- check_pending_application(customer_id),
-         :ok <- check_rejection_cooldown(customer_id) do
+         :ok <- check_rejection_cooldown(customer_id),
+         {:ok, product} <- fetch_available_product(scope, attrs["loan_product_id"]),
+         :ok <- check_product_bounds(product, amount, term_months) do
       customer = customer_id && Customers.get_customer!(scope, customer_id)
-      amount = attrs["requested_amount"]
       {risk_level, risk_score, _signals} = Risk.evaluate(customer_id, amount)
 
       attrs =
@@ -169,9 +174,13 @@ defmodule MiwayCreditCore.Applications do
   carries one.
   """
   def approve_application(%LoanApplication{} = application, %Scope{} = scope) do
+    product = Products.get_product!(scope, application.loan_product_id)
+
     with :ok <- check_maker_checker(application, scope),
-         :ok <- check_approval_limit(application, scope) do
-      do_approve_application(application, scope.user.id)
+         :ok <- check_approval_limit(application, scope),
+         :ok <- check_guarantor_requirement(application, product, scope),
+         :ok <- check_minimum_approval_role(product, scope) do
+      do_approve_application(application, scope.user.id, product)
     end
   end
 
@@ -188,17 +197,32 @@ defmodule MiwayCreditCore.Applications do
     end
   end
 
-  defp do_approve_application(%LoanApplication{} = application, admin_id) do
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
+  defp check_guarantor_requirement(_application, %LoanProduct{requires_guarantor: false}, _scope), do: :ok
 
-    interest_rate = default_interest_rate()
+  defp check_guarantor_requirement(application, %LoanProduct{requires_guarantor: true} = product, scope) do
+    count = scope |> Customers.list_guarantors_for_customer(application.customer_id) |> length()
+    if count >= product.minimum_guarantors, do: :ok, else: {:error, :guarantor_required}
+  end
+
+  defp check_minimum_approval_role(%LoanProduct{minimum_approval_role: role}, scope) do
+    if Authorization.role_meets_minimum?(scope, role), do: :ok, else: {:error, :insufficient_approval_role}
+  end
+
+  defp do_approve_application(%LoanApplication{} = application, admin_id, %LoanProduct{} = product) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
 
     %{total_repayment: total_repayment} =
       InterestCalculator.calculate(%{
         amount: application.requested_amount,
-        interest_rate: interest_rate,
+        interest_rate: product.interest_rate,
         term_months: application.requested_term_months
       })
+
+    origination_fee =
+      product.origination_fee_percent
+      |> Decimal.mult(application.requested_amount)
+      |> Decimal.div(Decimal.new("100"))
+      |> Decimal.round(2)
 
     Ecto.Multi.new()
     |> Ecto.Multi.update(:application, LoanApplication.decision_changeset(application, %{
@@ -211,16 +235,19 @@ defmodule MiwayCreditCore.Applications do
         organisation_id: application.organisation_id,
         loan_application_id: application.id,
         customer_id: application.customer_id,
+        loan_product_id: product.id,
         principal_amount: application.requested_amount,
-        interest_rate: interest_rate,
+        interest_rate: product.interest_rate,
+        interest_method: product.interest_method,
         term_months: application.requested_term_months,
         opened_at: now,
         status: "active",
         # The account owes the full scheduled repayment (principal +
-        # interest), not just the principal disbursed — this is what
-        # reconciles against the sum of repayment_schedule_installments
-        # and is what a customer actually needs to pay to close the loan.
-        outstanding_balance: total_repayment
+        # interest) plus any origination fee, not just the principal
+        # disbursed — this is what reconciles against the sum of
+        # repayment_schedule_installments plus the fee entry below, and
+        # is what a customer actually needs to pay to close the loan.
+        outstanding_balance: Decimal.add(total_repayment, origination_fee)
       })
     end)
     |> Ecto.Multi.insert(:disbursement, fn %{account: account} ->
@@ -236,8 +263,9 @@ defmodule MiwayCreditCore.Applications do
         occurred_at: now
       })
     end)
+    |> maybe_insert_origination_fee(origination_fee, now)
     |> Ecto.Multi.run(:schedule, fn repo, %{account: account} ->
-      generate_repayment_schedule(repo, account)
+      generate_repayment_schedule(repo, account, product.grace_period_days)
     end)
     |> Ecto.Multi.run(:update_customer_stats, fn repo, %{account: account} ->
       CustomerStats.recalculate(repo, account.customer_id)
@@ -247,6 +275,28 @@ defmodule MiwayCreditCore.Applications do
       {:ok, %{application: application, account: account}} -> {:ok, application, account}
       {:error, :application, changeset, _}                 -> {:error, changeset}
       {:error, _, reason, _}                                -> {:error, reason}
+    end
+  end
+
+  # Zero-fee products skip this step entirely rather than posting a
+  # $0.00 no-op ledger entry.
+  defp maybe_insert_origination_fee(multi, origination_fee, now) do
+    if Decimal.compare(origination_fee, Decimal.new("0")) == :gt do
+      Ecto.Multi.insert(multi, :origination_fee, fn %{account: account, disbursement: disbursement} ->
+        AccountingEntry.changeset(%AccountingEntry{}, %{
+          organisation_id: account.organisation_id,
+          loan_account_id: account.id,
+          entry_type: "fee",
+          amount: origination_fee,
+          running_balance: Decimal.add(disbursement.running_balance, origination_fee),
+          source_type: "loan_account",
+          source_id: account.id,
+          description: "Origination fee",
+          occurred_at: now
+        })
+      end)
+    else
+      multi
     end
   end
 
@@ -328,13 +378,7 @@ defmodule MiwayCreditCore.Applications do
 
   defp stringify_keys(attrs), do: Map.new(attrs, fn {k, v} -> {to_string(k), v} end)
 
-  # Interest rate isn't collected on the application form today (the old
-  # Loan schema took it directly from admin input on create) — kept as a
-  # fixed default here so approval has a rate to lock in. Swap for a
-  # per-application field or a risk-based rate table when that's designed.
-  defp default_interest_rate, do: Decimal.new("18.00")
-
-  defp generate_repayment_schedule(repo, %LoanAccount{} = account) do
+  defp generate_repayment_schedule(repo, %LoanAccount{} = account, grace_period_days) do
     %{monthly_payment: monthly_payment} =
       InterestCalculator.calculate(%{
         amount: account.principal_amount,
@@ -347,6 +391,11 @@ defmodule MiwayCreditCore.Applications do
     # :naive_datetime — insert_all bypasses changesets/schema casting,
     # so this must already match that type, not a DateTime.
     now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+
+    # The whole schedule is anchored `grace_period_days` after
+    # disbursement, not just the first installment — every due date
+    # shifts uniformly, the monthly cadence between them is unchanged.
+    base_date = Timex.shift(DateTime.to_date(account.opened_at), days: grace_period_days || 0)
 
     {installments, _} =
       Enum.map_reduce(1..account.term_months, account.principal_amount, fn n, remaining_principal ->
@@ -363,7 +412,7 @@ defmodule MiwayCreditCore.Applications do
           organisation_id: account.organisation_id,
           loan_account_id: account.id,
           installment_number: n,
-          due_date: Timex.shift(DateTime.to_date(account.opened_at), months: n),
+          due_date: Timex.shift(base_date, months: n),
           scheduled_amount: Decimal.add(principal_due, interest_due),
           scheduled_principal: principal_due,
           scheduled_interest: interest_due,
@@ -378,6 +427,51 @@ defmodule MiwayCreditCore.Applications do
 
     repo.insert_all(RepaymentScheduleInstallment, installments)
     {:ok, :scheduled}
+  end
+
+  defp fetch_available_product(_scope, nil), do: {:error, :product_required}
+
+  defp fetch_available_product(scope, product_id) do
+    scope
+    |> Products.list_available_products()
+    |> Enum.find(&(&1.id == product_id))
+    |> case do
+      nil -> {:error, :product_unavailable}
+      product -> {:ok, product}
+    end
+  end
+
+  defp check_product_bounds(_product, nil, _term_months), do: :ok
+  defp check_product_bounds(_product, _amount, nil), do: :ok
+
+  defp check_product_bounds(%LoanProduct{} = product, amount, term_months) do
+    cond do
+      Decimal.compare(amount, product.minimum_principal) == :lt -> {:error, :amount_below_minimum}
+      Decimal.compare(amount, product.maximum_principal) == :gt -> {:error, :amount_above_maximum}
+      term_months < product.minimum_term_months -> {:error, :term_below_minimum}
+      term_months > product.maximum_term_months -> {:error, :term_above_maximum}
+      true -> :ok
+    end
+  end
+
+  defp to_decimal(%Decimal{} = value), do: value
+  defp to_decimal(nil), do: nil
+
+  defp to_decimal(value) do
+    case Decimal.cast(value) do
+      {:ok, decimal} -> decimal
+      :error -> nil
+    end
+  end
+
+  defp to_integer(value) when is_integer(value), do: value
+  defp to_integer(nil), do: nil
+
+  defp to_integer(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {int, _} -> int
+      :error -> nil
+    end
   end
 
   defp check_pending_application(nil), do: :ok

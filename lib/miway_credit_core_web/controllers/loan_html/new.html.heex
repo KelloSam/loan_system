@@ -28,6 +28,15 @@
       <%= error_tag f, :customer_id %>
     </div>
 
+    <div>
+      <label class="form-label">Loan Product <span class="text-red-500">*</span></label>
+      <%= select f, :loan_product_id,
+            Enum.map(@products, &{"#{&1.name} (#{&1.interest_rate}%, #{&1.minimum_term_months}-#{&1.maximum_term_months}mo)", &1.id}),
+            prompt: "Select a product…",
+            class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+      <p class="form-hint mt-1">Sets the interest rate, permitted amount/term range, and any requirements this loan must satisfy.</p>
+    </div>
+
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div>
         <label class="form-label">Requested Amount (ZMW) <span class="text-red-500">*</span></label>

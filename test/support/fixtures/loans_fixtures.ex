@@ -17,15 +17,28 @@ defmodule MiwayCreditCore.LoansFixtures do
   """
   def valid_application_attrs(attrs \\ %{}) do
     customer_id = attrs[:customer_id] || attrs["customer_id"] || customer_fixture().id
+    organisation_id = Repo.get!(Customer, customer_id).organisation_id
+    product_id = attrs[:loan_product_id] || attrs["loan_product_id"] || default_product_id(organisation_id)
 
     Enum.into(stringify_keys(attrs), %{
       "customer_id" => customer_id,
+      "loan_product_id" => product_id,
       # Deliberately not a round number — a round amount trips
       # FraudDetector's signal_round_amount and would make risk_level
       # unpredictable for tests that aren't about fraud scoring.
       "requested_amount" => "1234.56",
       "requested_term_months" => "6"
     })
+  end
+
+  @doc "The organisation's seeded default product (every organisation_fixture/1 gets one via Authorization.provision_organisation/1)."
+  def default_product_id(organisation_id) do
+    scope = %Scope{organisation_id: organisation_id}
+
+    case MiwayCreditCore.Products.list_available_products(scope) do
+      [product | _] -> product.id
+      [] -> nil
+    end
   end
 
   @doc "Scope matching whichever customer this application is (or will be) filed under."

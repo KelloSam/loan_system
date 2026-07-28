@@ -1,7 +1,7 @@
 defmodule MiwayCreditCoreWeb.LoanController do
   use MiwayCreditCoreWeb, :controller
 
-  alias MiwayCreditCore.{Applications, Lending, Payments, Customers, AuditLogs}
+  alias MiwayCreditCore.{Applications, Lending, Payments, Customers, Products, AuditLogs}
   alias MiwayCreditCore.Applications.{LoanApplication, Collateral}
   alias MiwayCreditCore.Payments.PaymentTransaction
   alias MiwayCreditCoreWeb.Plugs.RequirePermissionPlug
@@ -57,8 +57,9 @@ defmodule MiwayCreditCoreWeb.LoanController do
 
   def new(conn, _params) do
     customers = Customers.list_customers(conn.assigns.current_scope)
+    products = Products.list_available_products(conn.assigns.current_scope)
     changeset = LoanApplication.changeset(%LoanApplication{}, %{})
-    render(conn, :new, changeset: changeset, customers: customers)
+    render(conn, :new, changeset: changeset, customers: customers, products: products)
   end
 
   def create(conn, %{"loan_application" => application_params}) do
@@ -87,9 +88,40 @@ defmodule MiwayCreditCoreWeb.LoanController do
         |> put_flash(:error, "Blocked: this customer was rejected within the last 30 days. New applications are frozen during the cooling-off period.")
         |> redirect(to: ~p"/admin/loans/new")
 
+      {:error, :product_required} ->
+        conn
+        |> put_flash(:error, "Select a loan product.")
+        |> redirect(to: ~p"/admin/loans/new")
+
+      {:error, :product_unavailable} ->
+        conn
+        |> put_flash(:error, "That product is no longer available. Choose a different one.")
+        |> redirect(to: ~p"/admin/loans/new")
+
+      {:error, :amount_below_minimum} ->
+        conn
+        |> put_flash(:error, "Requested amount is below this product's minimum principal.")
+        |> redirect(to: ~p"/admin/loans/new")
+
+      {:error, :amount_above_maximum} ->
+        conn
+        |> put_flash(:error, "Requested amount is above this product's maximum principal.")
+        |> redirect(to: ~p"/admin/loans/new")
+
+      {:error, :term_below_minimum} ->
+        conn
+        |> put_flash(:error, "Requested term is shorter than this product's minimum term.")
+        |> redirect(to: ~p"/admin/loans/new")
+
+      {:error, :term_above_maximum} ->
+        conn
+        |> put_flash(:error, "Requested term is longer than this product's maximum term.")
+        |> redirect(to: ~p"/admin/loans/new")
+
       {:error, changeset} ->
         customers = Customers.list_customers(conn.assigns.current_scope)
-        render(conn, :new, changeset: changeset, customers: customers)
+        products = Products.list_available_products(conn.assigns.current_scope)
+        render(conn, :new, changeset: changeset, customers: customers, products: products)
     end
   end
 
@@ -155,6 +187,16 @@ defmodule MiwayCreditCoreWeb.LoanController do
       {:error, :exceeds_approval_limit} ->
         conn
         |> put_flash(:error, "This amount exceeds your approval limit.")
+        |> redirect(to: ~p"/admin/loans/#{id}")
+
+      {:error, :guarantor_required} ->
+        conn
+        |> put_flash(:error, "This product requires a guarantor on record before it can be approved.")
+        |> redirect(to: ~p"/admin/loans/#{id}")
+
+      {:error, :insufficient_approval_role} ->
+        conn
+        |> put_flash(:error, "This product requires a more senior role to approve.")
         |> redirect(to: ~p"/admin/loans/#{id}")
 
       {:error, _} ->

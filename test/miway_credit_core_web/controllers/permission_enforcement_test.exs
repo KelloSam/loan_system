@@ -32,17 +32,23 @@ defmodule MiwayCreditCoreWeb.PermissionEnforcementTest do
       assert conn |> get(~p"/admin/loans/#{application.id}") |> html_response(200)
     end
 
-    test "Create: can submit a new application", %{conn: conn, loan_officer: loan_officer, customer: customer} do
+    test "Create: can submit a new application", %{
+      conn: conn,
+      loan_officer: loan_officer,
+      organisation: organisation,
+      customer: customer
+    } do
       conn = conn |> login(loan_officer)
 
       conn =
         post(conn, ~p"/admin/loans", loan_application: %{
           "customer_id" => customer.id,
+          "loan_product_id" => default_product_id(organisation.id),
           "requested_amount" => "1234.56",
           "requested_term_months" => "6"
         })
 
-      assert redirected_to(conn) =~ ~r{^/admin/loans/}
+      assert redirected_to(conn) =~ ~r/^\/admin\/loans\/[0-9a-f-]{36}$/
     end
 
     test "Edit: can update a pending application", %{conn: conn, loan_officer: loan_officer, customer: customer} do
@@ -115,12 +121,18 @@ defmodule MiwayCreditCoreWeb.PermissionEnforcementTest do
       assert redirected_to(conn) == ~p"/admin/loans/#{application.id}"
     end
 
-    test "maker-checker still applies even to an organisation_administrator", %{conn: conn, org_admin: org_admin, customer: customer} do
+    test "maker-checker still applies even to an organisation_administrator", %{
+      conn: conn,
+      org_admin: org_admin,
+      organisation: organisation,
+      customer: customer
+    } do
       conn = conn |> login(org_admin)
 
       conn =
         post(conn, ~p"/admin/loans", loan_application: %{
           "customer_id" => customer.id,
+          "loan_product_id" => default_product_id(organisation.id),
           "requested_amount" => "1234.56",
           "requested_term_months" => "6"
         })
@@ -195,6 +207,64 @@ defmodule MiwayCreditCoreWeb.PermissionEnforcementTest do
       conn = conn |> login(user)
       assert conn |> get(~p"/admin/customers") |> Map.fetch!(:status) == 403
     end
+  end
+
+  describe "products.view / products.manage — loan_officer can see, only org_admin can write" do
+    test "loan_officer can list products (granted products.view by default)", %{conn: conn, loan_officer: loan_officer} do
+      conn = conn |> login(loan_officer) |> get(~p"/admin/products")
+      assert html_response(conn, 200)
+    end
+
+    test "loan_officer is refused a real 403 creating a product", %{conn: conn, loan_officer: loan_officer} do
+      conn = conn |> login(loan_officer) |> get(~p"/admin/products/new")
+      assert conn.status == 403
+    end
+
+    test "loan_officer is refused a real 403 posting a new product directly, not just hidden from the menu", %{
+      conn: conn,
+      loan_officer: loan_officer
+    } do
+      conn =
+        conn
+        |> login(loan_officer)
+        |> post(~p"/admin/products", product: valid_product_attrs())
+
+      assert conn.status == 403
+    end
+
+    test "org_admin can create, edit, retire, and reactivate a product", %{conn: conn, org_admin: org_admin} do
+      conn = conn |> login(org_admin)
+
+      conn = post(conn, ~p"/admin/products", product: valid_product_attrs())
+      assert redirected_to(conn) == ~p"/admin/products"
+
+      product = MiwayCreditCore.Repo.get_by!(MiwayCreditCore.Products.LoanProduct, name: valid_product_attrs()["name"])
+
+      conn = patch(conn, ~p"/admin/products/#{product.id}", product: %{"interest_rate" => "20.00"})
+      assert redirected_to(conn) == ~p"/admin/products"
+
+      conn = patch(conn, ~p"/admin/products/#{product.id}/retire")
+      assert redirected_to(conn) == ~p"/admin/products"
+      assert MiwayCreditCore.Repo.get!(MiwayCreditCore.Products.LoanProduct, product.id).status == "retired"
+
+      conn = patch(conn, ~p"/admin/products/#{product.id}/activate")
+      assert redirected_to(conn) == ~p"/admin/products"
+      assert MiwayCreditCore.Repo.get!(MiwayCreditCore.Products.LoanProduct, product.id).status == "active"
+    end
+  end
+
+  defp valid_product_attrs do
+    %{
+      "name" => "Permission Test Product",
+      "minimum_principal" => "100.00",
+      "maximum_principal" => "50000.00",
+      "interest_method" => "reducing_balance",
+      "interest_rate" => "18.00",
+      "minimum_term_months" => "1",
+      "maximum_term_months" => "24",
+      "repayment_frequency" => "monthly",
+      "effective_from" => Date.utc_today()
+    }
   end
 
   defp login(conn, user) do

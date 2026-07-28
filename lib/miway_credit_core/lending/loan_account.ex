@@ -9,6 +9,12 @@ defmodule MiwayCreditCore.Lending.LoanAccount do
   written inside the same Ecto.Multi that inserts the corresponding
   ledger entry, so it cannot drift under normal operation. See
   `MiwayCreditCore.Accounting.rebuild_outstanding_balance/1`.
+
+  `loan_product_id` is traceability only, for reporting — the actual
+  terms (`interest_rate`, `interest_method`, `term_months`) are frozen
+  onto this record directly at approval time and never re-read from
+  the product afterward, so editing or retiring a `LoanProduct` later
+  never changes an existing account's terms.
   """
 
   use Ecto.Schema
@@ -20,6 +26,7 @@ defmodule MiwayCreditCore.Lending.LoanAccount do
   schema "loan_accounts" do
     field :principal_amount, :decimal
     field :interest_rate, :decimal
+    field :interest_method, :string
     field :term_months, :integer
 
     field :opened_at, :utc_datetime
@@ -30,6 +37,7 @@ defmodule MiwayCreditCore.Lending.LoanAccount do
     belongs_to :organisation, MiwayCreditCore.Organisations.Organisation, type: :binary_id
     belongs_to :loan_application, MiwayCreditCore.Applications.LoanApplication, type: :binary_id
     belongs_to :customer, MiwayCreditCore.Customers.Customer, type: :binary_id
+    belongs_to :loan_product, MiwayCreditCore.Products.LoanProduct, type: :binary_id
 
     has_many :repayment_schedule_installments, MiwayCreditCore.Lending.RepaymentScheduleInstallment,
       preload_order: [asc: :due_date]
@@ -42,10 +50,11 @@ defmodule MiwayCreditCore.Lending.LoanAccount do
 
   def changeset(loan_account, attrs) do
     loan_account
-    |> cast(attrs, [:organisation_id, :loan_application_id, :customer_id, :principal_amount, :interest_rate,
-                   :term_months, :opened_at, :status, :outstanding_balance, :closed_at])
-    |> validate_required([:organisation_id, :loan_application_id, :customer_id, :principal_amount, :interest_rate,
-                          :term_months, :opened_at, :status, :outstanding_balance])
+    |> cast(attrs, [:organisation_id, :loan_application_id, :customer_id, :loan_product_id, :principal_amount,
+                   :interest_rate, :interest_method, :term_months, :opened_at, :status, :outstanding_balance,
+                   :closed_at])
+    |> validate_required([:organisation_id, :loan_application_id, :customer_id, :loan_product_id, :principal_amount,
+                          :interest_rate, :interest_method, :term_months, :opened_at, :status, :outstanding_balance])
     |> validate_inclusion(:status, @statuses)
     |> validate_number(:principal_amount, greater_than: 0)
     |> validate_number(:interest_rate, greater_than: 0)
@@ -54,6 +63,7 @@ defmodule MiwayCreditCore.Lending.LoanAccount do
     |> foreign_key_constraint(:organisation_id)
     |> foreign_key_constraint(:loan_application_id)
     |> foreign_key_constraint(:customer_id)
+    |> foreign_key_constraint(:loan_product_id)
     |> unique_constraint(:loan_application_id)
   end
 end

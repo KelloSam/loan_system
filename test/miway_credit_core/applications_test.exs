@@ -64,6 +64,17 @@ defmodule MiwayCreditCore.ApplicationsTest do
       assert {:error, %Ecto.Changeset{}} =
                Applications.create_application(
                  scope,
+                 valid_application_attrs(%{"customer_id" => customer.id, "purpose" => String.duplicate("x", 501)})
+               )
+    end
+
+    test "rejects an amount below the product's minimum principal with a clear reason, not a bare changeset error" do
+      customer = customer_fixture()
+      scope = %Scope{organisation_id: customer.organisation_id}
+
+      assert {:error, :amount_below_minimum} =
+               Applications.create_application(
+                 scope,
                  valid_application_attrs(%{"customer_id" => customer.id, "requested_amount" => "-5"})
                )
     end
