@@ -241,6 +241,29 @@ defmodule MiwayCreditCoreWeb.PermissionEnforcementTest do
       assert conn |> post(~p"/admin/customers/#{customer.id}/guarantors", guarantor: %{}) |> Map.fetch!(:status) == 403
       assert conn |> post(~p"/admin/customers/#{customer.id}/consents", consent: %{}) |> Map.fetch!(:status) == 403
       assert conn |> patch(~p"/admin/customers/#{customer.id}/kyc/submit") |> Map.fetch!(:status) == 403
+      assert conn |> post(~p"/admin/customers/#{customer.id}/credit_reports", credit_report: %{}) |> Map.fetch!(:status) == 403
+    end
+
+    test "loan_officer (granted customers.manage by default) can record a credit report once consent is on file", %{
+      conn: conn,
+      loan_officer: loan_officer,
+      customer: customer
+    } do
+      conn = conn |> login(loan_officer)
+
+      conn =
+        post(conn, ~p"/admin/customers/#{customer.id}/consents",
+          consent: %{"consent_type" => "credit_check", "method" => "signed_form"}
+        )
+
+      assert redirected_to(conn) == ~p"/admin/customers/#{customer.id}"
+
+      conn =
+        post(conn, ~p"/admin/customers/#{customer.id}/credit_reports",
+          credit_report: %{"outcome" => "clear", "checked_at" => Date.utc_today()}
+        )
+
+      assert redirected_to(conn) == ~p"/admin/customers/#{customer.id}"
     end
 
     test "a staff member with no RoleAssignment at all is refused even read access", %{

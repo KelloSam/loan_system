@@ -229,6 +229,53 @@
   </.form>
 </div>
 
+<%# Credit Reports (CRB checks) %>
+<div class="card p-6 mb-6">
+  <h2 class="section-title mb-4">Credit Reports <span class="ml-1.5 text-sm font-normal text-gray-400">(<%= length(@credit_reports) %>)</span></h2>
+
+  <%= if Enum.empty?(@credit_reports) do %>
+    <p class="text-sm text-gray-400 mb-4">None recorded.</p>
+  <% else %>
+    <ul class="divide-y divide-gray-50 mb-4">
+      <%= for report <- @credit_reports do %>
+        <li class="py-2.5">
+          <div class="flex items-center justify-between">
+            <p class="text-sm font-medium text-navy-900">
+              <span class={if report.outcome == "clear", do: "text-emerald-600", else: "text-red-600"}>
+                <%= String.capitalize(report.outcome) %>
+              </span>
+              <span class="text-gray-400 font-normal"><%= if report.score, do: " · Score #{report.score}" %></span>
+            </p>
+            <p class="text-xs text-gray-400">Checked <%= Calendar.strftime(report.checked_at, "%d %b %Y") %></p>
+          </div>
+          <%= if report.reference_number do %>
+            <p class="text-xs text-gray-400">Ref: <%= report.reference_number %></p>
+          <% end %>
+          <%= if report.summary do %>
+            <p class="text-xs text-gray-500 mt-0.5"><%= report.summary %></p>
+          <% end %>
+        </li>
+      <% end %>
+    </ul>
+  <% end %>
+
+  <%= if @has_credit_check_consent do %>
+    <.form :let={f} for={@credit_report_changeset} action={~p"/admin/customers/#{@customer}/credit_reports"} as={:credit_report} class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <%= select f, :outcome, [{"Clear", "clear"}, {"Adverse", "adverse"}],
+            prompt: "Outcome", class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+      <%= number_input f, :score, placeholder: "Score (optional)", class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+      <%= date_input f, :checked_at, value: input_value(f, :checked_at) || Date.utc_today(),
+            class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+      <%= text_input f, :reference_number, placeholder: "Bureau reference (optional)", class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600 sm:col-span-2" %>
+      <%= submit "Record", class: "btn-outline" %>
+      <%= textarea f, :summary, rows: 2, placeholder: "Summary (optional)",
+            class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600 sm:col-span-3" %>
+    </.form>
+  <% else %>
+    <p class="text-sm text-amber-600">This customer has no active credit-check consent on file — grant it in Consent Records above before recording a CRB report.</p>
+  <% end %>
+</div>
+
 <%# Loan history %>
 <div class="card overflow-hidden">
   <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">

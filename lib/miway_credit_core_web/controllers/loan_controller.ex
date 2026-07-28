@@ -238,6 +238,31 @@ defmodule MiwayCreditCoreWeb.LoanController do
         |> put_flash(:error, "This product requires a more senior role to approve.")
         |> redirect(to: ~p"/admin/loans/#{id}")
 
+      {:error, :income_data_missing} ->
+        conn
+        |> put_flash(:error, "This product requires an affordability check, but the customer has no income data on file.")
+        |> redirect(to: ~p"/admin/loans/#{id}")
+
+      {:error, :affordability_exceeded} ->
+        conn
+        |> put_flash(:error, "This loan would exceed the product's maximum debt-to-income ratio for this customer.")
+        |> redirect(to: ~p"/admin/loans/#{id}")
+
+      {:error, :crb_check_required} ->
+        conn
+        |> put_flash(:error, "This product requires a CRB report on record before it can be approved.")
+        |> redirect(to: ~p"/admin/loans/#{id}")
+
+      {:error, :adverse_crb_report} ->
+        conn
+        |> put_flash(:error, "This customer's most recent CRB report is adverse.")
+        |> redirect(to: ~p"/admin/loans/#{id}")
+
+      {:error, :crb_check_expired} ->
+        conn
+        |> put_flash(:error, "This customer's CRB report is more than 90 days old — a fresh check is required.")
+        |> redirect(to: ~p"/admin/loans/#{id}")
+
       {:error, _} ->
         conn
         |> put_flash(:error, "Could not approve application.")

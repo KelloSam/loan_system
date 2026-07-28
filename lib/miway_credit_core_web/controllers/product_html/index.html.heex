@@ -41,8 +41,9 @@
                 <%= if product.requires_guarantor do %><span class="badge badge-pending">Guarantor</span><% end %>
                 <%= if product.requires_collateral do %><span class="badge badge-pending">Collateral</span><% end %>
                 <%= if product.requires_crb_check do %><span class="badge badge-pending">CRB</span><% end %>
+                <%= if product.requires_affordability_check do %><span class="badge badge-pending">Affordability</span><% end %>
                 <%= if product.minimum_approval_role do %><span class="badge badge-pending"><%= product.minimum_approval_role %>+</span><% end %>
-                <%= if !product.requires_guarantor and !product.requires_collateral and !product.requires_crb_check and is_nil(product.minimum_approval_role) do %>
+                <%= if !product.requires_guarantor and !product.requires_collateral and !product.requires_crb_check and !product.requires_affordability_check and is_nil(product.minimum_approval_role) do %>
                   <span class="text-xs text-gray-400">None</span>
                 <% end %>
               </div>

@@ -121,8 +121,19 @@
 
       <label class="flex items-center gap-3 cursor-pointer">
         <%= checkbox f, :requires_crb_check, class: "h-4 w-4 rounded border-gray-300 text-navy-900 focus:ring-navy-600" %>
-        <span class="text-sm text-gray-700">Requires a CRB check <span class="text-gray-400">(recorded, not yet enforced)</span></span>
+        <span class="text-sm text-gray-700">Requires a clear CRB report on record, checked within the last 90 days (enforced at approval)</span>
       </label>
+
+      <label class="flex items-center gap-3 cursor-pointer">
+        <%= checkbox f, :requires_affordability_check, class: "h-4 w-4 rounded border-gray-300 text-navy-900 focus:ring-navy-600" %>
+        <span class="text-sm text-gray-700">Requires an affordability check (enforced at approval)</span>
+      </label>
+      <div class="ml-7">
+        <label class="form-label">Max debt-to-income (%)</label>
+        <%= number_input f, :max_debt_to_income_percent, step: "0.01", value: input_value(f, :max_debt_to_income_percent) || "40.00",
+              class: "block w-32 rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+        <p class="form-hint mt-1">Existing obligations + this loan's installment, as a share of the customer's gross monthly income.</p>
+      </div>
 
       <div>
         <label class="form-label">Minimum approval role <span class="text-gray-400 font-normal">(optional)</span></label>

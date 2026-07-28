@@ -84,6 +84,7 @@ defmodule MiwayCreditCoreWeb.Router do
     delete "/customers/:id/next_of_kin/:next_of_kin_id", CustomerController, :delete_next_of_kin
     post "/customers/:id/guarantors", CustomerController, :create_guarantor
     delete "/customers/:id/guarantors/:guarantor_id", CustomerController, :delete_guarantor
+    post "/customers/:id/credit_reports", CustomerController, :create_credit_report
     post "/customers/:id/kyc_documents", CustomerController, :create_kyc_document
     get "/customers/:id/kyc_documents/:document_id/download", CustomerController, :download_kyc_document
     delete "/customers/:id/kyc_documents/:document_id", CustomerController, :remove_kyc_document
