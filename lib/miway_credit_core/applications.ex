@@ -1,10 +1,16 @@
 defmodule MiwayCreditCore.Applications do
   @moduledoc """
   The request-and-decision half of the domain, plus the collateral
-  pledged to secure an approved loan. Approving an application is the
-  one moment that creates a LoanAccount, generates its repayment
-  schedule, and posts the opening disbursement ledger entry — all in
-  one transaction, so an account never exists half-formed.
+  pledged to secure a disbursed loan. The lifecycle is a real state
+  machine — pending -> under_review -> approved/rejected, with
+  approved -> disbursed as its own separate step — see
+  assess_application/3, approve_application/2, disburse_application/2,
+  reject_application/3, withdraw_application/2. Disbursing is the one
+  moment that creates a LoanAccount, generates its repayment schedule,
+  and posts the opening disbursement ledger entry — all in one
+  transaction, so an account never exists half-formed. Approving alone
+  never does: a credit decision and the actual release of funds are
+  never the same instant.
 
   Collateral lives here rather than as its own top-level context: it's
   supporting information for a granted application with no proven
@@ -72,7 +78,7 @@ defmodule MiwayCreditCore.Applications do
   def count_active_applications(%Scope{} = scope) do
     LoanApplication
     |> scope_organisation(scope)
-    |> where([a], a.status == "pending")
+    |> where([a], a.status in ["pending", "under_review"])
     |> Repo.aggregate(:count)
   end
 
@@ -158,31 +164,59 @@ defmodule MiwayCreditCore.Applications do
   end
 
   @doc """
-  Approves a pending application: creates its LoanAccount, generates the
-  repayment schedule, posts the opening disbursement ledger entry, and
-  recalculates customer stats — all in one transaction. `application`
-  must already be a caller-scoped struct (fetched via get_application!/2)
-  — every record this creates derives organisation_id from it directly,
-  not from a fresh scope, so approval can't cross an organisation
-  boundary even if called with a stale reference.
-
-  Two checks happen before any write: maker-checker (the approver
-  can't be the same person who submitted the application — a nil
-  created_by_id, from before this was tracked, never blocks anyone,
-  since there's no maker on record to conflict with) and the
-  approver's ApprovalLimit for "applications.approve", if their role
-  carries one.
+  Moves a pending application to under_review — staff assessment,
+  decision-ready. Only a pending application can be assessed. Notes
+  are optional free text (what the loan officer found), surfaced to
+  whoever decides the application next.
   """
-  def approve_application(%LoanApplication{} = application, %Scope{} = scope) do
+  def assess_application(application, scope, notes \\ nil)
+
+  def assess_application(%LoanApplication{status: "pending"} = application, %Scope{} = scope, notes) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    application
+    |> LoanApplication.decision_changeset(%{
+      status: "under_review",
+      assessed_at: now,
+      assessed_by_id: scope.user.id,
+      assessment_notes: notes
+    })
+    |> Repo.update()
+  end
+
+  def assess_application(%LoanApplication{}, %Scope{}, _notes), do: {:error, :invalid_status}
+
+  @doc """
+  Approves an assessed application — records the credit decision only.
+  Does **not** create a LoanAccount or move any money; that happens
+  separately in disburse_application/2, once. Only an application
+  already under_review (i.e. already assessed) can be approved —
+  `assess_application/3` must run first.
+
+  Four checks happen before the decision is written: maker-checker
+  (the approver can't be the same person who submitted the
+  application — a nil created_by_id, from before this was tracked,
+  never blocks anyone, since there's no maker on record to conflict
+  with), the approver's ApprovalLimit for "applications.approve" if
+  their role carries one, the product's guarantor requirement (if
+  any), and the product's minimum_approval_role (if any).
+  """
+  def approve_application(%LoanApplication{status: "under_review"} = application, %Scope{} = scope) do
     product = Products.get_product!(scope, application.loan_product_id)
 
     with :ok <- check_maker_checker(application, scope),
          :ok <- check_approval_limit(application, scope),
          :ok <- check_guarantor_requirement(application, product, scope),
          :ok <- check_minimum_approval_role(product, scope) do
-      do_approve_application(application, scope.user.id, product)
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      application
+      |> LoanApplication.decision_changeset(%{status: "approved", decided_at: now, decided_by_id: scope.user.id})
+      |> Repo.update()
     end
   end
+
+  def approve_application(%LoanApplication{}, %Scope{}), do: {:error, :invalid_status}
 
   defp check_maker_checker(%LoanApplication{created_by_id: nil}, _scope), do: :ok
 
@@ -208,7 +242,28 @@ defmodule MiwayCreditCore.Applications do
     if Authorization.role_meets_minimum?(scope, role), do: :ok, else: {:error, :insufficient_approval_role}
   end
 
-  defp do_approve_application(%LoanApplication{} = application, admin_id, %LoanProduct{} = product) do
+  @doc """
+  Disburses an approved application: creates its LoanAccount, generates
+  the repayment schedule, posts the opening disbursement ledger entry,
+  and recalculates customer stats — all in one transaction, including
+  the application's own transition to disbursed. Only an approved
+  application can be disbursed; this is deliberately a separate step
+  from the approval decision itself (see approve_application/2), so a
+  credit decision and the actual release of funds are never the same
+  instant. `application` must already be a caller-scoped struct
+  (fetched via get_application!/2) — every record this creates derives
+  organisation_id from it directly, not from a fresh scope, so
+  disbursement can't cross an organisation boundary even if called
+  with a stale reference.
+  """
+  def disburse_application(%LoanApplication{status: "approved"} = application, %Scope{} = scope) do
+    product = Products.get_product!(scope, application.loan_product_id)
+    do_disburse_application(application, scope.user.id, product)
+  end
+
+  def disburse_application(%LoanApplication{}, %Scope{}), do: {:error, :invalid_status}
+
+  defp do_disburse_application(%LoanApplication{} = application, admin_id, %LoanProduct{} = product) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
     %{total_repayment: total_repayment} =
@@ -226,9 +281,9 @@ defmodule MiwayCreditCore.Applications do
 
     Ecto.Multi.new()
     |> Ecto.Multi.update(:application, LoanApplication.decision_changeset(application, %{
-      status: "approved",
-      decided_at: now,
-      decided_by_id: admin_id
+      status: "disbursed",
+      disbursed_at: now,
+      disbursed_by_id: admin_id
     }))
     |> Ecto.Multi.insert(:account, fn %{application: application} ->
       LoanAccount.changeset(%LoanAccount{}, %{
@@ -301,11 +356,13 @@ defmodule MiwayCreditCore.Applications do
   end
 
   @doc """
-  Rejects a pending application. Same maker-checker guard as approval
-  — the person who submitted it can't be the one who decides it,
-  either way. Recalculates customer stats (no-op today, kept for symmetry).
+  Rejects an assessed application. Same maker-checker guard as
+  approval, same under_review precondition — the person who submitted
+  it can't be the one who decides it, either way, and a decision can't
+  be made before assessment. Recalculates customer stats (no-op today,
+  kept for symmetry).
   """
-  def reject_application(%LoanApplication{} = application, %Scope{} = scope, reason) do
+  def reject_application(%LoanApplication{status: "under_review"} = application, %Scope{} = scope, reason) do
     with :ok <- check_maker_checker(application, scope) do
       now = DateTime.utc_now() |> DateTime.truncate(:second)
 
@@ -325,6 +382,27 @@ defmodule MiwayCreditCore.Applications do
       end
     end
   end
+
+  def reject_application(%LoanApplication{}, %Scope{}, _reason), do: {:error, :invalid_status}
+
+  @doc """
+  Withdraws an application still in flight — pending or under_review.
+  Not an approval-style decision by someone else, so no maker-checker
+  check: anyone holding applications.withdraw can pull back any
+  in-flight application in their organisation. Once a decision has
+  been made (approved/rejected) or funds disbursed, withdrawal is no
+  longer possible.
+  """
+  def withdraw_application(%LoanApplication{status: status} = application, %Scope{} = scope)
+      when status in ["pending", "under_review"] do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    application
+    |> LoanApplication.decision_changeset(%{status: "withdrawn", decided_at: now, decided_by_id: scope.user.id})
+    |> Repo.update()
+  end
+
+  def withdraw_application(%LoanApplication{}, %Scope{}), do: {:error, :invalid_status}
 
   # ---------------------------------------------------------------------------
   # Collateral — attaches only to an approved LoanAccount

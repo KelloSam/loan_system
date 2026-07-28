@@ -79,7 +79,7 @@ defmodule MiwayCreditCore.Risk.FraudDetector do
     if new?, do: {20, "Customer account is less than 7 days old"}, else: nil
   end
 
-  # +15 — no approved or completed loans on record
+  # +15 — no disbursed loans on record
   defp signal_no_repayment_history(nil, _exclude), do: nil
   defp signal_no_repayment_history(customer_id, exclude_id) do
     if prior_successful_count(customer_id, exclude_id) == 0 do
@@ -161,9 +161,14 @@ defmodule MiwayCreditCore.Risk.FraudDetector do
   # DB helpers
   # ---------------------------------------------------------------------------
 
+  # "Successful" means funds actually moved — disbursed, not merely
+  # approved. Under Step 9's split lifecycle, approved alone is just a
+  # decision; a customer with no disbursed loans has no real track
+  # record yet even if something is sitting approved awaiting
+  # disbursement.
   defp prior_successful_count(customer_id, nil) do
     from(la in LoanApplication,
-      where: la.customer_id == ^customer_id and la.status == "approved",
+      where: la.customer_id == ^customer_id and la.status == "disbursed",
       select: count(la.id)
     )
     |> Repo.one()
@@ -173,7 +178,7 @@ defmodule MiwayCreditCore.Risk.FraudDetector do
     from(la in LoanApplication,
       where:
         la.customer_id == ^customer_id and
-          la.status == "approved" and
+          la.status == "disbursed" and
           la.id != ^exclude_id,
       select: count(la.id)
     )
@@ -182,7 +187,7 @@ defmodule MiwayCreditCore.Risk.FraudDetector do
 
   defp avg_prior_loans(customer_id, nil) do
     from(la in LoanApplication,
-      where: la.customer_id == ^customer_id and la.status == "approved",
+      where: la.customer_id == ^customer_id and la.status == "disbursed",
       select: avg(la.requested_amount)
     )
     |> Repo.one()
@@ -192,7 +197,7 @@ defmodule MiwayCreditCore.Risk.FraudDetector do
     from(la in LoanApplication,
       where:
         la.customer_id == ^customer_id and
-          la.status == "approved" and
+          la.status == "disbursed" and
           la.id != ^exclude_id,
       select: avg(la.requested_amount)
     )

@@ -55,17 +55,25 @@ defmodule MiwayCreditCore.LoansFixtures do
   end
 
   @doc """
-  An application_fixture/1 that's already approved — returns the
-  LoanApplication struct with :loan_account preloaded, so callers can
-  reach either `application.id` / `application.customer_id` or
-  `application.loan_account.id` / `.outstanding_balance` etc.
+  An application_fixture/1 driven all the way through the lifecycle
+  (assess -> approve -> disburse) — returns the LoanApplication struct
+  with :loan_account preloaded, so callers can reach either
+  `application.id` / `application.customer_id` or
+  `application.loan_account.id` / `.outstanding_balance` etc. Name
+  kept as-is (not e.g. disbursed_application_fixture) since every
+  existing caller across the test suite already expects a live
+  account back — renaming would just be call-site churn for no
+  behavioral reason.
   """
   def approved_application_fixture(attrs \\ %{}) do
     application = application_fixture(attrs)
     admin = admin_fixture()
     admin_scope = %Scope{user: admin, organisation_id: :all}
-    {:ok, approved, account} = MiwayCreditCore.Applications.approve_application(application, admin_scope)
-    %{approved | loan_account: account}
+
+    {:ok, assessed} = MiwayCreditCore.Applications.assess_application(application, admin_scope)
+    {:ok, approved} = MiwayCreditCore.Applications.approve_application(assessed, admin_scope)
+    {:ok, disbursed, account} = MiwayCreditCore.Applications.disburse_application(approved, admin_scope)
+    %{disbursed | loan_account: account}
   end
 
   def valid_payment_attrs(%MiwayCreditCore.Lending.LoanAccount{} = account, attrs \\ %{}) do

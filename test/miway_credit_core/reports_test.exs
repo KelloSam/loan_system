@@ -23,9 +23,12 @@ defmodule MiwayCreditCore.ReportsTest do
       assert summary.active_loans == Reports.portfolio_summary(scope).active_loans
 
       admin = MiwayCreditCore.AccountsFixtures.admin_fixture()
-      {:ok, _approved, account} = Applications.approve_application(application, %Scope{user: admin, organisation_id: :all})
-      after_approve = Reports.portfolio_summary(scope)
-      assert after_approve.active_loans == summary.active_loans + 1
+      admin_scope = %Scope{user: admin, organisation_id: :all}
+      {:ok, assessed} = Applications.assess_application(application, admin_scope)
+      {:ok, approved} = Applications.approve_application(assessed, admin_scope)
+      {:ok, _disbursed, account} = Applications.disburse_application(approved, admin_scope)
+      after_disburse = Reports.portfolio_summary(scope)
+      assert after_disburse.active_loans == summary.active_loans + 1
 
       {:ok, _} = Lending.close_account(account)
       after_close = Reports.portfolio_summary(scope)

@@ -7,7 +7,7 @@ defmodule MiwayCreditCore.Applications.LoanApplication do
   use Ecto.Schema
   import Ecto.Changeset
 
-  @statuses ~w(pending approved rejected withdrawn)
+  @statuses ~w(pending under_review approved rejected disbursed withdrawn)
   @risk_levels ~w(low medium high)
 
   @primary_key {:id, :binary_id, autogenerate: true}
@@ -23,10 +23,16 @@ defmodule MiwayCreditCore.Applications.LoanApplication do
     field :decided_at, :utc_datetime
     field :rejection_reason, :string
 
+    field :assessed_at, :utc_datetime
+    field :assessment_notes, :string
+    field :disbursed_at, :utc_datetime
+
     belongs_to :organisation, MiwayCreditCore.Organisations.Organisation, type: :binary_id
     belongs_to :customer, MiwayCreditCore.Customers.Customer, type: :binary_id
     belongs_to :decided_by, MiwayCreditCore.Accounts.User
     belongs_to :created_by, MiwayCreditCore.Accounts.User
+    belongs_to :assessed_by, MiwayCreditCore.Accounts.User
+    belongs_to :disbursed_by, MiwayCreditCore.Accounts.User
     belongs_to :loan_product, MiwayCreditCore.Products.LoanProduct, type: :binary_id
     has_one :loan_account, MiwayCreditCore.Lending.LoanAccount
 
@@ -59,14 +65,25 @@ defmodule MiwayCreditCore.Applications.LoanApplication do
     |> foreign_key_constraint(:loan_product_id)
   end
 
-  @doc "Changeset for deciding a pending application (approve/reject/withdraw)."
+  @doc """
+  Changeset for a lifecycle transition — assess, approve, reject,
+  disburse, or withdraw. Each caller casts only the fields relevant to
+  its own transition (e.g. assess sets assessed_at/assessed_by_id,
+  not decided_at), so only :status is universally required.
+  """
   def decision_changeset(loan_application, attrs) do
     loan_application
-    |> cast(attrs, [:status, :decided_at, :decided_by_id, :rejection_reason])
-    |> validate_required([:status, :decided_at])
+    |> cast(attrs, [
+      :status, :decided_at, :decided_by_id, :rejection_reason,
+      :assessed_at, :assessed_by_id, :assessment_notes,
+      :disbursed_at, :disbursed_by_id
+    ])
+    |> validate_required([:status])
     |> validate_inclusion(:status, @statuses)
     |> validate_rejection_reason()
     |> foreign_key_constraint(:decided_by_id)
+    |> foreign_key_constraint(:assessed_by_id)
+    |> foreign_key_constraint(:disbursed_by_id)
   end
 
   defp validate_rejection_reason(changeset) do

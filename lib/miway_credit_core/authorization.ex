@@ -7,12 +7,14 @@ defmodule MiwayCreditCore.Authorization do
 
   The permission catalog is a fixed, code-defined vocabulary (not a
   database table) matching today's real controller actions — no entry
-  exists for an action nothing can trigger yet. `applications.submit`/
-  `.assess` and `loans.disburse` aren't here: today's LoanApplication
-  lifecycle is flat (pending → approved/rejected, no separate submit/
-  assess step) and disbursement happens automatically inside approval,
-  not as its own action. They get added for real once Step 9
-  introduces the state machine they correspond to.
+  exists for an action nothing can trigger yet. `applications.create`
+  covers submission (no separate `applications.submit` key — they're
+  the same action, a rename would be pure churn). `applications.assess`,
+  `applications.withdraw`, and `loans.disburse` were added in Step 9,
+  once `LoanApplication`'s state machine grew real assess/withdraw/
+  disburse steps distinct from the create/approve/reject it had before
+  — see `MiwayCreditCore.Applications.assess_application/3`,
+  `withdraw_application/2`, `disburse_application/2`.
   """
 
   import Ecto.Query
@@ -29,8 +31,11 @@ defmodule MiwayCreditCore.Authorization do
     applications.view
     applications.create
     applications.edit
+    applications.assess
     applications.approve
     applications.reject
+    applications.withdraw
+    loans.disburse
     payments.receive
     payments.reverse
     collateral.manage
@@ -55,6 +60,8 @@ defmodule MiwayCreditCore.Authorization do
       applications.create
       applications.view
       applications.edit
+      applications.assess
+      applications.withdraw
       payments.receive
       customers.manage
       customers.view
