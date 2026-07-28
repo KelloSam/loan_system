@@ -92,6 +92,9 @@ defmodule MiwayCreditCoreWeb.Router do
     patch "/customers/:id/kyc/submit", CustomerController, :submit_kyc_review
     patch "/customers/:id/kyc/verify", CustomerController, :verify_kyc
     patch "/customers/:id/kyc/reject", CustomerController, :reject_kyc
+    resources "/products", ProductController, except: [:show, :delete]
+    patch "/products/:id/retire", ProductController, :retire
+    patch "/products/:id/activate", ProductController, :activate
     resources "/loans", LoanController
     patch "/loans/:id/approve", LoanController, :approve
     patch "/loans/:id/reject", LoanController, :reject

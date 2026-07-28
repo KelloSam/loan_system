@@ -1,0 +1,152 @@
+<div class="mb-6">
+  <div class="flex items-center gap-2 text-sm text-gray-400 mb-1">
+    <%= link "Products", to: ~p"/admin/products", class: "hover:text-navy-600" %>
+    <span>›</span>
+    <span class="text-navy-900 font-medium"><%= @product.name %></span>
+  </div>
+  <h1 class="text-2xl font-bold text-navy-900">Edit Product</h1>
+  <p class="mt-1 text-sm text-amber-600">Editing never changes loans already issued under this product — they keep the terms frozen at approval time.</p>
+</div>
+
+<div class="max-w-2xl">
+  <.form :let={f} for={@changeset} action={~p"/admin/products/#{@product}"} method="put" class="card p-6 space-y-5">
+
+    <%= if @changeset.action do %>
+      <div class="flex items-center gap-2.5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        Please correct the errors below.
+      </div>
+    <% end %>
+
+    <div>
+      <label class="form-label">Name <span class="text-red-500">*</span></label>
+      <%= text_input f, :name,
+            class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+      <%= error_tag f, :name %>
+    </div>
+
+    <div>
+      <label class="form-label">Description <span class="text-gray-400 font-normal">(optional)</span></label>
+      <%= textarea f, :description, rows: 2,
+            class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <label class="form-label">Minimum Principal (ZMW) <span class="text-red-500">*</span></label>
+        <%= number_input f, :minimum_principal, step: "0.01",
+              class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+        <%= error_tag f, :minimum_principal %>
+      </div>
+      <div>
+        <label class="form-label">Maximum Principal (ZMW) <span class="text-red-500">*</span></label>
+        <%= number_input f, :maximum_principal, step: "0.01",
+              class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+        <%= error_tag f, :maximum_principal %>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <label class="form-label">Minimum Term (months) <span class="text-red-500">*</span></label>
+        <%= number_input f, :minimum_term_months,
+              class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+        <%= error_tag f, :minimum_term_months %>
+      </div>
+      <div>
+        <label class="form-label">Maximum Term (months) <span class="text-red-500">*</span></label>
+        <%= number_input f, :maximum_term_months,
+              class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+        <%= error_tag f, :maximum_term_months %>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <label class="form-label">Interest Rate (% p.a.) <span class="text-red-500">*</span></label>
+        <%= number_input f, :interest_rate, step: "0.01",
+              class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+        <%= error_tag f, :interest_rate %>
+      </div>
+      <div>
+        <label class="form-label">Interest Method <span class="text-red-500">*</span></label>
+        <%= select f, :interest_method, [{"Reducing balance", "reducing_balance"}],
+              class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+      </div>
+    </div>
+
+    <div>
+      <label class="form-label">Repayment Frequency <span class="text-red-500">*</span></label>
+      <%= select f, :repayment_frequency, [{"Monthly", "monthly"}],
+            class: "block w-full sm:w-1/2 rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div>
+        <label class="form-label">Origination Fee (%)</label>
+        <%= number_input f, :origination_fee_percent, step: "0.01",
+              class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+      </div>
+      <div>
+        <label class="form-label">Late Payment Penalty (%)</label>
+        <%= number_input f, :late_payment_penalty_percent, step: "0.01",
+              class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+      </div>
+      <div>
+        <label class="form-label">Grace Period (days)</label>
+        <%= number_input f, :grace_period_days,
+              class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+      </div>
+    </div>
+
+    <div class="rounded-lg bg-gray-50 border border-gray-200 p-4 space-y-3">
+      <p class="text-sm font-medium text-gray-700">Requirements to approve a loan under this product</p>
+
+      <label class="flex items-center gap-3 cursor-pointer">
+        <%= checkbox f, :requires_guarantor, class: "h-4 w-4 rounded border-gray-300 text-navy-900 focus:ring-navy-600" %>
+        <span class="text-sm text-gray-700">Requires a guarantor on record (enforced at approval)</span>
+      </label>
+      <div class="ml-7">
+        <label class="form-label">Minimum guarantors</label>
+        <%= number_input f, :minimum_guarantors,
+              class: "block w-32 rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+      </div>
+
+      <label class="flex items-center gap-3 cursor-pointer">
+        <%= checkbox f, :requires_collateral, class: "h-4 w-4 rounded border-gray-300 text-navy-900 focus:ring-navy-600" %>
+        <span class="text-sm text-gray-700">Requires collateral <span class="text-gray-400">(recorded, not enforced — collateral only attaches after approval)</span></span>
+      </label>
+
+      <label class="flex items-center gap-3 cursor-pointer">
+        <%= checkbox f, :requires_crb_check, class: "h-4 w-4 rounded border-gray-300 text-navy-900 focus:ring-navy-600" %>
+        <span class="text-sm text-gray-700">Requires a CRB check <span class="text-gray-400">(recorded, not yet enforced)</span></span>
+      </label>
+
+      <div>
+        <label class="form-label">Minimum approval role <span class="text-gray-400 font-normal">(optional)</span></label>
+        <%= select f, :minimum_approval_role,
+              [{"No minimum", nil}, {"Loan officer", "loan_officer"}, {"Organisation administrator", "organisation_administrator"}, {"Platform administrator", "platform_administrator"}],
+              class: "block w-full sm:w-1/2 rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <label class="form-label">Effective From <span class="text-red-500">*</span></label>
+        <%= date_input f, :effective_from,
+              class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+        <%= error_tag f, :effective_from %>
+      </div>
+      <div>
+        <label class="form-label">Effective Until <span class="text-gray-400 font-normal">(optional, open-ended if blank)</span></label>
+        <%= date_input f, :effective_until,
+              class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+      </div>
+    </div>
+
+    <div class="flex justify-end gap-3 pt-2 border-t border-gray-100">
+      <%= link "Cancel", to: ~p"/admin/products", class: "btn-outline" %>
+      <%= submit "Save Changes", class: "btn-primary" %>
+    </div>
+
+  </.form>
+</div>

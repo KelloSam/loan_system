@@ -20,6 +20,7 @@ defmodule MiwayCreditCore.Authorization do
   alias MiwayCreditCore.Authorization.{Role, RolePermission, RoleAssignment, ApprovalLimit}
   alias MiwayCreditCore.Organisations
   alias MiwayCreditCore.Organisations.OrganisationMembership
+  alias MiwayCreditCore.Products
   alias MiwayCreditCore.Accounts.Scope
 
   @permission_keys ~w(
@@ -33,11 +34,19 @@ defmodule MiwayCreditCore.Authorization do
     payments.receive
     payments.reverse
     collateral.manage
+    products.view
+    products.manage
     reports.view
     audit.view
   )
 
   @role_names ~w(platform_administrator organisation_administrator loan_officer)
+
+  # Ordered lowest to highest authority — used by role_meets_minimum?/2
+  # for a product's `minimum_approval_role`, a different axis from
+  # ApprovalLimit's per-role dollar ceiling: "this product always needs
+  # at least this role," regardless of amount.
+  @role_tiers @role_names |> Enum.reverse()
 
   @default_permissions %{
     "platform_administrator" => @permission_keys,
@@ -49,6 +58,7 @@ defmodule MiwayCreditCore.Authorization do
       payments.receive
       customers.manage
       customers.view
+      products.view
       reports.view
     )
   }
@@ -56,20 +66,46 @@ defmodule MiwayCreditCore.Authorization do
   def permission_keys, do: @permission_keys
 
   @doc """
-  Creates an Organisation (via Organisations.create_organisation/1)
-  and its 3 default Roles, atomically. Organisations itself stays
-  foundational — depends on nothing, including this context — so this
-  orchestration lives here, on the dependent side, not there.
+  Creates an Organisation (via Organisations.create_organisation/1),
+  its 3 default Roles, and a default "Standard Loan" product,
+  atomically. Organisations itself stays foundational — depends on
+  nothing, including this context — so this orchestration lives here,
+  on the dependent side, not there.
   """
   def provision_organisation(attrs) do
     Repo.transaction(fn ->
       with {:ok, organisation} <- Organisations.create_organisation(attrs),
-           {:ok, _roles} <- seed_default_roles(Repo, organisation.id) do
+           {:ok, _roles} <- seed_default_roles(Repo, organisation.id),
+           {:ok, _product} <- seed_default_product(organisation.id) do
         organisation
       else
         {:error, reason} -> Repo.rollback(reason)
       end
     end)
+  end
+
+  @doc """
+  The same "Standard Loan" terms the Step 8 migration backfilled for
+  every pre-existing organisation — 18.00% reducing balance, monthly,
+  no fee/penalty/grace, no requirements, generous bounds — so a fresh
+  organisation can originate loans immediately, exactly as it could
+  before configurable products existed.
+  """
+  def seed_default_product(organisation_id) do
+    scope = %Scope{organisation_id: organisation_id}
+
+    Products.create_product(scope, %{
+      "name" => "Standard Loan",
+      "description" => "Default product — 18% reducing-balance, no requirements.",
+      "minimum_principal" => "0.01",
+      "maximum_principal" => "999999999.99",
+      "interest_method" => "reducing_balance",
+      "interest_rate" => "18.00",
+      "minimum_term_months" => "1",
+      "maximum_term_months" => "360",
+      "repayment_frequency" => "monthly",
+      "effective_from" => Date.utc_today()
+    })
   end
 
   @doc """
@@ -204,6 +240,43 @@ defmodule MiwayCreditCore.Authorization do
           limits -> Enum.min(limits, Decimal)
         end
     end
+  end
+
+  @doc """
+  Whether the scope currently holds a role at or above `minimum_role`
+  in authority (`loan_officer < organisation_administrator <
+  platform_administrator`) — a product's `minimum_approval_role` gate.
+  A different axis from `approval_limit/2`'s per-role dollar ceiling:
+  "this product always needs at least this role," regardless of
+  amount. `nil` minimum_role means no gate at all.
+  """
+  def role_meets_minimum?(_scope, nil), do: true
+  def role_meets_minimum?(%Scope{organisation_id: :all}, _minimum_role), do: true
+  def role_meets_minimum?(%Scope{staff_member: nil}, _minimum_role), do: false
+
+  def role_meets_minimum?(%Scope{staff_member: staff_member, organisation_id: organisation_id}, minimum_role) do
+    membership = Repo.get_by(OrganisationMembership, staff_member_id: staff_member.id, organisation_id: organisation_id)
+
+    case membership do
+      nil ->
+        false
+
+      membership ->
+        minimum_tier = Enum.find_index(@role_tiers, &(&1 == minimum_role))
+
+        membership.id
+        |> held_role_names()
+        |> Enum.map(&Enum.find_index(@role_tiers, fn tier -> tier == &1 end))
+        |> Enum.any?(fn tier -> tier && minimum_tier && tier >= minimum_tier end)
+    end
+  end
+
+  defp held_role_names(organisation_membership_id) do
+    RoleAssignment
+    |> where([ra], ra.organisation_membership_id == ^organisation_membership_id)
+    |> Repo.all()
+    |> Enum.filter(&RoleAssignment.active?/1)
+    |> Enum.map(fn assignment -> Repo.get!(Role, assignment.role_id).name end)
   end
 
   def set_approval_limit(role_id, permission_key, max_amount) do

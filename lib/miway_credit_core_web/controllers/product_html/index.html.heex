@@ -1,0 +1,78 @@
+<div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+  <div>
+    <h1 class="text-2xl font-bold text-navy-900">Loan Products</h1>
+    <p class="mt-0.5 text-sm text-gray-500">Configurable lending terms — editing a product never changes an already-issued loan's terms</p>
+  </div>
+  <%= link "New Product", to: ~p"/admin/products/new", class: "btn-primary self-start" %>
+</div>
+
+<div class="card overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="min-w-full">
+      <thead>
+        <tr class="bg-gray-50 border-b border-gray-100">
+          <th class="th">Name</th>
+          <th class="th">Rate</th>
+          <th class="th hidden sm:table-cell">Principal Range</th>
+          <th class="th hidden sm:table-cell">Term Range</th>
+          <th class="th hidden md:table-cell">Requirements</th>
+          <th class="th">Status</th>
+          <th class="th text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        <%= for product <- @products do %>
+          <tr class="hover:bg-gray-50 transition-colors">
+            <td class="td">
+              <p class="font-medium text-navy-900"><%= product.name %></p>
+              <%= if product.description do %>
+                <p class="text-xs text-gray-400"><%= product.description %></p>
+              <% end %>
+            </td>
+            <td class="td text-gray-700"><%= product.interest_rate %>%</td>
+            <td class="td text-gray-500 hidden sm:table-cell">
+              ZMW <%= product.minimum_principal %> – <%= product.maximum_principal %>
+            </td>
+            <td class="td text-gray-500 hidden sm:table-cell">
+              <%= product.minimum_term_months %> – <%= product.maximum_term_months %> mo
+            </td>
+            <td class="td text-gray-500 hidden md:table-cell">
+              <div class="flex flex-wrap gap-1">
+                <%= if product.requires_guarantor do %><span class="badge badge-pending">Guarantor</span><% end %>
+                <%= if product.requires_collateral do %><span class="badge badge-pending">Collateral</span><% end %>
+                <%= if product.requires_crb_check do %><span class="badge badge-pending">CRB</span><% end %>
+                <%= if product.minimum_approval_role do %><span class="badge badge-pending"><%= product.minimum_approval_role %>+</span><% end %>
+                <%= if !product.requires_guarantor and !product.requires_collateral and !product.requires_crb_check and is_nil(product.minimum_approval_role) do %>
+                  <span class="text-xs text-gray-400">None</span>
+                <% end %>
+              </div>
+            </td>
+            <td class="td">
+              <%= if product.status == "active" do %>
+                <span class="badge badge-active">Active</span>
+              <% else %>
+                <span class="badge badge-inactive">Retired</span>
+              <% end %>
+            </td>
+            <td class="td text-right space-x-3">
+              <%= link "Edit", to: ~p"/admin/products/#{product}/edit", class: "text-sm font-medium text-navy-600 hover:text-navy-900" %>
+              <%= if product.status == "active" do %>
+                <%= link "Retire", to: ~p"/admin/products/#{product}/retire", method: :patch,
+                      data: [confirm: "Retire #{product.name}? It will no longer be selectable for new applications."],
+                      class: "text-sm font-medium text-red-500 hover:text-red-700" %>
+              <% else %>
+                <%= link "Activate", to: ~p"/admin/products/#{product}/activate", method: :patch,
+                      class: "text-sm font-medium text-emerald-600 hover:text-emerald-700" %>
+              <% end %>
+            </td>
+          </tr>
+        <% end %>
+        <%= if Enum.empty?(@products) do %>
+          <tr>
+            <td colspan="7" class="py-12 text-center text-sm text-gray-400">No products configured yet.</td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+</div>
