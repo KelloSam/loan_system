@@ -10,8 +10,8 @@ defmodule MiwayCreditCoreWeb.LoanController do
   plug RequirePermissionPlug, "applications.create" when action in [:new, :create]
   plug RequirePermissionPlug, "applications.edit" when action in [:edit, :update, :delete]
   plug RequirePermissionPlug, "applications.assess" when action == :assess
-  plug RequirePermissionPlug, "applications.approve" when action == :approve
-  plug RequirePermissionPlug, "applications.reject" when action == :reject
+  plug RequirePermissionPlug, "applications.approve" when action in [:approve, :conditionally_approve, :clear_conditions]
+  plug RequirePermissionPlug, "applications.reject" when action in [:reject, :refer]
   plug RequirePermissionPlug, "loans.disburse" when action == :disburse
   plug RequirePermissionPlug, "applications.withdraw" when action == :withdraw
   plug RequirePermissionPlug, "payments.receive" when action == :create_payment
@@ -195,10 +195,11 @@ defmodule MiwayCreditCoreWeb.LoanController do
     end
   end
 
-  def approve(conn, %{"id" => id}) do
+  def approve(conn, %{"id" => id} = params) do
     application = Applications.get_application!(conn.assigns.current_scope, id)
+    attestation = attests_no_conflict_of_interest?(params)
 
-    case Applications.approve_application(application, conn.assigns.current_scope) do
+    case Applications.approve_application(application, conn.assigns.current_scope, attestation) do
       {:ok, application} ->
         AuditLogs.log("loan_application_approved",
           actor_id: conn.assigns.current_user.id,
@@ -206,66 +207,21 @@ defmodule MiwayCreditCoreWeb.LoanController do
           target_type: "loan_application",
           target_id: application.id,
           ip_address: get_ip(conn),
-          metadata: %{requested_amount: application.requested_amount, customer_id: application.customer_id}
+          metadata: %{requested_amount: application.requested_amount, customer_id: application.customer_id, level_status: application.status}
         )
 
+        message =
+          if application.status == "approved",
+            do: "Application approved — ready to disburse.",
+            else: "Level approved — awaiting the next required approval."
+
         conn
-        |> put_flash(:info, "Application approved — ready to disburse.")
+        |> put_flash(:info, message)
         |> redirect(to: ~p"/admin/loans/#{application}")
 
-      {:error, :invalid_status} ->
+      {:error, reason} ->
         conn
-        |> put_flash(:error, "This application hasn't been assessed yet — it can't be approved.")
-        |> redirect(to: ~p"/admin/loans/#{id}")
-
-      {:error, :maker_checker_violation} ->
-        conn
-        |> put_flash(:error, "You submitted this application — someone else must decide it.")
-        |> redirect(to: ~p"/admin/loans/#{id}")
-
-      {:error, :exceeds_approval_limit} ->
-        conn
-        |> put_flash(:error, "This amount exceeds your approval limit.")
-        |> redirect(to: ~p"/admin/loans/#{id}")
-
-      {:error, :guarantor_required} ->
-        conn
-        |> put_flash(:error, "This product requires a guarantor on record before it can be approved.")
-        |> redirect(to: ~p"/admin/loans/#{id}")
-
-      {:error, :insufficient_approval_role} ->
-        conn
-        |> put_flash(:error, "This product requires a more senior role to approve.")
-        |> redirect(to: ~p"/admin/loans/#{id}")
-
-      {:error, :income_data_missing} ->
-        conn
-        |> put_flash(:error, "This product requires an affordability check, but the customer has no income data on file.")
-        |> redirect(to: ~p"/admin/loans/#{id}")
-
-      {:error, :affordability_exceeded} ->
-        conn
-        |> put_flash(:error, "This loan would exceed the product's maximum debt-to-income ratio for this customer.")
-        |> redirect(to: ~p"/admin/loans/#{id}")
-
-      {:error, :crb_check_required} ->
-        conn
-        |> put_flash(:error, "This product requires a CRB report on record before it can be approved.")
-        |> redirect(to: ~p"/admin/loans/#{id}")
-
-      {:error, :adverse_crb_report} ->
-        conn
-        |> put_flash(:error, "This customer's most recent CRB report is adverse.")
-        |> redirect(to: ~p"/admin/loans/#{id}")
-
-      {:error, :crb_check_expired} ->
-        conn
-        |> put_flash(:error, "This customer's CRB report is more than 90 days old — a fresh check is required.")
-        |> redirect(to: ~p"/admin/loans/#{id}")
-
-      {:error, _} ->
-        conn
-        |> put_flash(:error, "Could not approve application.")
+        |> put_flash(:error, approval_error_message(reason))
         |> redirect(to: ~p"/admin/loans/#{id}")
     end
   end
@@ -273,8 +229,9 @@ defmodule MiwayCreditCoreWeb.LoanController do
   def reject(conn, %{"id" => id} = params) do
     application = Applications.get_application!(conn.assigns.current_scope, id)
     reason = Map.get(params, "reason", "Not specified")
+    decline_reason_category = Map.get(params, "decline_reason_category", "other")
 
-    case Applications.reject_application(application, conn.assigns.current_scope, reason) do
+    case Applications.reject_application(application, conn.assigns.current_scope, reason, decline_reason_category) do
       {:ok, application} ->
         AuditLogs.log("loan_application_rejected",
           actor_id: conn.assigns.current_user.id,
@@ -282,28 +239,123 @@ defmodule MiwayCreditCoreWeb.LoanController do
           target_type: "loan_application",
           target_id: application.id,
           ip_address: get_ip(conn),
-          metadata: %{requested_amount: application.requested_amount, customer_id: application.customer_id}
+          metadata: %{requested_amount: application.requested_amount, customer_id: application.customer_id, decline_reason_category: decline_reason_category}
         )
 
         conn
         |> put_flash(:info, "Application rejected.")
         |> redirect(to: ~p"/admin/loans/#{application}")
 
-      {:error, :invalid_status} ->
+      {:error, reason} ->
         conn
-        |> put_flash(:error, "This application hasn't been assessed yet — it can't be rejected.")
-        |> redirect(to: ~p"/admin/loans/#{id}")
-
-      {:error, :maker_checker_violation} ->
-        conn
-        |> put_flash(:error, "You submitted this application — someone else must decide it.")
-        |> redirect(to: ~p"/admin/loans/#{id}")
-
-      {:error, _} ->
-        conn
-        |> put_flash(:error, "Could not reject application.")
+        |> put_flash(:error, approval_error_message(reason))
         |> redirect(to: ~p"/admin/loans/#{id}")
     end
+  end
+
+  def conditionally_approve(conn, %{"id" => id} = params) do
+    application = Applications.get_application!(conn.assigns.current_scope, id)
+    conditions = Map.get(params, "conditions", "")
+    attestation = attests_no_conflict_of_interest?(params)
+
+    case Applications.conditionally_approve_application(application, conn.assigns.current_scope, conditions, attestation) do
+      {:ok, application} ->
+        AuditLogs.log("loan_application_conditionally_approved",
+          actor_id: conn.assigns.current_user.id,
+          actor_email: conn.assigns.current_user.email,
+          target_type: "loan_application",
+          target_id: application.id,
+          ip_address: get_ip(conn),
+          metadata: %{customer_id: application.customer_id, conditions: conditions}
+        )
+
+        conn
+        |> put_flash(:info, "Application conditionally approved — conditions must be cleared before disbursement.")
+        |> redirect(to: ~p"/admin/loans/#{application}")
+
+      {:error, reason} ->
+        conn
+        |> put_flash(:error, approval_error_message(reason))
+        |> redirect(to: ~p"/admin/loans/#{id}")
+    end
+  end
+
+  def refer(conn, %{"id" => id} = params) do
+    application = Applications.get_application!(conn.assigns.current_scope, id)
+    reason = Map.get(params, "reason", "")
+
+    case Applications.refer_application(application, conn.assigns.current_scope, reason) do
+      {:ok, application} ->
+        AuditLogs.log("loan_application_referred",
+          actor_id: conn.assigns.current_user.id,
+          actor_email: conn.assigns.current_user.email,
+          target_type: "loan_application",
+          target_id: application.id,
+          ip_address: get_ip(conn),
+          metadata: %{customer_id: application.customer_id, reason: reason}
+        )
+
+        conn
+        |> put_flash(:info, "Application referred back for more information.")
+        |> redirect(to: ~p"/admin/loans/#{application}")
+
+      {:error, reason} ->
+        conn
+        |> put_flash(:error, approval_error_message(reason))
+        |> redirect(to: ~p"/admin/loans/#{id}")
+    end
+  end
+
+  def clear_conditions(conn, %{"id" => id}) do
+    application = Applications.get_application!(conn.assigns.current_scope, id)
+
+    case Applications.clear_conditions(application, conn.assigns.current_scope) do
+      {:ok, application} ->
+        AuditLogs.log("loan_application_conditions_cleared",
+          actor_id: conn.assigns.current_user.id,
+          actor_email: conn.assigns.current_user.email,
+          target_type: "loan_application",
+          target_id: application.id,
+          ip_address: get_ip(conn),
+          metadata: %{customer_id: application.customer_id}
+        )
+
+        conn
+        |> put_flash(:info, "Conditions cleared — ready to disburse.")
+        |> redirect(to: ~p"/admin/loans/#{application}")
+
+      {:error, reason} ->
+        conn
+        |> put_flash(:error, approval_error_message(reason))
+        |> redirect(to: ~p"/admin/loans/#{id}")
+    end
+  end
+
+  defp attests_no_conflict_of_interest?(params) do
+    Map.get(params, "conflict_of_interest_confirmed") in ["true", "on", true]
+  end
+
+  defp approval_error_message(:invalid_status), do: "This application isn't in a status that allows this action."
+  defp approval_error_message(:maker_checker_violation), do: "You submitted this application — someone else must decide it."
+  defp approval_error_message(:already_decided), do: "You've already recorded a decision on this application — a different person must act next."
+  defp approval_error_message(:conflict_of_interest_attestation_required), do: "You must confirm you have no conflict of interest with this applicant."
+  defp approval_error_message(:exceeds_approval_limit), do: "This amount exceeds your approval limit."
+  defp approval_error_message(:guarantor_required), do: "This product requires a guarantor on record before it can be approved."
+  defp approval_error_message(:insufficient_approval_role), do: "This product requires a more senior role to approve."
+  defp approval_error_message(:income_data_missing), do: "This product requires an affordability check, but the customer has no income data on file."
+  defp approval_error_message(:affordability_exceeded), do: "This loan would exceed the product's maximum debt-to-income ratio for this customer."
+  defp approval_error_message(:crb_check_required), do: "This product requires a CRB report on record before it can be approved."
+  defp approval_error_message(:adverse_crb_report), do: "This customer's most recent CRB report is adverse."
+  defp approval_error_message(:crb_check_expired), do: "This customer's CRB report is more than 90 days old — a fresh check is required."
+  defp approval_error_message(:conditions_not_cleared), do: "This application's conditions must be cleared before it can be disbursed."
+  defp approval_error_message(:no_conditions_to_clear), do: "This application has no outstanding conditions to clear."
+  defp approval_error_message(%Ecto.Changeset{} = changeset), do: "Could not complete this action: #{changeset_error_summary(changeset)}"
+  defp approval_error_message(_), do: "Could not complete this action."
+
+  defp changeset_error_summary(changeset) do
+    changeset
+    |> Ecto.Changeset.traverse_errors(fn {msg, _opts} -> msg end)
+    |> Enum.map_join("; ", fn {field, errors} -> "#{field} #{Enum.join(errors, ", ")}" end)
   end
 
   def disburse(conn, %{"id" => id}) do
@@ -327,6 +379,11 @@ defmodule MiwayCreditCoreWeb.LoanController do
       {:error, :invalid_status} ->
         conn
         |> put_flash(:error, "This application isn't approved yet — it can't be disbursed.")
+        |> redirect(to: ~p"/admin/loans/#{id}")
+
+      {:error, :conditions_not_cleared} ->
+        conn
+        |> put_flash(:error, "This application's conditions must be cleared before it can be disbursed.")
         |> redirect(to: ~p"/admin/loans/#{id}")
 
       {:error, _} ->

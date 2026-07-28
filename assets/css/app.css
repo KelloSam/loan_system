@@ -89,6 +89,7 @@
 .badge-approved      { @apply bg-blue-100 text-blue-800; }
 .badge-pending       { @apply bg-amber-100 text-amber-800; }
 .badge-under_review  { @apply bg-amber-100 text-amber-800; }
+.badge-referred      { @apply bg-purple-100 text-purple-800; }
 .badge-disbursed     { @apply bg-emerald-100 text-emerald-800; }
 .badge-rejected      { @apply bg-red-100 text-red-800; }
 .badge-withdrawn     { @apply bg-gray-100 text-gray-600; }

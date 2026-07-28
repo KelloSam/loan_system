@@ -100,6 +100,9 @@ defmodule MiwayCreditCoreWeb.Router do
     patch "/loans/:id/assess", LoanController, :assess
     patch "/loans/:id/approve", LoanController, :approve
     patch "/loans/:id/reject", LoanController, :reject
+    patch "/loans/:id/conditionally_approve", LoanController, :conditionally_approve
+    patch "/loans/:id/refer", LoanController, :refer
+    patch "/loans/:id/clear_conditions", LoanController, :clear_conditions
     patch "/loans/:id/disburse", LoanController, :disburse
     patch "/loans/:id/withdraw", LoanController, :withdraw
     post "/loans/:id/payments", LoanController, :create_payment

@@ -12,7 +12,7 @@
     </p>
   </div>
   <div class="flex flex-wrap gap-2">
-    <%= if @application.status == "pending" do %>
+    <%= if @application.status in ["pending", "referred"] do %>
       <%= link "Edit", to: ~p"/admin/loans/#{@application}/edit", class: "btn-outline" %>
       <details class="reject-disclosure">
         <summary class="btn-gold reject-toggle">Assess</summary>
@@ -39,11 +39,23 @@
     <% end %>
     <%= if @application.status == "under_review" do %>
       <%= link "Edit", to: ~p"/admin/loans/#{@application}/edit", class: "btn-outline" %>
-      <%= link "Approve",
-            to: ~p"/admin/loans/#{@application}/approve",
-            method: :patch,
-            data: [confirm: "Approve this application?"],
-            class: "btn-gold" %>
+
+      <details class="reject-disclosure">
+        <summary class="btn-gold reject-toggle">Approve</summary>
+        <div class="card p-4 mt-2">
+          <.form :let={_f} for={%{}} as={:approve} action={~p"/admin/loans/#{@application}/approve"} method="patch">
+            <label class="flex items-start gap-2 text-sm text-gray-700">
+              <input type="checkbox" name="conflict_of_interest_confirmed" value="true" required
+                     class="mt-0.5 h-4 w-4 rounded border-gray-300 text-navy-900 focus:ring-navy-600" />
+              <span>I confirm I have no conflict of interest with this applicant</span>
+            </label>
+            <div class="flex justify-end gap-2 mt-2">
+              <button type="submit" class="btn-gold">Confirm Approve</button>
+            </div>
+          </.form>
+        </div>
+      </details>
+
       <details class="reject-disclosure">
         <summary class="btn-danger reject-toggle">Reject</summary>
         <div class="card p-4 mt-2">
@@ -56,12 +68,66 @@
               required
               placeholder="Why is this application being rejected?"
             ></textarea>
+            <label class="form-label mt-2" for="decline_reason_category">Decline category</label>
+            <select id="decline_reason_category" name="decline_reason_category"
+                    class="block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600">
+              <option value="insufficient_income">Insufficient income</option>
+              <option value="poor_credit_history">Poor credit history</option>
+              <option value="incomplete_documentation">Incomplete documentation</option>
+              <option value="policy_violation">Policy violation</option>
+              <option value="fraud_suspected">Fraud suspected</option>
+              <option value="other">Other</option>
+            </select>
             <div class="flex justify-end gap-2 mt-2">
               <button type="submit" class="btn-danger">Confirm Reject</button>
             </div>
           </.form>
         </div>
       </details>
+
+      <details class="reject-disclosure">
+        <summary class="btn-outline reject-toggle">Conditionally Approve</summary>
+        <div class="card p-4 mt-2">
+          <.form :let={_f} for={%{}} as={:conditionally_approve} action={~p"/admin/loans/#{@application}/conditionally_approve"} method="patch">
+            <label class="form-label" for="conditions">Conditions</label>
+            <textarea
+              id="conditions"
+              name="conditions"
+              rows="3"
+              required
+              placeholder="What must be satisfied before this loan can be disbursed?"
+            ></textarea>
+            <label class="flex items-start gap-2 text-sm text-gray-700 mt-2">
+              <input type="checkbox" name="conflict_of_interest_confirmed" value="true" required
+                     class="mt-0.5 h-4 w-4 rounded border-gray-300 text-navy-900 focus:ring-navy-600" />
+              <span>I confirm I have no conflict of interest with this applicant</span>
+            </label>
+            <div class="flex justify-end gap-2 mt-2">
+              <button type="submit" class="btn-outline">Confirm Conditional Approval</button>
+            </div>
+          </.form>
+        </div>
+      </details>
+
+      <details class="reject-disclosure">
+        <summary class="btn-outline reject-toggle">Refer</summary>
+        <div class="card p-4 mt-2">
+          <.form :let={_f} for={%{}} as={:refer} action={~p"/admin/loans/#{@application}/refer"} method="patch">
+            <label class="form-label" for="refer_reason">What's needed?</label>
+            <textarea
+              id="refer_reason"
+              name="reason"
+              rows="3"
+              required
+              placeholder="What additional information is required before this can be decided?"
+            ></textarea>
+            <div class="flex justify-end gap-2 mt-2">
+              <button type="submit" class="btn-outline">Confirm Refer</button>
+            </div>
+          </.form>
+        </div>
+      </details>
+
       <%= link "Withdraw",
             to: ~p"/admin/loans/#{@application}/withdraw",
             method: :patch,
@@ -69,11 +135,19 @@
             class: "btn-outline" %>
     <% end %>
     <%= if @application.status == "approved" do %>
-      <%= link "Disburse",
-            to: ~p"/admin/loans/#{@application}/disburse",
-            method: :patch,
-            data: [confirm: "Disburse this loan? This creates the account and generates the repayment schedule."],
-            class: "btn-gold" %>
+      <%= if @application.conditions && is_nil(@application.conditions_cleared_at) do %>
+        <%= link "Clear Conditions",
+              to: ~p"/admin/loans/#{@application}/clear_conditions",
+              method: :patch,
+              data: [confirm: "Confirm that all conditions have been met?"],
+              class: "btn-outline" %>
+      <% else %>
+        <%= link "Disburse",
+              to: ~p"/admin/loans/#{@application}/disburse",
+              method: :patch,
+              data: [confirm: "Disburse this loan? This creates the account and generates the repayment schedule."],
+              class: "btn-gold" %>
+      <% end %>
     <% end %>
     <%= link "All Loans", to: ~p"/admin/loans", class: "text-sm font-medium text-gray-400 hover:text-navy-600 self-center" %>
   </div>
@@ -185,6 +259,19 @@
           <dd class="text-navy-900"><%= @application.rejection_reason %></dd>
         </div>
       <% end %>
+      <%= if @application.conditions do %>
+        <div class="pt-2 border-t border-gray-100 text-sm">
+          <dt class="text-gray-500 mb-1">
+            Conditions
+            <%= if @application.conditions_cleared_at do %>
+              <span class="badge badge-approved ml-1">Cleared</span>
+            <% else %>
+              <span class="badge badge-pending ml-1">Outstanding</span>
+            <% end %>
+          </dt>
+          <dd class="text-navy-900"><%= @application.conditions %></dd>
+        </div>
+      <% end %>
       <%= if @application.purpose do %>
         <div class="pt-2 border-t border-gray-100 text-sm">
           <dt class="text-gray-500 mb-1">Purpose</dt>
@@ -228,6 +315,44 @@
   <% end %>
 
 </div>
+
+<%# Approval Trail — the operational view of a multi-level or committee application's progress, otherwise invisible %>
+<%= if @application.approval_decisions != [] do %>
+  <div class="card overflow-hidden mb-6">
+    <div class="px-5 py-4 border-b border-gray-100">
+      <h2 class="section-title">Approval Trail</h2>
+    </div>
+    <table class="min-w-full">
+      <thead>
+        <tr class="bg-gray-50 border-b border-gray-100">
+          <th class="th">Level</th>
+          <th class="th">Decision</th>
+          <th class="th">By</th>
+          <th class="th">When</th>
+          <th class="th">Notes</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        <%= for decision <- @application.approval_decisions do %>
+          <tr class="hover:bg-gray-50">
+            <td class="td"><%= decision.level %></td>
+            <td class="td">
+              <span class={"badge badge-#{if decision.decision == "approved", do: "approved", else: "rejected"}"}>
+                <%= String.capitalize(decision.decision) %>
+              </span>
+              <%= if decision.decline_reason_category do %>
+                <span class="form-hint"><%= decision.decline_reason_category |> String.replace("_", " ") |> String.capitalize() %></span>
+              <% end %>
+            </td>
+            <td class="td"><%= decision.decided_by.email %></td>
+            <td class="td text-gray-400"><%= Calendar.strftime(decision.decided_at, "%d %b %Y %H:%M") %></td>
+            <td class="td text-gray-500"><%= decision.notes || decision.conditions %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>
 
 <%# Collateral — only once an account exists (collateral secures a granted loan) %>
 <%= if @account do %>

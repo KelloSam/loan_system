@@ -137,7 +137,41 @@
         <%= select f, :minimum_approval_role,
               [{"No minimum", nil}, {"Loan officer", "loan_officer"}, {"Organisation administrator", "organisation_administrator"}, {"Platform administrator", "platform_administrator"}],
               class: "block w-full sm:w-1/2 rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+        <p class="form-hint mt-1">Level 1's minimum role. This is also who's eligible to vote on a committee decision if it's level 1.</p>
       </div>
+
+      <label class="flex items-center gap-3 cursor-pointer pt-2 border-t border-gray-200">
+        <%= checkbox f, :requires_second_level_approval, class: "h-4 w-4 rounded border-gray-300 text-navy-900 focus:ring-navy-600" %>
+        <span class="text-sm text-gray-700">Requires a second approval level</span>
+      </label>
+      <div class="ml-7">
+        <label class="form-label">Second level minimum role <span class="text-gray-400 font-normal">(optional, falls back to the minimum role above)</span></label>
+        <%= select f, :second_level_minimum_role,
+              [{"No minimum", nil}, {"Loan officer", "loan_officer"}, {"Organisation administrator", "organisation_administrator"}, {"Platform administrator", "platform_administrator"}],
+              class: "block w-full sm:w-1/2 rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+      </div>
+
+      <label class="flex items-center gap-3 cursor-pointer">
+        <%= checkbox f, :requires_committee_decision, class: "h-4 w-4 rounded border-gray-300 text-navy-900 focus:ring-navy-600" %>
+        <span class="text-sm text-gray-700">Final level requires a committee decision, not just one person</span>
+      </label>
+      <div class="ml-7 flex gap-4">
+        <div>
+          <label class="form-label">Committee size</label>
+          <%= number_input f, :committee_size,
+                class: "block w-24 rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+        </div>
+        <div>
+          <label class="form-label">Quorum needed</label>
+          <%= number_input f, :committee_quorum,
+                class: "block w-24 rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+        </div>
+      </div>
+
+      <label class="flex items-center gap-3 cursor-pointer pt-2 border-t border-gray-200">
+        <%= checkbox f, :requires_separation_of_duties, class: "h-4 w-4 rounded border-gray-300 text-navy-900 focus:ring-navy-600" %>
+        <span class="text-sm text-gray-700">Requires separation of duties <span class="text-gray-400">(the submitter can never also decide — on by default)</span></span>
+      </label>
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -92,7 +92,7 @@ defmodule MiwayCreditCoreWeb.PermissionEnforcementTest do
 
       admin_conn = conn |> login(org_admin)
       admin_conn = patch(admin_conn, ~p"/admin/loans/#{application.id}/assess")
-      _admin_conn = patch(admin_conn, ~p"/admin/loans/#{application.id}/approve")
+      _admin_conn = patch(admin_conn, ~p"/admin/loans/#{application.id}/approve", %{"conflict_of_interest_confirmed" => "true"})
 
       conn =
         build_conn()
@@ -135,7 +135,7 @@ defmodule MiwayCreditCoreWeb.PermissionEnforcementTest do
       conn = patch(conn, ~p"/admin/loans/#{application.id}/assess")
       assert redirected_to(conn) == ~p"/admin/loans/#{application.id}"
 
-      conn = patch(conn, ~p"/admin/loans/#{application.id}/approve")
+      conn = patch(conn, ~p"/admin/loans/#{application.id}/approve", %{"conflict_of_interest_confirmed" => "true"})
       assert redirected_to(conn) == ~p"/admin/loans/#{application.id}"
 
       reloaded = Applications.get_application!(%Scope{organisation_id: :all}, application.id)
@@ -148,7 +148,7 @@ defmodule MiwayCreditCoreWeb.PermissionEnforcementTest do
       conn = conn |> login(org_admin)
 
       conn = patch(conn, ~p"/admin/loans/#{application.id}/assess")
-      conn = patch(conn, ~p"/admin/loans/#{application.id}/approve")
+      conn = patch(conn, ~p"/admin/loans/#{application.id}/approve", %{"conflict_of_interest_confirmed" => "true"})
 
       conn = patch(conn, ~p"/admin/loans/#{application.id}/disburse")
       assert redirected_to(conn) == ~p"/admin/loans/#{application.id}"
@@ -189,7 +189,7 @@ defmodule MiwayCreditCoreWeb.PermissionEnforcementTest do
       application_id = application_path |> String.split("/") |> List.last()
 
       conn = patch(conn, ~p"/admin/loans/#{application_id}/assess")
-      conn2 = patch(conn, ~p"/admin/loans/#{application_id}/approve")
+      conn2 = patch(conn, ~p"/admin/loans/#{application_id}/approve", %{"conflict_of_interest_confirmed" => "true"})
       assert Phoenix.Flash.get(conn2.assigns.flash, :error) =~ "submitted this application"
     end
 
@@ -278,6 +278,75 @@ defmodule MiwayCreditCoreWeb.PermissionEnforcementTest do
 
       conn = conn |> login(user)
       assert conn |> get(~p"/admin/customers") |> Map.fetch!(:status) == 403
+    end
+  end
+
+  describe "conditionally_approve, refer, clear_conditions — same permission tier as approve/reject" do
+    test "loan_officer is refused a real 403 on conditionally_approve", %{conn: conn, loan_officer: loan_officer, customer: customer} do
+      application = application_fixture(%{"customer_id" => customer.id})
+
+      conn =
+        conn
+        |> login(loan_officer)
+        |> patch(~p"/admin/loans/#{application.id}/conditionally_approve", %{
+          "conditions" => "x",
+          "conflict_of_interest_confirmed" => "true"
+        })
+
+      assert conn.status == 403
+    end
+
+    test "loan_officer is refused a real 403 on refer", %{conn: conn, loan_officer: loan_officer, customer: customer} do
+      application = application_fixture(%{"customer_id" => customer.id})
+
+      conn = conn |> login(loan_officer) |> patch(~p"/admin/loans/#{application.id}/refer", %{"reason" => "need docs"})
+      assert conn.status == 403
+    end
+
+    test "org_admin can conditionally approve, then must clear conditions before disbursing", %{conn: conn, org_admin: org_admin, customer: customer} do
+      application = application_fixture(%{"customer_id" => customer.id})
+      conn = conn |> login(org_admin)
+      conn = patch(conn, ~p"/admin/loans/#{application.id}/assess")
+
+      conn =
+        patch(conn, ~p"/admin/loans/#{application.id}/conditionally_approve", %{
+          "conditions" => "Provide payslip",
+          "conflict_of_interest_confirmed" => "true"
+        })
+
+      assert redirected_to(conn) == ~p"/admin/loans/#{application.id}"
+
+      reloaded = Applications.get_application!(%Scope{organisation_id: :all}, application.id)
+      assert reloaded.status == "approved"
+      assert reloaded.conditions == "Provide payslip"
+
+      conn = patch(conn, ~p"/admin/loans/#{application.id}/disburse")
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "conditions must be cleared"
+
+      conn = patch(conn, ~p"/admin/loans/#{application.id}/clear_conditions")
+      assert redirected_to(conn) == ~p"/admin/loans/#{application.id}"
+
+      conn = patch(conn, ~p"/admin/loans/#{application.id}/disburse")
+      assert redirected_to(conn) == ~p"/admin/loans/#{application.id}"
+    end
+
+    test "org_admin can refer an application back, then re-assess and approve it", %{conn: conn, org_admin: org_admin, customer: customer} do
+      application = application_fixture(%{"customer_id" => customer.id})
+      conn = conn |> login(org_admin)
+      conn = patch(conn, ~p"/admin/loans/#{application.id}/assess")
+
+      conn = patch(conn, ~p"/admin/loans/#{application.id}/refer", %{"reason" => "Need proof of income"})
+      assert redirected_to(conn) == ~p"/admin/loans/#{application.id}"
+
+      reloaded = Applications.get_application!(%Scope{organisation_id: :all}, application.id)
+      assert reloaded.status == "referred"
+
+      conn = patch(conn, ~p"/admin/loans/#{application.id}/assess")
+      conn = patch(conn, ~p"/admin/loans/#{application.id}/approve", %{"conflict_of_interest_confirmed" => "true"})
+      assert redirected_to(conn) == ~p"/admin/loans/#{application.id}"
+
+      reloaded = Applications.get_application!(%Scope{organisation_id: :all}, application.id)
+      assert reloaded.status == "approved"
     end
   end
 
