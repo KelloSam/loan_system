@@ -15,7 +15,7 @@ defmodule MiwayCreditCore.Accounting.AccountingEntry do
   use Ecto.Schema
   import Ecto.Changeset
 
-  @entry_types ~w(disbursement repayment fee write_off reversal)
+  @entry_types ~w(disbursement repayment fee penalty write_off reversal)
   @source_types ~w(payment_transaction loan_account manual_adjustment)
 
   @primary_key {:id, :binary_id, autogenerate: true}

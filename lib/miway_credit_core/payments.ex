@@ -1,23 +1,33 @@
 defmodule MiwayCreditCore.Payments do
   @moduledoc """
-  Money actually received. `record_payment/1` allocates the amount
-  across that account's unpaid installments oldest-due-date-first (a
-  transaction can satisfy more than one installment; an installment can
-  be satisfied across more than one transaction), posts a repayment
-  ledger entry, and updates the account's cached balance — all in one
-  transaction. Overpayment (amount > outstanding_balance) is rejected
-  rather than creating a credit balance.
+  Money actually received. `record_payment/2` allocates the *payable*
+  portion of the amount (capped at the account's outstanding_balance)
+  across that account's unpaid installments, in the organisation's
+  configured order (penalty, then interest, then principal by
+  default — see `MiwayCreditCore.Organisations.get_settings/1`), posts a
+  repayment ledger entry, and updates the account's cached balance —
+  all in one transaction. Overpaying is allowed: the unapplied excess
+  is recorded as `overpayment_amount` on the transaction itself rather
+  than silently rejected or turned into a customer credit wallet.
 
-  Never hard-deletes a transaction — see `void_payment/2`.
+  Never hard-deletes a transaction — a posted payment that was a
+  mistake is voided (`void_payment/2`); a posted payment that later
+  turns out not to have cleared (a bounced cheque) is failed
+  (`fail_payment/2`); a payment attempt that never reconciled in the
+  first place is logged directly as failed
+  (`record_failed_payment/2`), with no allocation or balance effect.
   """
 
   import Ecto.Query
   alias MiwayCreditCore.Repo
+  alias MiwayCreditCore.Organisations
   alias MiwayCreditCore.Customers.CustomerStats
   alias MiwayCreditCore.Payments.{PaymentTransaction, PaymentAllocation}
   alias MiwayCreditCore.Lending.{LoanAccount, RepaymentScheduleInstallment}
   alias MiwayCreditCore.Accounting.AccountingEntry
   alias MiwayCreditCore.Accounts.Scope
+
+  @default_allocation_order ~w(penalty interest principal)
 
   def list_transactions_for_account(%Scope{} = scope, loan_account_id) do
     PaymentTransaction
@@ -34,10 +44,12 @@ defmodule MiwayCreditCore.Payments do
   end
 
   @doc """
-  Records a payment: inserts the transaction, allocates it across
-  unpaid installments oldest-first, posts a repayment ledger entry, and
-  updates the account's cached outstanding_balance (closing the account
-  if it reaches zero).
+  Records a payment: inserts the transaction, allocates the payable
+  portion across unpaid installments in the organisation's configured
+  order, posts a repayment ledger entry, and updates the account's
+  cached outstanding_balance (closing the account if it reaches
+  zero). Any amount beyond the outstanding balance is recorded as
+  `overpayment_amount` — never applied, never rejected.
 
   Looks the account up itself, scoped — loan_account_id comes from
   submitted form/API params, not a value the caller already had
@@ -48,77 +60,144 @@ defmodule MiwayCreditCore.Payments do
     loan_account_id = Map.get(attrs, :loan_account_id) || Map.get(attrs, "loan_account_id")
     amount           = decimal(Map.get(attrs, :amount) || Map.get(attrs, "amount"))
     account          = loan_account_id && get_scoped_account(scope, loan_account_id)
-    attrs            = attrs |> stringify_keys() |> Map.put("organisation_id", account && account.organisation_id)
+    payable          = account && amount && decimal_min(amount, account.outstanding_balance)
+    overpayment      = payable && Decimal.sub(amount, payable)
 
-    with :ok <- check_amount(account, amount) do
-      now = DateTime.utc_now() |> DateTime.truncate(:second)
+    attrs =
+      attrs
+      |> stringify_keys()
+      |> Map.put("organisation_id", account && account.organisation_id)
+      |> Map.put("payable_amount", payable)
+      |> Map.put("overpayment_amount", overpayment)
 
-      Ecto.Multi.new()
-      |> Ecto.Multi.insert(:transaction, PaymentTransaction.changeset(%PaymentTransaction{}, attrs))
-      |> Ecto.Multi.run(:allocations, fn repo, %{transaction: transaction} ->
-        allocate(repo, account, transaction, transaction.amount)
-      end)
-      |> Ecto.Multi.run(:account, fn repo, %{transaction: transaction} ->
-        new_balance = Decimal.sub(account.outstanding_balance, transaction.amount)
-        closed? = Decimal.compare(new_balance, Decimal.new("0")) == :eq
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-        account
-        |> LoanAccount.changeset(%{
-          outstanding_balance: new_balance,
-          status: if(closed?, do: "closed", else: account.status),
-          closed_at: if(closed?, do: now, else: account.closed_at)
-        })
-        |> repo.update()
-      end)
-      |> Ecto.Multi.insert(:ledger_entry, fn %{transaction: transaction, account: account} ->
-        AccountingEntry.changeset(%AccountingEntry{}, %{
-          organisation_id: account.organisation_id,
-          loan_account_id: account.id,
-          entry_type: "repayment",
-          amount: Decimal.negate(transaction.amount),
-          running_balance: account.outstanding_balance,
-          source_type: "payment_transaction",
-          source_id: transaction.id,
-          description: "Payment received",
-          recorded_by_id: transaction.recorded_by_id,
-          occurred_at: now
-        })
-      end)
-      |> Ecto.Multi.run(:update_customer_stats, fn repo, %{account: account} ->
-        CustomerStats.recalculate(repo, account.customer_id)
-      end)
-      |> Repo.transaction()
-      |> case do
-        {:ok, %{transaction: transaction}} -> {:ok, transaction}
-        {:error, :transaction, changeset, _} -> {:error, changeset}
-        {:error, _, reason, _} -> {:error, reason}
-      end
+    Ecto.Multi.new()
+    |> Ecto.Multi.insert(:transaction, PaymentTransaction.changeset(%PaymentTransaction{}, attrs))
+    |> Ecto.Multi.run(:allocations, fn repo, %{transaction: transaction} ->
+      allocate(repo, account, transaction, transaction.payable_amount)
+    end)
+    |> Ecto.Multi.run(:account, fn repo, %{transaction: transaction} ->
+      new_balance = Decimal.sub(account.outstanding_balance, transaction.payable_amount)
+      closed? = Decimal.compare(new_balance, Decimal.new("0")) == :eq
+
+      account
+      |> LoanAccount.changeset(%{
+        outstanding_balance: new_balance,
+        status: if(closed?, do: "closed", else: account.status),
+        closed_at: if(closed?, do: now, else: account.closed_at)
+      })
+      |> repo.update()
+    end)
+    |> Ecto.Multi.insert(:ledger_entry, fn %{transaction: transaction, account: account} ->
+      AccountingEntry.changeset(%AccountingEntry{}, %{
+        organisation_id: account.organisation_id,
+        loan_account_id: account.id,
+        entry_type: "repayment",
+        amount: Decimal.negate(transaction.payable_amount),
+        running_balance: account.outstanding_balance,
+        source_type: "payment_transaction",
+        source_id: transaction.id,
+        description: "Payment received",
+        recorded_by_id: transaction.recorded_by_id,
+        occurred_at: now
+      })
+    end)
+    |> Ecto.Multi.run(:update_customer_stats, fn repo, %{account: account} ->
+      CustomerStats.recalculate(repo, account.customer_id)
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{transaction: transaction}} -> {:ok, transaction}
+      {:error, :transaction, changeset, _} -> {:error, changeset}
+      {:error, _, reason, _} -> {:error, reason}
     end
   end
 
   @doc """
+  Logs a payment attempt that never actually reconciled (the customer
+  says they paid, but no matching funds arrived) — a `"failed"`
+  transaction with no allocation, no ledger entry, and no balance
+  effect. Purely an auditable record of the attempt.
+  """
+  def record_failed_payment(%Scope{} = scope, attrs \\ %{}) do
+    loan_account_id = Map.get(attrs, :loan_account_id) || Map.get(attrs, "loan_account_id")
+    account          = loan_account_id && get_scoped_account(scope, loan_account_id)
+
+    attrs =
+      attrs
+      |> stringify_keys()
+      |> Map.put("organisation_id", account && account.organisation_id)
+
+    %PaymentTransaction{}
+    |> PaymentTransaction.failed_attempt_changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
   Voids a posted payment: reverses its allocations' effect on each
-  installment's paid_amount/status, posts a compensating reversal
-  ledger entry, restores the account's outstanding_balance (reopening
-  it if voiding pushes the balance back above zero), and recalculates
-  customer stats. Never deletes the transaction row — the audit trail
-  stays intact.
+  installment's paid_amount/penalty_paid/status, posts a compensating
+  reversal ledger entry, restores the account's outstanding_balance
+  (reopening it if voiding pushes the balance back above zero), and
+  recalculates customer stats. Never deletes the transaction row — the
+  audit trail stays intact.
   """
   def void_payment(%PaymentTransaction{status: "posted"} = transaction, attrs) do
+    reverse_posted_transaction(transaction, attrs, %{
+      status: "voided",
+      timestamp_field: "voided_at",
+      actor_field: "voided_by_id",
+      reason_field: "void_reason",
+      changeset_fun: &PaymentTransaction.void_changeset/2,
+      description: "Payment voided"
+    })
+  end
+
+  @doc """
+  Marks a *posted* payment as failed after the fact — a cheque that
+  bounced days after being recorded, for example. Same reversal
+  mechanics as `void_payment/2` (nothing is deleted, the balance and
+  installments are restored), but lands on `"failed"` with a
+  `fail_reason` rather than `"voided"` with a `void_reason`, so
+  reporting can later tell "we made a mistake" apart from "the
+  customer's payment didn't clear".
+  """
+  def fail_payment(%PaymentTransaction{status: "posted"} = transaction, attrs) do
+    reverse_posted_transaction(transaction, attrs, %{
+      status: "failed",
+      timestamp_field: "failed_at",
+      actor_field: "failed_by_id",
+      reason_field: "fail_reason",
+      changeset_fun: &PaymentTransaction.fail_changeset/2,
+      description: "Payment failed"
+    })
+  end
+
+  # ---------------------------------------------------------------------------
+  # Private helpers
+  # ---------------------------------------------------------------------------
+
+  # Shared by void_payment/2 and fail_payment/2 — both un-post a
+  # payment the exact same way (reverse allocations, restore the
+  # account balance and installments, post a compensating reversal
+  # entry, recalculate customer stats); they differ only in which
+  # terminal status/timestamp/actor/reason fields get set.
+  defp reverse_posted_transaction(transaction, attrs, opts) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
     account = Repo.get!(LoanAccount, transaction.loan_account_id)
     attrs = stringify_keys(attrs)
 
     Ecto.Multi.new()
-    |> Ecto.Multi.update(:transaction, PaymentTransaction.void_changeset(transaction, Map.merge(attrs, %{
-      "status" => "voided",
-      "voided_at" => now
+    |> Ecto.Multi.update(:transaction, opts.changeset_fun.(transaction, Map.merge(attrs, %{
+      "status" => opts.status,
+      opts.timestamp_field => now
     })))
     |> Ecto.Multi.run(:reversed_installments, fn repo, _ ->
       reverse_allocations(repo, transaction)
     end)
     |> Ecto.Multi.run(:account, fn repo, _ ->
-      new_balance = Decimal.add(account.outstanding_balance, transaction.amount)
+      restored = transaction.payable_amount || transaction.amount
+      new_balance = Decimal.add(account.outstanding_balance, restored)
       reopen? = account.status == "closed" and Decimal.compare(new_balance, Decimal.new("0")) == :gt
 
       account
@@ -134,12 +213,12 @@ defmodule MiwayCreditCore.Payments do
         organisation_id: account.organisation_id,
         loan_account_id: account.id,
         entry_type: "reversal",
-        amount: transaction.amount,
+        amount: transaction.payable_amount || transaction.amount,
         running_balance: account.outstanding_balance,
         source_type: "payment_transaction",
         source_id: transaction.id,
-        description: "Payment voided: #{Map.get(attrs, "void_reason")}",
-        recorded_by_id: Map.get(attrs, "voided_by_id"),
+        description: "#{opts.description}: #{Map.get(attrs, opts.reason_field)}",
+        recorded_by_id: Map.get(attrs, opts.actor_field),
         occurred_at: now
       })
     end)
@@ -153,76 +232,146 @@ defmodule MiwayCreditCore.Payments do
     end
   end
 
-  # ---------------------------------------------------------------------------
-  # Private helpers
-  # ---------------------------------------------------------------------------
-
-  defp check_amount(nil, _amount), do: :ok
-  defp check_amount(_account, nil), do: :ok
-
-  defp check_amount(%LoanAccount{outstanding_balance: balance}, amount) do
-    if Decimal.compare(amount, balance) == :gt do
-      {:error, :amount_exceeds_balance}
-    else
-      :ok
-    end
-  end
-
-  # Oldest-due-date-first allocation across unpaid installments.
-  defp allocate(repo, %LoanAccount{id: loan_account_id, organisation_id: organisation_id}, transaction, amount) do
+  # Allocates `payable` across unpaid/overdue installments, oldest
+  # due-date-first, walking the organisation's configured component
+  # order (default penalty -> interest -> principal). Interest and
+  # principal still share a single paid_amount column — which portion
+  # of it is "interest" vs "principal" is derived on the fly
+  # (interest-first, the standard amortization convention), not stored
+  # separately, so this never double-counts across passes.
+  defp allocate(repo, %LoanAccount{} = account, transaction, payable) do
     installments =
       from(i in RepaymentScheduleInstallment,
-        where: i.loan_account_id == ^loan_account_id and i.status in ["upcoming", "overdue", "partially_paid"],
+        where: i.loan_account_id == ^account.id and i.status in ["upcoming", "overdue", "partially_paid"],
         order_by: [asc: i.due_date]
       )
       |> repo.all()
 
-    Enum.reduce_while(installments, amount, fn installment, remaining ->
+    order = allocation_order(account.organisation_id)
+
+    Enum.reduce_while(installments, payable, fn installment, remaining ->
       if Decimal.compare(remaining, Decimal.new("0")) == :eq do
         {:halt, remaining}
       else
-        due = Decimal.sub(installment.scheduled_amount, installment.paid_amount)
-        take = if Decimal.compare(remaining, due) == :gt, do: due, else: remaining
-
-        %PaymentAllocation{}
-        |> PaymentAllocation.changeset(%{
-          organisation_id: organisation_id,
-          payment_transaction_id: transaction.id,
-          repayment_schedule_installment_id: installment.id,
-          allocated_amount: take
-        })
-        |> repo.insert!()
-
-        new_paid = Decimal.add(installment.paid_amount, take)
-        fully_paid? = Decimal.compare(new_paid, installment.scheduled_amount) != :lt
-
-        installment
-        |> RepaymentScheduleInstallment.changeset(%{
-          paid_amount: new_paid,
-          status: if(fully_paid?, do: "paid", else: "partially_paid"),
-          paid_at: if(fully_paid?, do: DateTime.utc_now() |> DateTime.truncate(:second), else: nil)
-        })
-        |> repo.update!()
-
-        {:cont, Decimal.sub(remaining, take)}
+        {:cont, allocate_installment(repo, order, installment, account, transaction, remaining)}
       end
     end)
 
     {:ok, :allocated}
   end
 
-  # Reverses every allocation this transaction made, restoring each
-  # touched installment's paid_amount/status.
-  defp reverse_allocations(repo, transaction) do
-    allocations =
-      from(pa in PaymentAllocation, where: pa.payment_transaction_id == ^transaction.id)
-      |> repo.all()
+  # Fully settles one installment — walking its components in the
+  # organisation's configured order — before any remaining payment
+  # moves on to the next (oldest-due-date) installment. Nested this
+  # way rather than component-first-across-every-installment so a
+  # payment can never skip ahead to pay off, say, installment #3's
+  # interest while installment #1's principal is still outstanding.
+  defp allocate_installment(repo, order, installment, account, transaction, remaining) do
+    {remaining, paid_amount, penalty_paid} =
+      Enum.reduce(order, {remaining, installment.paid_amount, installment.penalty_paid}, fn
+        component, {remaining, paid_amount, penalty_paid} ->
+          if Decimal.compare(remaining, Decimal.new("0")) == :eq do
+            {remaining, paid_amount, penalty_paid}
+          else
+            current = %{paid_amount: paid_amount, penalty_paid: penalty_paid}
+            owed = component_owed(component, installment, current)
 
+            if Decimal.compare(owed, Decimal.new("0")) == :gt do
+              take = decimal_min(remaining, owed)
+
+              %PaymentAllocation{}
+              |> PaymentAllocation.changeset(%{
+                organisation_id: account.organisation_id,
+                payment_transaction_id: transaction.id,
+                repayment_schedule_installment_id: installment.id,
+                allocated_amount: take,
+                component: component
+              })
+              |> repo.insert!()
+
+              updated = apply_component(component, current, take)
+              {Decimal.sub(remaining, take), updated.paid_amount, updated.penalty_paid}
+            else
+              {remaining, paid_amount, penalty_paid}
+            end
+          end
+      end)
+
+    fully_paid? =
+      Decimal.compare(paid_amount, installment.scheduled_amount) != :lt and
+        Decimal.compare(penalty_paid, installment.penalty_amount) != :lt
+
+    # "partially_paid" describes progress against principal/interest
+    # specifically — an installment where only the penalty got paid
+    # (paid_amount untouched) hasn't made any repayment progress, so
+    # its status is left as-is rather than misleadingly flipping.
+    status =
+      cond do
+        fully_paid? -> "paid"
+        Decimal.compare(paid_amount, Decimal.new("0")) == :gt -> "partially_paid"
+        true -> installment.status
+      end
+
+    installment
+    |> RepaymentScheduleInstallment.changeset(%{
+      paid_amount: paid_amount,
+      penalty_paid: penalty_paid,
+      status: status,
+      paid_at: if(fully_paid?, do: DateTime.utc_now() |> DateTime.truncate(:second), else: nil)
+    })
+    |> repo.update!()
+
+    remaining
+  end
+
+  defp component_owed("penalty", installment, current) do
+    Decimal.sub(installment.penalty_amount, current.penalty_paid)
+  end
+
+  defp component_owed("interest", installment, current) do
+    paid_interest = decimal_min(current.paid_amount, installment.scheduled_interest)
+    Decimal.sub(installment.scheduled_interest, paid_interest)
+  end
+
+  defp component_owed("principal", installment, current) do
+    paid_interest = decimal_min(current.paid_amount, installment.scheduled_interest)
+    paid_principal = Decimal.sub(current.paid_amount, paid_interest)
+    Decimal.sub(installment.scheduled_principal, paid_principal)
+  end
+
+  defp apply_component("penalty", current, take), do: %{current | penalty_paid: Decimal.add(current.penalty_paid, take)}
+  defp apply_component(_interest_or_principal, current, take), do: %{current | paid_amount: Decimal.add(current.paid_amount, take)}
+
+  defp allocation_order(organisation_id) do
+    case Organisations.get_settings(organisation_id) do
+      %{allocation_order: [_ | _] = order} -> order
+      _ -> @default_allocation_order
+    end
+  end
+
+  # Reverses every allocation this transaction made, restoring each
+  # touched installment's paid_amount/penalty_paid/status. Grouped by
+  # installment first — a single transaction can carry more than one
+  # allocation against the same installment (e.g. a penalty allocation
+  # and a principal allocation both landing on the same installment),
+  # so each installment's reversal must apply in one pass, not
+  # re-fetch-and-overwrite per allocation.
+  defp reverse_allocations(repo, transaction) do
     today = Date.utc_today()
 
-    Enum.each(allocations, fn allocation ->
-      installment = repo.get!(RepaymentScheduleInstallment, allocation.repayment_schedule_installment_id)
-      new_paid = Decimal.sub(installment.paid_amount, allocation.allocated_amount)
+    from(pa in PaymentAllocation, where: pa.payment_transaction_id == ^transaction.id)
+    |> repo.all()
+    |> Enum.group_by(& &1.repayment_schedule_installment_id)
+    |> Enum.each(fn {installment_id, allocations} ->
+      installment = repo.get!(RepaymentScheduleInstallment, installment_id)
+
+      {new_paid, new_penalty_paid} =
+        Enum.reduce(allocations, {installment.paid_amount, installment.penalty_paid}, fn allocation, {paid, penalty_paid} ->
+          case allocation.component do
+            "penalty" -> {paid, Decimal.sub(penalty_paid, allocation.allocated_amount)}
+            _ -> {Decimal.sub(paid, allocation.allocated_amount), penalty_paid}
+          end
+        end)
 
       status =
         cond do
@@ -232,12 +381,19 @@ defmodule MiwayCreditCore.Payments do
         end
 
       installment
-      |> RepaymentScheduleInstallment.changeset(%{paid_amount: new_paid, status: status, paid_at: nil})
+      |> RepaymentScheduleInstallment.changeset(%{
+        paid_amount: new_paid,
+        penalty_paid: new_penalty_paid,
+        status: status,
+        paid_at: nil
+      })
       |> repo.update!()
     end)
 
     {:ok, :reversed}
   end
+
+  defp decimal_min(a, b), do: if(Decimal.compare(a, b) == :gt, do: b, else: a)
 
   defp decimal(nil), do: nil
   defp decimal(%Decimal{} = d), do: d

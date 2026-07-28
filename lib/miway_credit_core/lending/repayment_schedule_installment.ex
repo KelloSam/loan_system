@@ -21,6 +21,9 @@ defmodule MiwayCreditCore.Lending.RepaymentScheduleInstallment do
     field :scheduled_interest, :decimal
     field :paid_amount, :decimal, default: Decimal.new("0.00")
 
+    field :penalty_amount, :decimal, default: Decimal.new("0.00")
+    field :penalty_paid, :decimal, default: Decimal.new("0.00")
+
     field :status, :string, default: "upcoming"
     field :paid_at, :utc_datetime
 
@@ -34,12 +37,15 @@ defmodule MiwayCreditCore.Lending.RepaymentScheduleInstallment do
   def changeset(installment, attrs) do
     installment
     |> cast(attrs, [:organisation_id, :loan_account_id, :installment_number, :due_date, :scheduled_amount,
-                   :scheduled_principal, :scheduled_interest, :paid_amount, :status, :paid_at])
+                   :scheduled_principal, :scheduled_interest, :paid_amount, :penalty_amount, :penalty_paid,
+                   :status, :paid_at])
     |> validate_required([:organisation_id, :loan_account_id, :installment_number, :due_date, :scheduled_amount,
                           :scheduled_principal, :scheduled_interest, :status])
     |> validate_inclusion(:status, @statuses)
     |> validate_number(:scheduled_amount, greater_than: 0)
     |> validate_number(:paid_amount, greater_than_or_equal_to: 0)
+    |> validate_number(:penalty_amount, greater_than_or_equal_to: 0)
+    |> validate_number(:penalty_paid, greater_than_or_equal_to: 0)
     |> foreign_key_constraint(:organisation_id)
     |> foreign_key_constraint(:loan_account_id)
   end

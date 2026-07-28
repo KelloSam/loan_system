@@ -44,4 +44,5 @@ defmodule MiwayCreditCore.Lending do
   defdelegate total_overdue_amount(scope, customer_id \\ nil), to: Schedule
   defdelegate overdue_installments(scope), to: Schedule
   defdelegate installments_due_soon(scope, days \\ 7), to: Schedule
+  defdelegate days_past_due(account), to: Schedule
 end

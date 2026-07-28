@@ -8,7 +8,8 @@ defmodule MiwayCreditCore.Lending.Schedule do
 
   import Ecto.Query
   alias MiwayCreditCore.Repo
-  alias MiwayCreditCore.Lending.RepaymentScheduleInstallment
+  alias MiwayCreditCore.Lending.{RepaymentScheduleInstallment, LoanAccount}
+  alias MiwayCreditCore.Accounting.AccountingEntry
   alias MiwayCreditCore.Accounts.Scope
 
   def list_installments_for_account(%Scope{} = scope, loan_account_id) do
@@ -43,17 +44,77 @@ defmodule MiwayCreditCore.Lending.Schedule do
   job (called periodically by MiwayCreditCore.ArrearsScheduler), not a
   request handler, so it deliberately has no scope. Returns the number
   of rows flipped.
+
+  Also accrues a one-time late payment penalty (the loan product's
+  late_payment_penalty_percent against what's still owed on that
+  installment) the moment an installment goes overdue — not a daily
+  or compounding charge, just the single accrual real loan products
+  actually apply, folded into the account's outstanding_balance and
+  posted as a "penalty" AccountingEntry, same pattern as the
+  origination fee posted at disbursement.
   """
   def mark_overdue_installments do
     today = Date.utc_today()
 
-    {count, _} =
+    newly_overdue =
       from(i in RepaymentScheduleInstallment,
         where: i.status in ["upcoming", "partially_paid"] and i.due_date < ^today
       )
-      |> Repo.update_all(set: [status: "overdue"])
+      |> preload(loan_account: :loan_product)
+      |> Repo.all()
 
-    count
+    Enum.each(newly_overdue, &flip_to_overdue/1)
+
+    length(newly_overdue)
+  end
+
+  defp flip_to_overdue(installment) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    account = installment.loan_account
+    penalty = penalty_owed(installment, account.loan_product)
+
+    Ecto.Multi.new()
+    |> Ecto.Multi.update(:installment, RepaymentScheduleInstallment.changeset(installment, %{
+      status: "overdue",
+      penalty_amount: Decimal.add(installment.penalty_amount, penalty)
+    }))
+    |> maybe_accrue_penalty_ledger(account, penalty, now)
+    |> Repo.transaction()
+  end
+
+  defp penalty_owed(installment, product) do
+    outstanding = Decimal.sub(installment.scheduled_amount, installment.paid_amount)
+
+    outstanding
+    |> Decimal.mult(product.late_payment_penalty_percent)
+    |> Decimal.div(Decimal.new("100"))
+    |> Decimal.round(2)
+  end
+
+  # Zero-penalty products skip this entirely rather than posting a
+  # $0.00 no-op ledger entry — same convention as the origination fee.
+  defp maybe_accrue_penalty_ledger(multi, account, penalty, now) do
+    if Decimal.compare(penalty, Decimal.new("0")) == :gt do
+      multi
+      |> Ecto.Multi.update(:account, LoanAccount.changeset(account, %{
+        outstanding_balance: Decimal.add(account.outstanding_balance, penalty)
+      }))
+      |> Ecto.Multi.insert(:penalty_entry, fn %{account: account} ->
+        AccountingEntry.changeset(%AccountingEntry{}, %{
+          organisation_id: account.organisation_id,
+          loan_account_id: account.id,
+          entry_type: "penalty",
+          amount: penalty,
+          running_balance: account.outstanding_balance,
+          source_type: "loan_account",
+          source_id: account.id,
+          description: "Late payment penalty accrued",
+          occurred_at: now
+        })
+      end)
+    else
+      multi
+    end
   end
 
   @doc "Count of overdue installments, optionally scoped to one customer."
@@ -83,6 +144,23 @@ defmodule MiwayCreditCore.Lending.Schedule do
     |> order_by([i], asc: i.due_date)
     |> preload(loan_account: :customer)
     |> Repo.all()
+  end
+
+  @doc "Days since the oldest overdue installment on this account fell due. 0 if none overdue."
+  def days_past_due(%LoanAccount{id: loan_account_id}) do
+    oldest_overdue_due_date =
+      from(i in RepaymentScheduleInstallment,
+        where: i.loan_account_id == ^loan_account_id and i.status == "overdue",
+        order_by: [asc: i.due_date],
+        select: i.due_date,
+        limit: 1
+      )
+      |> Repo.one()
+
+    case oldest_overdue_due_date do
+      nil -> 0
+      due_date -> Date.diff(Date.utc_today(), due_date)
+    end
   end
 
   @doc "Installments due within the next `days` days (default 7), scoped to the caller's organisation."

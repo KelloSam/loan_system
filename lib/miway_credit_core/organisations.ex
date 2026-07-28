@@ -33,6 +33,16 @@ defmodule MiwayCreditCore.Organisations do
 
   def get_organisation!(id), do: Repo.get!(Organisation, id)
 
+  @doc """
+  An organisation's settings row (currency, timezone, payment
+  allocation order). Every organisation gets one via
+  `create_organisation/1` — nil is only possible for data that
+  predates that guarantee, so callers should treat it as optional.
+  """
+  def get_settings(organisation_id) do
+    Repo.get_by(OrganisationSettings, organisation_id: organisation_id)
+  end
+
   def create_branch(attrs \\ %{}) do
     %Branch{}
     |> Branch.changeset(attrs)
