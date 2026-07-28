@@ -7,7 +7,7 @@ defmodule MiwayCreditCore.AuditLogsTest do
     test "always returns :ok and persists the event" do
       assert :ok =
                AuditLogs.log("loan_approved",
-                 actor_id: Ecto.UUID.generate(),
+                 actor_id: 1,
                  actor_email: "admin@example.com",
                  target_type: "loan",
                  target_id: Ecto.UUID.generate(),

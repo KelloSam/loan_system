@@ -8,7 +8,7 @@ defmodule MiwayCreditCore.AuditLogs do
   the calling request, so the main business flow is never blocked by logging.
 
   Options:
-    - actor_id:    UUID of the user who performed the action
+    - actor_id:    id of the Accounts.User who performed the action (integer)
     - actor_email: email of that user (stored so logs remain readable even
                    if the user record is later deleted)
     - target_type: "loan", "customer", "payment", etc.
