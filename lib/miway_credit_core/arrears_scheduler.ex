@@ -1,14 +1,17 @@
 defmodule MiwayCreditCore.ArrearsScheduler do
   @moduledoc """
   Periodically flips unpaid installments past their due_date to
-  "overdue" (MiwayCreditCore.Lending.mark_overdue_installments/0). Runs once
-  shortly after startup, then on a fixed interval — no external job
-  library needed at this scale.
+  "overdue" (MiwayCreditCore.Lending.mark_overdue_installments/0) and
+  evaluates every due promise-to-pay
+  (MiwayCreditCore.Collections.evaluate_promises/0) — the same tick
+  serves both rather than running two near-identical background
+  processes. Runs once shortly after startup, then on a fixed
+  interval — no external job library needed at this scale.
 
   Disabled in the test environment (config :miway_credit_core,
   ArrearsScheduler, enabled: false) — a background process querying
   the DB outside a test's checked-out sandbox connection would error
-  intermittently; the underlying query is unit-tested directly instead.
+  intermittently; the underlying queries are unit-tested directly instead.
   """
 
   use GenServer
@@ -32,6 +35,12 @@ defmodule MiwayCreditCore.ArrearsScheduler do
 
     if count > 0 do
       Logger.info("ArrearsScheduler: flipped #{count} installment(s) to overdue")
+    end
+
+    promises_evaluated = MiwayCreditCore.Collections.evaluate_promises()
+
+    if promises_evaluated > 0 do
+      Logger.info("ArrearsScheduler: evaluated #{promises_evaluated} due promise(s) to pay")
     end
 
     Process.send_after(self(), :check_overdue, state.interval_ms)

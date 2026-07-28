@@ -44,6 +44,12 @@ defmodule MiwayCreditCore.Authorization do
     products.manage
     reports.view
     audit.view
+    collections.view
+    collections.manage
+    write_offs.request
+    write_offs.approve
+    restructuring.request
+    restructuring.approve
   )
 
   @role_names ~w(platform_administrator organisation_administrator loan_officer)
@@ -68,6 +74,10 @@ defmodule MiwayCreditCore.Authorization do
       customers.view
       products.view
       reports.view
+      collections.view
+      collections.manage
+      write_offs.request
+      restructuring.request
     )
   }
 

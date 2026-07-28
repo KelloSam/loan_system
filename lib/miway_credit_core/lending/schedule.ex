@@ -10,6 +10,7 @@ defmodule MiwayCreditCore.Lending.Schedule do
   alias MiwayCreditCore.Repo
   alias MiwayCreditCore.Lending.{RepaymentScheduleInstallment, LoanAccount}
   alias MiwayCreditCore.Accounting.{AccountingEntry, GeneralLedger}
+  alias MiwayCreditCore.Collections
   alias MiwayCreditCore.Accounts.Scope
 
   def list_installments_for_account(%Scope{} = scope, loan_account_id) do
@@ -51,7 +52,10 @@ defmodule MiwayCreditCore.Lending.Schedule do
   or compounding charge, just the single accrual real loan products
   actually apply, folded into the account's outstanding_balance and
   posted as a "penalty" AccountingEntry, same pattern as the
-  origination fee posted at disbursement.
+  origination fee posted at disbursement. Also ensures a
+  `Collections.CollectionCase` is open for the account — collections
+  work starts the moment arrears exist, not behind some extra
+  severity threshold.
   """
   def mark_overdue_installments do
     today = Date.utc_today()
@@ -79,6 +83,7 @@ defmodule MiwayCreditCore.Lending.Schedule do
       penalty_amount: Decimal.add(installment.penalty_amount, penalty)
     }))
     |> maybe_accrue_penalty_ledger(account, penalty, now)
+    |> Ecto.Multi.run(:collection_case, fn repo, _changes -> Collections.ensure_case_opened(repo, account) end)
     |> Repo.transaction()
   end
 

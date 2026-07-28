@@ -4,12 +4,21 @@ defmodule MiwayCreditCore.Lending.RepaymentScheduleInstallment do
   mutated directly by money-received logic. Only two things touch it:
   `MiwayCreditCore.Lending.Schedule.mark_overdue_installments/0` (flips
   status on time) and payment allocation (credits `paid_amount`).
+
+  `"restructured"` is terminal — set on every remaining unpaid
+  installment when `MiwayCreditCore.Collections.approve_restructuring/2`
+  supersedes them with a fresh schedule. Never deleted, matching this
+  codebase's established "append, never mutate" posture (reversed
+  disbursements/voided payments) — restructured rows stay visible as
+  history. Already excluded from the allocator's and the overdue
+  sweep's existing `["upcoming", "overdue", "partially_paid"]` filters
+  with no query changes needed.
   """
 
   use Ecto.Schema
   import Ecto.Changeset
 
-  @statuses ~w(upcoming overdue paid partially_paid)
+  @statuses ~w(upcoming overdue paid partially_paid restructured)
 
   @primary_key {:id, :binary_id, autogenerate: true}
   schema "repayment_schedule_installments" do
