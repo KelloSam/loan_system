@@ -38,7 +38,7 @@
               </div>
             </td>
             <td class="td text-gray-500 hidden md:table-cell"><%= customer.phone %></td>
-            <td class="td text-gray-500 hidden lg:table-cell"><%= customer.id_number %></td>
+            <td class="td text-gray-500 hidden lg:table-cell"><%= MiwayCreditCore.Customers.mask_id_number(customer.id_number) %></td>
             <td class="td hidden sm:table-cell"><%= customer.total_loans %></td>
             <td class="td hidden sm:table-cell">ZMW <%= customer.current_balance %></td>
             <td class="td">

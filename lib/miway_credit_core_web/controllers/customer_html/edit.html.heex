@@ -38,24 +38,75 @@
       </div>
 
       <div>
-        <label class="form-label">National ID Number <span class="text-red-500">*</span></label>
-        <%= text_input f, :id_number,
+        <label class="form-label">Email Address <span class="text-gray-400 font-normal">(optional)</span></label>
+        <%= email_input f, :email,
               class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
-        <%= error_tag f, :id_number %>
+        <%= error_tag f, :email %>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <label class="form-label">Customer Type <span class="text-red-500">*</span></label>
+        <%= select f, :customer_type, [{"Individual", "individual"}, {"Business", "business"}],
+              class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+        <%= error_tag f, :customer_type %>
+      </div>
+
+      <div>
+        <label class="form-label">Identity Document Type <span class="text-red-500">*</span></label>
+        <%= select f, :id_type,
+              [{"NRC", "nrc"}, {"Passport", "passport"}, {"Company Registration", "company_registration"}],
+              class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+        <%= error_tag f, :id_type %>
       </div>
     </div>
 
     <div>
-      <label class="form-label">Email Address <span class="text-gray-400 font-normal">(optional)</span></label>
-      <%= email_input f, :email,
+      <label class="form-label">Identity/Registration Number <span class="text-red-500">*</span></label>
+      <%= text_input f, :id_number,
             class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
-      <%= error_tag f, :email %>
+      <%= error_tag f, :id_number %>
     </div>
 
     <div>
       <label class="form-label">Address <span class="text-gray-400 font-normal">(optional)</span></label>
-      <%= textarea f, :address, rows: 2,
-            class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <%= text_input f, :address_line, placeholder: "Street / plot",
+              class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+        <%= text_input f, :city, placeholder: "City / town",
+              class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+        <%= text_input f, :province, placeholder: "Province",
+              class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+        <%= text_input f, :postal_code, placeholder: "Postal code",
+              class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+      </div>
+    </div>
+
+    <div class="rounded-lg bg-gray-50 border border-gray-200 p-4 space-y-3">
+      <p class="text-sm font-medium text-gray-700">Employment / Income <span class="text-gray-400 font-normal">(individuals, optional)</span></p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <%= text_input f, :employment_status, placeholder: "Employment status",
+              class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+        <%= text_input f, :employer_name, placeholder: "Employer name",
+              class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+        <%= text_input f, :occupation, placeholder: "Occupation",
+              class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+        <%= number_input f, :monthly_income, step: "0.01", placeholder: "Monthly income (ZMW)",
+              class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+      </div>
+    </div>
+
+    <div class="rounded-lg bg-gray-50 border border-gray-200 p-4 space-y-3">
+      <p class="text-sm font-medium text-gray-700">Business Details <span class="text-gray-400 font-normal">(businesses, optional)</span></p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <%= text_input f, :business_type, placeholder: "Business type",
+              class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+        <%= number_input f, :annual_turnover, step: "0.01", placeholder: "Annual turnover (ZMW)",
+              class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+        <%= number_input f, :years_in_operation, placeholder: "Years in operation",
+              class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+      </div>
     </div>
 
     <div class="rounded-lg bg-gray-50 border border-gray-200 p-4">

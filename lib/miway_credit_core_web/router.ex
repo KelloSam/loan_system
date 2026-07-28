@@ -80,6 +80,18 @@ defmodule MiwayCreditCoreWeb.Router do
     post "/settings/2fa/enable", TwoFactorController, :enable
     delete "/settings/2fa/disable", TwoFactorController, :disable
     resources "/customers", CustomerController
+    post "/customers/:id/next_of_kin", CustomerController, :create_next_of_kin
+    delete "/customers/:id/next_of_kin/:next_of_kin_id", CustomerController, :delete_next_of_kin
+    post "/customers/:id/guarantors", CustomerController, :create_guarantor
+    delete "/customers/:id/guarantors/:guarantor_id", CustomerController, :delete_guarantor
+    post "/customers/:id/kyc_documents", CustomerController, :create_kyc_document
+    get "/customers/:id/kyc_documents/:document_id/download", CustomerController, :download_kyc_document
+    delete "/customers/:id/kyc_documents/:document_id", CustomerController, :remove_kyc_document
+    post "/customers/:id/consents", CustomerController, :create_consent
+    delete "/customers/:id/consents/:consent_id", CustomerController, :revoke_consent
+    patch "/customers/:id/kyc/submit", CustomerController, :submit_kyc_review
+    patch "/customers/:id/kyc/verify", CustomerController, :verify_kyc
+    patch "/customers/:id/kyc/reject", CustomerController, :reject_kyc
     resources "/loans", LoanController
     patch "/loans/:id/approve", LoanController, :approve
     patch "/loans/:id/reject", LoanController, :reject

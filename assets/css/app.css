@@ -102,3 +102,6 @@
 .badge-written_off   { @apply bg-red-100 text-red-800; }
 .badge-defaulted     { @apply bg-red-100 text-red-800; }
 .badge-inactive      { @apply bg-gray-100 text-gray-600; }
+.badge-not_started   { @apply bg-gray-100 text-gray-600; }
+.badge-pending_review{ @apply bg-amber-100 text-amber-800; }
+.badge-verified      { @apply bg-emerald-100 text-emerald-800; }

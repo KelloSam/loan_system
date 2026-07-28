@@ -38,7 +38,7 @@
       <dd class="mt-1 text-sm font-medium text-navy-900"><%= @customer.phone %></dd>
     </div>
     <div>
-      <dt class="text-xs font-medium text-gray-400 uppercase tracking-wide">National ID</dt>
+      <dt class="text-xs font-medium text-gray-400 uppercase tracking-wide"><%= String.capitalize(@customer.id_type) %></dt>
       <dd class="mt-1 text-sm font-medium text-navy-900"><%= @customer.id_number %></dd>
     </div>
     <div>
@@ -46,8 +46,15 @@
       <dd class="mt-1 text-sm font-medium text-navy-900"><%= @customer.email || "—" %></dd>
     </div>
     <div>
+      <dt class="text-xs font-medium text-gray-400 uppercase tracking-wide">Customer Type</dt>
+      <dd class="mt-1 text-sm font-medium text-navy-900"><%= String.capitalize(@customer.customer_type) %></dd>
+    </div>
+    <div>
       <dt class="text-xs font-medium text-gray-400 uppercase tracking-wide">Address</dt>
-      <dd class="mt-1 text-sm font-medium text-navy-900"><%= @customer.address || "—" %></dd>
+      <dd class="mt-1 text-sm font-medium text-navy-900">
+        <%= [@customer.address_line, @customer.city, @customer.province, @customer.postal_code]
+              |> Enum.reject(&(&1 in [nil, ""])) |> Enum.join(", ") |> then(&(if &1 == "", do: "—", else: &1)) %>
+      </dd>
     </div>
     <div>
       <dt class="text-xs font-medium text-gray-400 uppercase tracking-wide">Status</dt>
@@ -60,6 +67,166 @@
       </dd>
     </div>
   </dl>
+</div>
+
+<%# KYC verification status %>
+<div class="card p-6 mb-6">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="section-title">KYC Verification</h2>
+    <span class={"badge badge-#{@customer.kyc_status}"}><%= @customer.kyc_status |> String.replace("_", " ") |> String.capitalize() %></span>
+  </div>
+
+  <%= if @customer.kyc_status == "rejected" and @customer.kyc_rejection_reason do %>
+    <p class="text-sm text-red-600 mb-4">Rejected: <%= @customer.kyc_rejection_reason %></p>
+  <% end %>
+
+  <div class="flex gap-3 flex-wrap items-start">
+    <%= if @customer.kyc_status in ["not_started", "rejected"] do %>
+      <%= link "Submit for Review", to: ~p"/admin/customers/#{@customer}/kyc/submit", method: :patch, class: "btn-outline" %>
+    <% end %>
+    <%= if @customer.kyc_status == "pending_review" do %>
+      <%= link "Mark Verified", to: ~p"/admin/customers/#{@customer}/kyc/verify", method: :patch, class: "btn-primary" %>
+      <.form :let={f} for={%{}} as={:kyc} action={~p"/admin/customers/#{@customer}/kyc/reject"} method="patch" class="flex gap-2">
+        <%= text_input f, :reason, placeholder: "Rejection reason",
+              class: "block rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+        <%= submit "Reject", class: "btn-danger" %>
+      </.form>
+    <% end %>
+  </div>
+</div>
+
+<%# Next of kin %>
+<div class="card p-6 mb-6">
+  <h2 class="section-title mb-4">Next of Kin <span class="ml-1.5 text-sm font-normal text-gray-400">(<%= length(@next_of_kins) %>)</span></h2>
+
+  <%= if Enum.empty?(@next_of_kins) do %>
+    <p class="text-sm text-gray-400 mb-4">None recorded.</p>
+  <% else %>
+    <ul class="divide-y divide-gray-50 mb-4">
+      <%= for nok <- @next_of_kins do %>
+        <li class="py-2.5 flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-navy-900"><%= nok.name %> <span class="text-gray-400 font-normal">(<%= nok.relationship %>)</span></p>
+            <p class="text-xs text-gray-400"><%= nok.phone %></p>
+          </div>
+          <%= link "Remove", to: ~p"/admin/customers/#{@customer}/next_of_kin/#{nok}", method: :delete,
+                data: [confirm: "Remove #{nok.name} as next of kin?"], class: "text-xs font-medium text-red-500 hover:text-red-700" %>
+        </li>
+      <% end %>
+    </ul>
+  <% end %>
+
+  <.form :let={f} for={@next_of_kin_changeset} action={~p"/admin/customers/#{@customer}/next_of_kin"} as={:next_of_kin} class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+    <%= text_input f, :name, placeholder: "Name", class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+    <%= text_input f, :relationship, placeholder: "Relationship", class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+    <%= text_input f, :phone, placeholder: "Phone", class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+    <%= submit "Add", class: "btn-outline" %>
+  </.form>
+</div>
+
+<%# Guarantors %>
+<div class="card p-6 mb-6">
+  <h2 class="section-title mb-4">Guarantors <span class="ml-1.5 text-sm font-normal text-gray-400">(<%= length(@guarantors) %>)</span></h2>
+
+  <%= if Enum.empty?(@guarantors) do %>
+    <p class="text-sm text-gray-400 mb-4">None recorded.</p>
+  <% else %>
+    <ul class="divide-y divide-gray-50 mb-4">
+      <%= for g <- @guarantors do %>
+        <li class="py-2.5 flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-navy-900"><%= g.name %> <span class="text-gray-400 font-normal">(<%= g.relationship %>)</span></p>
+            <p class="text-xs text-gray-400"><%= g.phone %> · <%= String.capitalize(g.id_type) %> <%= g.id_number %></p>
+          </div>
+          <%= link "Remove", to: ~p"/admin/customers/#{@customer}/guarantors/#{g}", method: :delete,
+                data: [confirm: "Remove #{g.name} as guarantor?"], class: "text-xs font-medium text-red-500 hover:text-red-700" %>
+        </li>
+      <% end %>
+    </ul>
+  <% end %>
+
+  <.form :let={f} for={@guarantor_changeset} action={~p"/admin/customers/#{@customer}/guarantors"} as={:guarantor} class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+    <%= text_input f, :name, placeholder: "Name", class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+    <%= text_input f, :relationship, placeholder: "Relationship", class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+    <%= text_input f, :phone, placeholder: "Phone", class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+    <%= select f, :id_type, [{"NRC", "nrc"}, {"Passport", "passport"}, {"Company Registration", "company_registration"}],
+          prompt: "ID type", class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+    <%= text_input f, :id_number, placeholder: "ID number", class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+    <%= submit "Add", class: "btn-outline" %>
+  </.form>
+</div>
+
+<%# KYC documents — sensitive: never publicly accessible, only via the authenticated download action below %>
+<div class="card p-6 mb-6">
+  <h2 class="section-title mb-4">KYC Documents <span class="ml-1.5 text-sm font-normal text-gray-400">(<%= length(@kyc_documents) %>)</span></h2>
+
+  <%= if Enum.empty?(@kyc_documents) do %>
+    <p class="text-sm text-gray-400 mb-4">None uploaded.</p>
+  <% else %>
+    <ul class="divide-y divide-gray-50 mb-4">
+      <%= for doc <- @kyc_documents do %>
+        <li class="py-2.5 flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-navy-900"><%= doc.original_filename %></p>
+            <p class="text-xs text-gray-400"><%= doc.document_type |> String.replace("_", " ") |> String.capitalize() %> · <%= doc.status %></p>
+          </div>
+          <div class="flex gap-3">
+            <%= if doc.status == "active" do %>
+              <%= link "Download", to: ~p"/admin/customers/#{@customer}/kyc_documents/#{doc}/download", class: "text-xs font-medium text-navy-600 hover:text-navy-900" %>
+              <%= link "Remove", to: ~p"/admin/customers/#{@customer}/kyc_documents/#{doc}", method: :delete,
+                    data: [confirm: "Remove this document?"], class: "text-xs font-medium text-red-500 hover:text-red-700" %>
+            <% end %>
+          </div>
+        </li>
+      <% end %>
+    </ul>
+  <% end %>
+
+  <.form :let={f} for={@kyc_document_changeset} action={~p"/admin/customers/#{@customer}/kyc_documents"} as={:kyc_document}
+        multipart={true} class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+    <%= select f, :document_type,
+          [{"NRC copy", "nrc_copy"}, {"Passport copy", "passport_copy"}, {"Proof of address", "proof_of_address"},
+           {"Payslip", "payslip"}, {"Business registration certificate", "business_registration_certificate"}, {"Other", "other"}],
+          prompt: "Document type", class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+    <%= file_input f, :file, class: "block w-full text-sm" %>
+    <%= submit "Upload", class: "btn-outline" %>
+  </.form>
+</div>
+
+<%# Consent %>
+<div class="card p-6 mb-6">
+  <h2 class="section-title mb-4">Consent Records <span class="ml-1.5 text-sm font-normal text-gray-400">(<%= length(@consents) %>)</span></h2>
+
+  <%= if Enum.empty?(@consents) do %>
+    <p class="text-sm text-gray-400 mb-4">None recorded.</p>
+  <% else %>
+    <ul class="divide-y divide-gray-50 mb-4">
+      <%= for consent <- @consents do %>
+        <li class="py-2.5 flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-navy-900"><%= consent.consent_type |> String.replace("_", " ") |> String.capitalize() %></p>
+            <p class="text-xs text-gray-400">
+              <%= String.capitalize(consent.method) %> · Granted <%= Calendar.strftime(consent.granted_at, "%d %b %Y") %>
+              <%= if consent.revoked_at, do: " · Revoked #{Calendar.strftime(consent.revoked_at, "%d %b %Y")}" %>
+            </p>
+          </div>
+          <%= if is_nil(consent.revoked_at) do %>
+            <%= link "Revoke", to: ~p"/admin/customers/#{@customer}/consents/#{consent}", method: :delete,
+                  data: [confirm: "Revoke this consent?"], class: "text-xs font-medium text-red-500 hover:text-red-700" %>
+          <% end %>
+        </li>
+      <% end %>
+    </ul>
+  <% end %>
+
+  <.form :let={f} for={@consent_changeset} action={~p"/admin/customers/#{@customer}/consents"} as={:consent} class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+    <%= select f, :consent_type,
+          [{"Data processing", "data_processing"}, {"Credit check", "credit_check"}, {"Marketing communications", "marketing_communications"}, {"Other", "other"}],
+          prompt: "Consent type", class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+    <%= select f, :method, [{"Digital", "digital"}, {"Verbal", "verbal"}, {"Signed form", "signed_form"}],
+          prompt: "Method", class: "block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" %>
+    <%= submit "Record", class: "btn-outline" %>
+  </.form>
 </div>
 
 <%# Loan history %>
