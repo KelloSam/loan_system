@@ -32,3 +32,7 @@ miway_credit_core-*.tar
 
 # Also ignore assets/node_modules, in case you have a "node_modules" folder
 /assets/node_modules/
+
+# Uploaded KYC document bytes (see MiwayCreditCore.Customers.DocumentStorage)
+# — customer-uploaded files, real or demo, never belong in source control.
+/priv/kyc_uploads/

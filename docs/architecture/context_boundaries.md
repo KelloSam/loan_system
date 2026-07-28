@@ -11,6 +11,11 @@ compilation. Nothing calls it yet, and it calls nothing. It exists so
 that when its implementation phase arrives, the question "whose
 responsibility is this" is already answered.
 
+For the customer-facing side specifically — `User`/`Customer`/
+`CustomerUser` and where the web portal and a future native mobile
+app fit in the roadmap — see
+[`customer_experience_and_mobile.md`](customer_experience_and_mobile.md).
+
 ## Built Contexts
 
 See [`MIWAY_CREDITCORE_CONSTITUTION.md`](../MIWAY_CREDITCORE_CONSTITUTION.md)
