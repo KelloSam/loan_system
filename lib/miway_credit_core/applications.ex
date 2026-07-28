@@ -21,13 +21,14 @@ defmodule MiwayCreditCore.Applications do
   alias MiwayCreditCore.Lending.{LoanAccount, RepaymentScheduleInstallment, InterestCalculator}
   alias MiwayCreditCore.Accounting.AccountingEntry
   alias MiwayCreditCore.Accounts.Scope
+  alias MiwayCreditCore.Authorization
   alias MiwayCreditCore.Risk
 
   # ---------------------------------------------------------------------------
   # Queries
   # ---------------------------------------------------------------------------
 
-  @doc "Paginated applications, newest first, customer preloaded. Accepts page:/per_page:."
+  @doc "Paginated applications, newest first, customer + loan_account preloaded (the admin list view shows the account's status/rate once approved). Accepts page:/per_page:."
   def list_applications(%Scope{} = scope, opts \\ []) do
     page     = Keyword.get(opts, :page, 1)
     per_page = Keyword.get(opts, :per_page, 50)
@@ -35,7 +36,7 @@ defmodule MiwayCreditCore.Applications do
 
     LoanApplication
     |> scope_organisation(scope)
-    |> preload(:customer)
+    |> preload([:customer, :loan_account])
     |> order_by([a], desc: a.inserted_at)
     |> limit(^per_page)
     |> offset(^offset)
@@ -83,7 +84,9 @@ defmodule MiwayCreditCore.Applications do
   attrs — it's derived from the customer being applied for
   (Customers.get_customer!/2, itself scoped), so an application can
   only ever be filed for a customer already within the caller's
-  organisation.
+  organisation. created_by_id comes from scope.user — never from
+  attrs either — so it can't be spoofed to fake who the maker was for
+  maker-checker purposes at approval time.
   """
   def create_application(%Scope{} = scope, attrs \\ %{}) do
     attrs = stringify_keys(attrs)
@@ -100,6 +103,7 @@ defmodule MiwayCreditCore.Applications do
         |> Map.put("risk_level", risk_level)
         |> Map.put("risk_score", risk_score)
         |> Map.put("organisation_id", customer && customer.organisation_id)
+        |> Map.put("created_by_id", scope.user && scope.user.id)
 
       Ecto.Multi.new()
       |> Ecto.Multi.insert(:application, LoanApplication.changeset(%LoanApplication{}, attrs))
@@ -156,8 +160,35 @@ defmodule MiwayCreditCore.Applications do
   — every record this creates derives organisation_id from it directly,
   not from a fresh scope, so approval can't cross an organisation
   boundary even if called with a stale reference.
+
+  Two checks happen before any write: maker-checker (the approver
+  can't be the same person who submitted the application — a nil
+  created_by_id, from before this was tracked, never blocks anyone,
+  since there's no maker on record to conflict with) and the
+  approver's ApprovalLimit for "applications.approve", if their role
+  carries one.
   """
-  def approve_application(%LoanApplication{} = application, admin_id) do
+  def approve_application(%LoanApplication{} = application, %Scope{} = scope) do
+    with :ok <- check_maker_checker(application, scope),
+         :ok <- check_approval_limit(application, scope) do
+      do_approve_application(application, scope.user.id)
+    end
+  end
+
+  defp check_maker_checker(%LoanApplication{created_by_id: nil}, _scope), do: :ok
+
+  defp check_maker_checker(%LoanApplication{created_by_id: created_by_id}, %Scope{user: %{id: user_id}}) do
+    if created_by_id == user_id, do: {:error, :maker_checker_violation}, else: :ok
+  end
+
+  defp check_approval_limit(%LoanApplication{requested_amount: amount}, scope) do
+    case Authorization.approval_limit(scope, "applications.approve") do
+      nil -> :ok
+      limit -> if Decimal.compare(amount, limit) == :gt, do: {:error, :exceeds_approval_limit}, else: :ok
+    end
+  end
+
+  defp do_approve_application(%LoanApplication{} = application, admin_id) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
     interest_rate = default_interest_rate()
@@ -219,23 +250,29 @@ defmodule MiwayCreditCore.Applications do
     end
   end
 
-  @doc "Rejects a pending application. Recalculates customer stats (no-op today, kept for symmetry)."
-  def reject_application(%LoanApplication{} = application, admin_id, reason) do
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
+  @doc """
+  Rejects a pending application. Same maker-checker guard as approval
+  — the person who submitted it can't be the one who decides it,
+  either way. Recalculates customer stats (no-op today, kept for symmetry).
+  """
+  def reject_application(%LoanApplication{} = application, %Scope{} = scope, reason) do
+    with :ok <- check_maker_checker(application, scope) do
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-    result =
-      application
-      |> LoanApplication.decision_changeset(%{
-        status: "rejected",
-        decided_at: now,
-        decided_by_id: admin_id,
-        rejection_reason: reason
-      })
-      |> Repo.update()
+      result =
+        application
+        |> LoanApplication.decision_changeset(%{
+          status: "rejected",
+          decided_at: now,
+          decided_by_id: scope.user.id,
+          rejection_reason: reason
+        })
+        |> Repo.update()
 
-    with {:ok, updated} <- result do
-      CustomerStats.recalculate(updated.customer_id)
-      {:ok, updated}
+      with {:ok, updated} <- result do
+        CustomerStats.recalculate(updated.customer_id)
+        {:ok, updated}
+      end
     end
   end
 

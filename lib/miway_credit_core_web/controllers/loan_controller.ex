@@ -4,6 +4,16 @@ defmodule MiwayCreditCoreWeb.LoanController do
   alias MiwayCreditCore.{Applications, Lending, Payments, Customers, AuditLogs}
   alias MiwayCreditCore.Applications.{LoanApplication, Collateral}
   alias MiwayCreditCore.Payments.PaymentTransaction
+  alias MiwayCreditCoreWeb.Plugs.RequirePermissionPlug
+
+  plug RequirePermissionPlug, "applications.view" when action in [:index, :show]
+  plug RequirePermissionPlug, "applications.create" when action in [:new, :create]
+  plug RequirePermissionPlug, "applications.edit" when action in [:edit, :update, :delete]
+  plug RequirePermissionPlug, "applications.approve" when action == :approve
+  plug RequirePermissionPlug, "applications.reject" when action == :reject
+  plug RequirePermissionPlug, "payments.receive" when action == :create_payment
+  plug RequirePermissionPlug, "payments.reverse" when action == :void_payment
+  plug RequirePermissionPlug, "collateral.manage" when action in [:create_collateral, :delete_collateral]
 
   def index(conn, _params) do
     applications = Applications.list_applications(conn.assigns.current_scope)
@@ -122,7 +132,7 @@ defmodule MiwayCreditCoreWeb.LoanController do
   def approve(conn, %{"id" => id}) do
     application = Applications.get_application!(conn.assigns.current_scope, id)
 
-    case Applications.approve_application(application, conn.assigns.current_user.id) do
+    case Applications.approve_application(application, conn.assigns.current_scope) do
       {:ok, application, account} ->
         AuditLogs.log("loan_application_approved",
           actor_id: conn.assigns.current_user.id,
@@ -137,6 +147,16 @@ defmodule MiwayCreditCoreWeb.LoanController do
         |> put_flash(:info, "Application approved — account opened.")
         |> redirect(to: ~p"/admin/loans/#{application}")
 
+      {:error, :maker_checker_violation} ->
+        conn
+        |> put_flash(:error, "You submitted this application — someone else must decide it.")
+        |> redirect(to: ~p"/admin/loans/#{id}")
+
+      {:error, :exceeds_approval_limit} ->
+        conn
+        |> put_flash(:error, "This amount exceeds your approval limit.")
+        |> redirect(to: ~p"/admin/loans/#{id}")
+
       {:error, _} ->
         conn
         |> put_flash(:error, "Could not approve application.")
@@ -148,7 +168,7 @@ defmodule MiwayCreditCoreWeb.LoanController do
     application = Applications.get_application!(conn.assigns.current_scope, id)
     reason = Map.get(params, "reason", "Not specified")
 
-    case Applications.reject_application(application, conn.assigns.current_user.id, reason) do
+    case Applications.reject_application(application, conn.assigns.current_scope, reason) do
       {:ok, application} ->
         AuditLogs.log("loan_application_rejected",
           actor_id: conn.assigns.current_user.id,
@@ -162,6 +182,11 @@ defmodule MiwayCreditCoreWeb.LoanController do
         conn
         |> put_flash(:info, "Application rejected.")
         |> redirect(to: ~p"/admin/loans/#{application}")
+
+      {:error, :maker_checker_violation} ->
+        conn
+        |> put_flash(:error, "You submitted this application — someone else must decide it.")
+        |> redirect(to: ~p"/admin/loans/#{id}")
 
       {:error, _} ->
         conn

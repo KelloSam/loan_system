@@ -51,7 +51,7 @@ defmodule MiwayCreditCore.ApplicationsTest do
       scope = %Scope{organisation_id: customer.organisation_id}
       application = application_fixture(%{"customer_id" => customer.id})
       admin = admin_fixture()
-      {:ok, _rejected} = Applications.reject_application(application, admin.id, "Insufficient income")
+      {:ok, _rejected} = Applications.reject_application(application, %Scope{user: admin, organisation_id: :all}, "Insufficient income")
 
       assert {:error, :rejection_cooldown} =
                Applications.create_application(scope, valid_application_attrs(%{"customer_id" => customer.id}))
@@ -96,7 +96,7 @@ defmodule MiwayCreditCore.ApplicationsTest do
       application = application_fixture()
       admin = admin_fixture()
 
-      assert {:ok, approved, account} = Applications.approve_application(application, admin.id)
+      assert {:ok, approved, account} = Applications.approve_application(application, %Scope{user: admin, organisation_id: :all})
       assert approved.status == "approved"
       assert approved.decided_at
       assert approved.decided_by_id == admin.id
@@ -112,7 +112,7 @@ defmodule MiwayCreditCore.ApplicationsTest do
       application = application_fixture()
       scope = %Scope{organisation_id: application.organisation_id}
       admin = admin_fixture()
-      {:ok, _approved, account} = Applications.approve_application(application, admin.id)
+      {:ok, _approved, account} = Applications.approve_application(application, %Scope{user: admin, organisation_id: :all})
 
       assert Decimal.equal?(Accounting.rebuild_outstanding_balance(scope, account.id), account.outstanding_balance)
 
@@ -125,7 +125,7 @@ defmodule MiwayCreditCore.ApplicationsTest do
       application = application_fixture()
       scope = %Scope{organisation_id: application.organisation_id}
       admin = admin_fixture()
-      {:ok, _approved, account} = Applications.approve_application(application, admin.id)
+      {:ok, _approved, account} = Applications.approve_application(application, %Scope{user: admin, organisation_id: :all})
 
       reloaded_customer = Customers.get_customer!(scope, application.customer_id)
       assert Decimal.equal?(reloaded_customer.current_balance, account.outstanding_balance)
@@ -135,7 +135,7 @@ defmodule MiwayCreditCore.ApplicationsTest do
       application = application_fixture(%{"requested_term_months" => "3"})
       scope = %Scope{organisation_id: application.organisation_id}
       admin = admin_fixture()
-      {:ok, _approved, account} = Applications.approve_application(application, admin.id)
+      {:ok, _approved, account} = Applications.approve_application(application, %Scope{user: admin, organisation_id: :all})
 
       installments = Lending.list_installments_for_account(scope, account.id)
       assert length(installments) == 3
@@ -158,7 +158,7 @@ defmodule MiwayCreditCore.ApplicationsTest do
       application = application_fixture()
       admin = admin_fixture()
 
-      assert {:ok, rejected} = Applications.reject_application(application, admin.id, "Debt-to-income too high")
+      assert {:ok, rejected} = Applications.reject_application(application, %Scope{user: admin, organisation_id: :all}, "Debt-to-income too high")
       assert rejected.status == "rejected"
       assert rejected.decided_at
       assert rejected.decided_by_id == admin.id
@@ -169,7 +169,7 @@ defmodule MiwayCreditCore.ApplicationsTest do
       application = application_fixture()
       scope = %Scope{organisation_id: application.organisation_id}
       admin = admin_fixture()
-      {:ok, rejected} = Applications.reject_application(application, admin.id, "Not eligible")
+      {:ok, rejected} = Applications.reject_application(application, %Scope{user: admin, organisation_id: :all}, "Not eligible")
 
       assert Applications.get_application!(scope, rejected.id).loan_account == nil
     end
@@ -208,7 +208,7 @@ defmodule MiwayCreditCore.ApplicationsTest do
       assert Applications.count_active_applications(scope) == 1
 
       admin = admin_fixture()
-      {:ok, _} = Applications.reject_application(application, admin.id, "Not eligible")
+      {:ok, _} = Applications.reject_application(application, %Scope{user: admin, organisation_id: :all}, "Not eligible")
       assert Applications.count_active_applications(scope) == 0
     end
   end

@@ -50,7 +50,8 @@ defmodule MiwayCreditCore.LoansFixtures do
   def approved_application_fixture(attrs \\ %{}) do
     application = application_fixture(attrs)
     admin = admin_fixture()
-    {:ok, approved, account} = MiwayCreditCore.Applications.approve_application(application, admin.id)
+    admin_scope = %Scope{user: admin, organisation_id: :all}
+    {:ok, approved, account} = MiwayCreditCore.Applications.approve_application(application, admin_scope)
     %{approved | loan_account: account}
   end
 

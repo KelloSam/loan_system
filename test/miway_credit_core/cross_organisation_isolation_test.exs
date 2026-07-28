@@ -29,7 +29,7 @@ defmodule MiwayCreditCore.CrossOrganisationIsolationTest do
 
     application = application_fixture(%{"customer_id" => customer.id})
     admin = admin_fixture()
-    {:ok, approved, account} = Applications.approve_application(application, admin.id)
+    {:ok, approved, account} = Applications.approve_application(application, %Scope{user: admin, organisation_id: :all})
 
     {:ok, transaction} = Payments.record_payment(scope, valid_payment_attrs(account, %{"amount" => "50.00"}))
     {:ok, collateral} = Applications.create_collateral(account, %{"type" => "vehicle", "description" => "Car", "estimated_value" => "10000.00"})

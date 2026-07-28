@@ -6,6 +6,7 @@ defmodule MiwayCreditCore.Risk.FraudDetectorTest do
   import MiwayCreditCore.LoansFixtures
   alias MiwayCreditCore.Risk.FraudDetector
   alias MiwayCreditCore.Applications
+  alias MiwayCreditCore.Accounts.Scope
 
   describe "evaluate/3 — classification thresholds" do
     test "no customer tied and a non-round amount scores 0 (low)" do
@@ -41,7 +42,7 @@ defmodule MiwayCreditCore.Risk.FraudDetectorTest do
       customer = customer_fixture()
       application = application_fixture(%{"customer_id" => customer.id})
       admin = admin_fixture()
-      {:ok, _approved, _account} = Applications.approve_application(application, admin.id)
+      {:ok, _approved, _account} = Applications.approve_application(application, %Scope{user: admin, organisation_id: :all})
 
       {_level, _score, signals} = FraudDetector.evaluate(customer.id, "1234.56")
       refute Enum.any?(signals, &(&1 =~ "No repayment history"))
@@ -52,7 +53,7 @@ defmodule MiwayCreditCore.Risk.FraudDetectorTest do
       admin = admin_fixture()
 
       prior = application_fixture(%{"customer_id" => customer.id, "requested_amount" => "1000.50"})
-      {:ok, _approved, _account} = Applications.approve_application(prior, admin.id)
+      {:ok, _approved, _account} = Applications.approve_application(prior, %Scope{user: admin, organisation_id: :all})
 
       {_level, _score, signals} = FraudDetector.evaluate(customer.id, "5000")
       assert Enum.any?(signals, &(&1 =~ "3× the customer's average"))
@@ -62,7 +63,7 @@ defmodule MiwayCreditCore.Risk.FraudDetectorTest do
       customer = customer_fixture()
       application = application_fixture(%{"customer_id" => customer.id})
       admin = admin_fixture()
-      {:ok, _rejected} = Applications.reject_application(application, admin.id, "Not eligible")
+      {:ok, _rejected} = Applications.reject_application(application, %Scope{user: admin, organisation_id: :all}, "Not eligible")
 
       {_level, _score, signals} = FraudDetector.evaluate(customer.id, "1234.56")
       assert Enum.any?(signals, &(&1 =~ "rejected within the last 90 days"))
@@ -72,7 +73,7 @@ defmodule MiwayCreditCore.Risk.FraudDetectorTest do
       customer = customer_fixture()
       application = application_fixture(%{"customer_id" => customer.id})
       admin = admin_fixture()
-      {:ok, approved, _account} = Applications.approve_application(application, admin.id)
+      {:ok, approved, _account} = Applications.approve_application(application, %Scope{user: admin, organisation_id: :all})
 
       # Without excluding: the application counts as its own repayment history.
       {_level, _score, signals_included} = FraudDetector.evaluate(customer.id, "1234.56")

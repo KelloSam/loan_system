@@ -3,6 +3,10 @@ defmodule MiwayCreditCoreWeb.CustomerController do
 
   alias MiwayCreditCore.{Customers, Applications, AuditLogs}
   alias MiwayCreditCore.Customers.Customer
+  alias MiwayCreditCoreWeb.Plugs.RequirePermissionPlug
+
+  plug RequirePermissionPlug, "customers.view" when action in [:index, :show]
+  plug RequirePermissionPlug, "customers.manage" when action in [:new, :create, :edit, :update, :delete]
 
   def index(conn, _params) do
     customers = Customers.list_customers(conn.assigns.current_scope)

@@ -2,6 +2,9 @@ defmodule MiwayCreditCoreWeb.ReportController do
   use MiwayCreditCoreWeb, :controller
 
   alias MiwayCreditCore.Reports
+  alias MiwayCreditCoreWeb.Plugs.RequirePermissionPlug
+
+  plug RequirePermissionPlug, "reports.view" when action in [:index, :export_csv]
 
   def index(conn, _params) do
     scope = conn.assigns.current_scope
