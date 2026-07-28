@@ -12,6 +12,7 @@ defmodule MiwayCreditCore.Lending.Servicing do
   alias MiwayCreditCore.Customers.CustomerStats
   alias MiwayCreditCore.Lending.LoanAccount
   alias MiwayCreditCore.Accounting.AccountingEntry
+  alias MiwayCreditCore.Payments.PaymentTransaction
   alias MiwayCreditCore.Accounts.Scope
 
   @doc "Fetches an account by id, scoped — one belonging to a different organisation raises the same NoResultsError as an unknown id."
@@ -89,6 +90,60 @@ defmodule MiwayCreditCore.Lending.Servicing do
       {:error, _, reason, _}        -> {:error, reason}
     end
   end
+
+  @doc """
+  Reverses a disbursement that was wrong from the start — zeroes
+  outstanding_balance, posts a compensating `reversal` ledger entry,
+  flips status to `"reversed"`, and recalculates the customer's stats
+  — all in one transaction. The repayment schedule rows are left
+  as-is, never deleted (same "append, never mutate" posture as the
+  ledger itself) — a reversed account is simply excluded from
+  `count_active_accounts/1`/`total_outstanding_balance/1`'s existing
+  `status == "active"` filters, same as a written-off or closed one.
+
+  Only possible before any real money has moved against the loan:
+  refuses with `{:error, :payments_already_received}` once a posted
+  payment exists — unwinding partial repayments too is a materially
+  harder problem than this serves (a wrong disbursement caught before
+  any repayment, the realistic case).
+  """
+  def reverse_disbursement(%LoanAccount{status: "active"} = account, admin_id, reason) do
+    if Repo.exists?(from(t in PaymentTransaction, where: t.loan_account_id == ^account.id and t.status == "posted")) do
+      {:error, :payments_already_received}
+    else
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      Ecto.Multi.new()
+      |> Ecto.Multi.update(:account, LoanAccount.changeset(account, %{
+        status: "reversed",
+        outstanding_balance: Decimal.new("0.00"),
+        reversed_at: now,
+        reversed_by_id: admin_id,
+        reversal_reason: reason
+      }))
+      |> Ecto.Multi.insert(:entry, AccountingEntry.changeset(%AccountingEntry{}, %{
+        organisation_id: account.organisation_id,
+        loan_account_id: account.id,
+        entry_type: "reversal",
+        amount: Decimal.negate(account.outstanding_balance),
+        running_balance: Decimal.new("0.00"),
+        source_type: "manual_adjustment",
+        description: "Disbursement reversed: #{reason}",
+        recorded_by_id: admin_id,
+        occurred_at: now
+      }))
+      |> Ecto.Multi.run(:update_customer_stats, fn repo, %{account: account} ->
+        CustomerStats.recalculate(repo, account.customer_id)
+      end)
+      |> Repo.transaction()
+      |> case do
+        {:ok, %{account: account}} -> {:ok, account}
+        {:error, _, reason, _}     -> {:error, reason}
+      end
+    end
+  end
+
+  def reverse_disbursement(%LoanAccount{}, _admin_id, _reason), do: {:error, :invalid_status}
 
   defp scope_organisation(query, %Scope{organisation_id: :all}), do: query
   defp scope_organisation(query, %Scope{organisation_id: organisation_id}) do

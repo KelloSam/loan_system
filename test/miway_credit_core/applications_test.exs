@@ -185,6 +185,50 @@ defmodule MiwayCreditCore.ApplicationsTest do
       assert Decimal.compare(account.outstanding_balance, Decimal.new("0")) == :gt
     end
 
+    test "generates a unique contract_reference and defaults disbursement_method when not specified" do
+      application = application_fixture()
+      admin = admin_fixture()
+      admin_scope = %Scope{user: admin, organisation_id: :all}
+      {:ok, assessed} = Applications.assess_application(application, admin_scope)
+      {:ok, approved} = Applications.approve_application(assessed, admin_scope, true)
+
+      {:ok, _disbursed, account} = Applications.disburse_application(approved, admin_scope)
+
+      assert account.contract_reference =~ ~r/^LN-\d{4}-[0-9A-F]{8}$/
+      assert account.disbursement_method == "bank_transfer"
+      assert account.disbursement_reference == nil
+    end
+
+    test "persists a caller-supplied disbursement method and channel reference" do
+      application = application_fixture()
+      admin = admin_fixture()
+      admin_scope = %Scope{user: admin, organisation_id: :all}
+      {:ok, assessed} = Applications.assess_application(application, admin_scope)
+      {:ok, approved} = Applications.approve_application(assessed, admin_scope, true)
+
+      {:ok, _disbursed, account} =
+        Applications.disburse_application(approved, admin_scope, %{"method" => "mobile_money", "reference" => "MM-998877"})
+
+      assert account.disbursement_method == "mobile_money"
+      assert account.disbursement_reference == "MM-998877"
+    end
+
+    test "two disbursed accounts never collide on contract_reference" do
+      admin = admin_fixture()
+      admin_scope = %Scope{user: admin, organisation_id: :all}
+
+      accounts =
+        for _ <- 1..2 do
+          application = application_fixture()
+          {:ok, assessed} = Applications.assess_application(application, admin_scope)
+          {:ok, approved} = Applications.approve_application(assessed, admin_scope, true)
+          {:ok, _disbursed, account} = Applications.disburse_application(approved, admin_scope)
+          account
+        end
+
+      refute Enum.at(accounts, 0).contract_reference == Enum.at(accounts, 1).contract_reference
+    end
+
     test "the opening balance reconciles against the ledger's disbursement entry" do
       application = application_fixture()
       scope = %Scope{organisation_id: application.organisation_id}

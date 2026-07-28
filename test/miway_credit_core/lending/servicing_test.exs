@@ -56,6 +56,58 @@ defmodule MiwayCreditCore.Lending.ServicingTest do
     end
   end
 
+  describe "reverse_disbursement/3" do
+    test "zeroes the balance, posts a reversal ledger entry, and recalculates customer stats" do
+      application = approved_application_fixture()
+      scope = %Scope{organisation_id: application.organisation_id}
+      account = application.loan_account
+      admin = admin_fixture()
+
+      assert {:ok, reversed} = Lending.reverse_disbursement(account, admin.id, "Disbursed to the wrong customer")
+      assert reversed.status == "reversed"
+      assert reversed.reversed_at
+      assert reversed.reversal_reason == "Disbursed to the wrong customer"
+      assert Decimal.equal?(reversed.outstanding_balance, Decimal.new("0.00"))
+
+      entries = Accounting.list_entries_for_account(scope, account.id)
+      assert Enum.any?(entries, &(&1.entry_type == "reversal"))
+      assert Decimal.equal?(Accounting.rebuild_outstanding_balance(scope, account.id), Decimal.new("0.00"))
+
+      reloaded_customer = Customers.get_customer!(scope, application.customer_id)
+      assert Decimal.equal?(reloaded_customer.current_balance, Decimal.new("0.00"))
+    end
+
+    test "excludes a reversed account from count_active_accounts/1 and total_outstanding_balance/1" do
+      application = approved_application_fixture()
+      scope = %Scope{organisation_id: application.organisation_id}
+      account = application.loan_account
+      admin = admin_fixture()
+
+      assert Lending.count_active_accounts(scope) == 1
+      {:ok, _} = Lending.reverse_disbursement(account, admin.id, "Wrong customer")
+      assert Lending.count_active_accounts(scope) == 0
+      assert Decimal.equal?(Lending.total_outstanding_balance(scope), Decimal.new("0.00"))
+    end
+
+    test "refuses once a posted payment has been recorded against the account" do
+      application = approved_application_fixture()
+      account = application.loan_account
+      admin = admin_fixture()
+      _transaction = payment_fixture(account)
+
+      assert {:error, :payments_already_received} = Lending.reverse_disbursement(account, admin.id, "Too late now")
+    end
+
+    test "refuses on an account that isn't active" do
+      application = approved_application_fixture()
+      account = application.loan_account
+      admin = admin_fixture()
+      {:ok, closed} = Lending.close_account(account)
+
+      assert {:error, :invalid_status} = Lending.reverse_disbursement(closed, admin.id, "Too late")
+    end
+  end
+
   describe "aggregate counters" do
     test "count_active_accounts/0 and total_outstanding_balance/0 are scoped to one organisation" do
       application = approved_application_fixture()

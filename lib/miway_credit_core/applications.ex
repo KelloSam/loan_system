@@ -493,38 +493,49 @@ defmodule MiwayCreditCore.Applications do
   end
 
   @doc """
-  Disburses an approved application: creates its LoanAccount, generates
-  the repayment schedule, posts the opening disbursement ledger entry,
-  and recalculates customer stats — all in one transaction, including
-  the application's own transition to disbursed. Only an approved
-  application can be disbursed; this is deliberately a separate step
-  from the approval decision itself (see approve_application/2), so a
-  credit decision and the actual release of funds are never the same
-  instant. `application` must already be a caller-scoped struct
-  (fetched via get_application!/2) — every record this creates derives
-  organisation_id from it directly, not from a fresh scope, so
-  disbursement can't cross an organisation boundary even if called
-  with a stale reference.
+  Disburses an approved application: creates its LoanAccount (with a
+  system-generated contract reference and the disbursement's
+  method/channel reference — see `LoanAccount.generate_contract_reference/1`),
+  generates the repayment schedule, posts the opening disbursement
+  ledger entry, and recalculates customer stats — all in one
+  transaction, including the application's own transition to
+  disbursed. Only an approved application can be disbursed; this is
+  deliberately a separate step from the approval decision itself (see
+  approve_application/2), so a credit decision and the actual release
+  of funds are never the same instant. `application` must already be a
+  caller-scoped struct (fetched via get_application!/2) — every record
+  this creates derives organisation_id from it directly, not from a
+  fresh scope, so disbursement can't cross an organisation boundary
+  even if called with a stale reference.
+
+  `disbursement_details` is `%{"method" => ..., "reference" => ...}` —
+  "method" defaults to "bank_transfer" for callers that don't care to
+  specify it (`cash | bank_transfer | mobile_money | cheque | other`
+  otherwise), "reference" optional (the channel's own confirmation
+  number, e.g. a mobile money transaction id).
   """
-  def disburse_application(%LoanApplication{status: "approved"} = application, %Scope{} = scope) do
+  def disburse_application(application, scope, disbursement_details \\ %{"method" => "bank_transfer"})
+
+  def disburse_application(%LoanApplication{status: "approved"} = application, %Scope{} = scope, disbursement_details) do
     case check_conditions_cleared(application) do
       :ok ->
         product = Products.get_product!(scope, application.loan_product_id)
-        do_disburse_application(application, scope.user.id, product)
+        do_disburse_application(application, scope.user.id, product, stringify_keys(disbursement_details))
 
       error ->
         error
     end
   end
 
-  def disburse_application(%LoanApplication{}, %Scope{}), do: {:error, :invalid_status}
+  def disburse_application(%LoanApplication{}, %Scope{}, _disbursement_details), do: {:error, :invalid_status}
 
   defp check_conditions_cleared(%LoanApplication{conditions: nil}), do: :ok
   defp check_conditions_cleared(%LoanApplication{conditions_cleared_at: nil}), do: {:error, :conditions_not_cleared}
   defp check_conditions_cleared(%LoanApplication{}), do: :ok
 
-  defp do_disburse_application(%LoanApplication{} = application, admin_id, %LoanProduct{} = product) do
+  defp do_disburse_application(%LoanApplication{} = application, admin_id, %LoanProduct{} = product, disbursement_details) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
+    account_id = Ecto.UUID.generate()
 
     %{total_repayment: total_repayment} =
       InterestCalculator.calculate(%{
@@ -546,7 +557,7 @@ defmodule MiwayCreditCore.Applications do
       disbursed_by_id: admin_id
     }))
     |> Ecto.Multi.insert(:account, fn %{application: application} ->
-      LoanAccount.changeset(%LoanAccount{}, %{
+      LoanAccount.changeset(%LoanAccount{id: account_id}, %{
         organisation_id: application.organisation_id,
         loan_application_id: application.id,
         customer_id: application.customer_id,
@@ -555,6 +566,9 @@ defmodule MiwayCreditCore.Applications do
         interest_rate: product.interest_rate,
         interest_method: product.interest_method,
         term_months: application.requested_term_months,
+        contract_reference: LoanAccount.generate_contract_reference(account_id),
+        disbursement_method: disbursement_details["method"],
+        disbursement_reference: disbursement_details["reference"],
         opened_at: now,
         status: "active",
         # The account owes the full scheduled repayment (principal +

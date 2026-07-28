@@ -23,6 +23,7 @@ defmodule MiwayCreditCore.Lending do
   defdelegate list_accounts_for_customer(scope, customer_id), to: Servicing
   defdelegate close_account(account), to: Servicing
   defdelegate write_off_account(account, admin_id), to: Servicing
+  defdelegate reverse_disbursement(account, admin_id, reason), to: Servicing
   defdelegate count_active_accounts(scope), to: Servicing
   defdelegate total_outstanding_balance(scope), to: Servicing
 
