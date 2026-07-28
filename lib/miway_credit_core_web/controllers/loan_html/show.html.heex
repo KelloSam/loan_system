@@ -142,11 +142,28 @@
               data: [confirm: "Confirm that all conditions have been met?"],
               class: "btn-outline" %>
       <% else %>
-        <%= link "Disburse",
-              to: ~p"/admin/loans/#{@application}/disburse",
-              method: :patch,
-              data: [confirm: "Disburse this loan? This creates the account and generates the repayment schedule."],
-              class: "btn-gold" %>
+        <details class="reject-disclosure">
+          <summary class="btn-gold reject-toggle">Disburse</summary>
+          <div class="card p-4 mt-2">
+            <.form :let={_f} for={%{}} as={:disburse} action={~p"/admin/loans/#{@application}/disburse"} method="patch">
+              <label class="form-label" for="disburse_method">Disbursement method</label>
+              <select id="disburse_method" name="method" required
+                      class="block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600">
+                <option value="cash">Cash</option>
+                <option value="bank_transfer">Bank Transfer</option>
+                <option value="mobile_money">Mobile Money</option>
+                <option value="cheque">Cheque</option>
+                <option value="other">Other</option>
+              </select>
+              <label class="form-label mt-2" for="disburse_reference">Channel reference <span class="text-gray-400 font-normal">(optional)</span></label>
+              <input type="text" id="disburse_reference" name="reference" placeholder="e.g. mobile money transaction id"
+                     class="block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-navy-600 focus:ring-navy-600" />
+              <div class="flex justify-end gap-2 mt-2">
+                <button type="submit" class="btn-gold" data-confirm="Disburse this loan? This creates the account and generates the repayment schedule.">Confirm Disburse</button>
+              </div>
+            </.form>
+          </div>
+        </details>
       <% end %>
     <% end %>
     <%= link "All Loans", to: ~p"/admin/loans", class: "text-sm font-medium text-gray-400 hover:text-navy-600 self-center" %>
@@ -212,6 +229,10 @@
       </div>
       <%= if @account do %>
         <div class="flex justify-between text-sm">
+          <dt class="text-gray-500">Contract Reference</dt>
+          <dd class="font-medium text-navy-900 font-mono"><%= @account.contract_reference %></dd>
+        </div>
+        <div class="flex justify-between text-sm">
           <dt class="text-gray-500">Annual Rate</dt>
           <dd class="font-medium text-navy-900"><%= @account.interest_rate %>%</dd>
         </div>
@@ -223,6 +244,21 @@
           <dt class="text-gray-500">Opened</dt>
           <dd class="font-medium text-navy-900"><%= Calendar.strftime(@account.opened_at, "%d %b %Y") %></dd>
         </div>
+        <div class="flex justify-between text-sm">
+          <dt class="text-gray-500">Disbursed Via</dt>
+          <dd class="font-medium text-navy-900">
+            <%= @account.disbursement_method |> String.replace("_", " ") |> String.capitalize() %>
+            <%= if @account.disbursement_reference do %>
+              <span class="text-gray-400 font-mono text-xs">(<%= @account.disbursement_reference %>)</span>
+            <% end %>
+          </dd>
+        </div>
+        <%= if @account.status == "reversed" do %>
+          <div class="pt-2 border-t border-gray-100 text-sm">
+            <dt class="text-gray-500 mb-1">Reversal Reason</dt>
+            <dd class="text-navy-900"><%= @account.reversal_reason %></dd>
+          </div>
+        <% end %>
       <% else %>
         <div class="flex justify-between text-sm">
           <dt class="text-gray-500">Requested Term</dt>
@@ -279,6 +315,27 @@
         </div>
       <% end %>
     </dl>
+
+    <%= if @account && @account.status == "active" && Enum.all?(@transactions, &(&1.status != "posted")) do %>
+      <details class="reject-disclosure mt-4 pt-4 border-t border-gray-100">
+        <summary class="btn-danger reject-toggle">Reverse Disbursement</summary>
+        <div class="card p-4 mt-2">
+          <.form :let={_f} for={%{}} as={:reverse_disbursement} action={~p"/admin/loans/#{@application}/reverse_disbursement"} method="patch">
+            <label class="form-label" for="reversal_reason">Reason</label>
+            <textarea
+              id="reversal_reason"
+              name="reason"
+              rows="3"
+              required
+              placeholder="Why is this disbursement being reversed?"
+            ></textarea>
+            <div class="flex justify-end gap-2 mt-2">
+              <button type="submit" class="btn-danger" data-confirm="Reverse this disbursement? This can only be done before any payment has been recorded.">Confirm Reverse</button>
+            </div>
+          </.form>
+        </div>
+      </details>
+    <% end %>
   </div>
 
   <%# Compound interest breakdown — only once an account exists %>

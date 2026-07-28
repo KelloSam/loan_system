@@ -11,7 +11,7 @@ defmodule MiwayCreditCoreWeb.PermissionEnforcementTest do
 
   import MiwayCreditCore.{CustomersFixtures, LoansFixtures, OrganisationsFixtures}
 
-  alias MiwayCreditCore.{Applications, Payments}
+  alias MiwayCreditCore.{Applications, Payments, Lending}
   alias MiwayCreditCore.Accounts.Scope
 
   setup do
@@ -103,6 +103,17 @@ defmodule MiwayCreditCoreWeb.PermissionEnforcementTest do
       assert conn.status == 403
     end
 
+    test "Reverse Disbursement: refused with a real 403", %{conn: conn, loan_officer: loan_officer, customer: customer} do
+      application = approved_application_fixture(%{"customer_id" => customer.id})
+
+      conn =
+        conn
+        |> login(loan_officer)
+        |> patch(~p"/admin/loans/#{application.id}/reverse_disbursement", %{"reason" => "Wrong customer"})
+
+      assert conn.status == 403
+    end
+
     test "Reverse (void a payment): refused with a real 403", %{
       conn: conn,
       loan_officer: loan_officer,
@@ -156,6 +167,17 @@ defmodule MiwayCreditCoreWeb.PermissionEnforcementTest do
       reloaded = Applications.get_application!(%Scope{organisation_id: :all}, application.id)
       assert reloaded.status == "disbursed"
       assert reloaded.loan_account != nil
+    end
+
+    test "Reverse Disbursement: succeeds before any payment is recorded", %{conn: conn, org_admin: org_admin, customer: customer} do
+      application = approved_application_fixture(%{"customer_id" => customer.id})
+      conn = conn |> login(org_admin)
+
+      conn = patch(conn, ~p"/admin/loans/#{application.id}/reverse_disbursement", %{"reason" => "Wrong customer"})
+      assert redirected_to(conn) == ~p"/admin/loans/#{application.id}"
+
+      reloaded_account = Lending.get_account!(%Scope{organisation_id: :all}, application.loan_account.id)
+      assert reloaded_account.status == "reversed"
     end
 
     test "Reverse (void a payment): succeeds", %{conn: conn, org_admin: org_admin, organisation: organisation, customer: customer} do

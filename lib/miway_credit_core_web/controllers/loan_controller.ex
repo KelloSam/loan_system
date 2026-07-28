@@ -12,7 +12,7 @@ defmodule MiwayCreditCoreWeb.LoanController do
   plug RequirePermissionPlug, "applications.assess" when action == :assess
   plug RequirePermissionPlug, "applications.approve" when action in [:approve, :conditionally_approve, :clear_conditions]
   plug RequirePermissionPlug, "applications.reject" when action in [:reject, :refer]
-  plug RequirePermissionPlug, "loans.disburse" when action == :disburse
+  plug RequirePermissionPlug, "loans.disburse" when action in [:disburse, :reverse_disbursement]
   plug RequirePermissionPlug, "applications.withdraw" when action == :withdraw
   plug RequirePermissionPlug, "payments.receive" when action == :create_payment
   plug RequirePermissionPlug, "payments.reverse" when action == :void_payment
@@ -358,10 +358,11 @@ defmodule MiwayCreditCoreWeb.LoanController do
     |> Enum.map_join("; ", fn {field, errors} -> "#{field} #{Enum.join(errors, ", ")}" end)
   end
 
-  def disburse(conn, %{"id" => id}) do
+  def disburse(conn, %{"id" => id} = params) do
     application = Applications.get_application!(conn.assigns.current_scope, id)
+    disbursement_details = params |> Map.take(["method", "reference"]) |> Map.put_new("method", "bank_transfer")
 
-    case Applications.disburse_application(application, conn.assigns.current_scope) do
+    case Applications.disburse_application(application, conn.assigns.current_scope, disbursement_details) do
       {:ok, application, account} ->
         AuditLogs.log("loan_application_disbursed",
           actor_id: conn.assigns.current_user.id,
@@ -369,11 +370,16 @@ defmodule MiwayCreditCoreWeb.LoanController do
           target_type: "loan_account",
           target_id: account.id,
           ip_address: get_ip(conn),
-          metadata: %{principal_amount: account.principal_amount, customer_id: account.customer_id}
+          metadata: %{
+            principal_amount: account.principal_amount,
+            customer_id: account.customer_id,
+            contract_reference: account.contract_reference,
+            disbursement_method: account.disbursement_method
+          }
         )
 
         conn
-        |> put_flash(:info, "Application disbursed — account opened.")
+        |> put_flash(:info, "Application disbursed — account #{account.contract_reference} opened.")
         |> redirect(to: ~p"/admin/loans/#{application}")
 
       {:error, :invalid_status} ->
@@ -386,9 +392,52 @@ defmodule MiwayCreditCoreWeb.LoanController do
         |> put_flash(:error, "This application's conditions must be cleared before it can be disbursed.")
         |> redirect(to: ~p"/admin/loans/#{id}")
 
+      {:error, %Ecto.Changeset{} = changeset} ->
+        conn
+        |> put_flash(:error, "Could not disburse application: #{changeset_error_summary(changeset)}")
+        |> redirect(to: ~p"/admin/loans/#{id}")
+
       {:error, _} ->
         conn
         |> put_flash(:error, "Could not disburse application.")
+        |> redirect(to: ~p"/admin/loans/#{id}")
+    end
+  end
+
+  def reverse_disbursement(conn, %{"id" => id} = params) do
+    scope = conn.assigns.current_scope
+    application = Applications.get_application!(scope, id)
+    account = application.loan_account
+    reason = Map.get(params, "reason", "")
+
+    case Lending.reverse_disbursement(account, conn.assigns.current_user.id, reason) do
+      {:ok, reversed_account} ->
+        AuditLogs.log("loan_account_disbursement_reversed",
+          actor_id: conn.assigns.current_user.id,
+          actor_email: conn.assigns.current_user.email,
+          target_type: "loan_account",
+          target_id: reversed_account.id,
+          ip_address: get_ip(conn),
+          metadata: %{contract_reference: reversed_account.contract_reference, reason: reason}
+        )
+
+        conn
+        |> put_flash(:info, "Disbursement reversed.")
+        |> redirect(to: ~p"/admin/loans/#{application}")
+
+      {:error, :invalid_status} ->
+        conn
+        |> put_flash(:error, "This loan account isn't active — its disbursement can't be reversed.")
+        |> redirect(to: ~p"/admin/loans/#{id}")
+
+      {:error, :payments_already_received} ->
+        conn
+        |> put_flash(:error, "This loan already has payments recorded against it — its disbursement can no longer be reversed.")
+        |> redirect(to: ~p"/admin/loans/#{id}")
+
+      {:error, _} ->
+        conn
+        |> put_flash(:error, "Could not reverse this disbursement.")
         |> redirect(to: ~p"/admin/loans/#{id}")
     end
   end
