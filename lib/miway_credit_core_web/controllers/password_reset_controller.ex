@@ -23,7 +23,7 @@ defmodule MiwayCreditCoreWeb.PasswordResetController do
     )
 
     conn
-    |> put_flash(:info, "If an account exists for that email, password-reset instructions have been sent.")
+    |> put_flash(:info, request_flash_message())
     |> redirect(to: ~p"/login")
   end
 
@@ -69,6 +69,15 @@ defmodule MiwayCreditCoreWeb.PasswordResetController do
             |> put_flash(:error, "Couldn't reset your password.")
             |> render(:edit, token: token, changeset: changeset)
         end
+    end
+  end
+
+  defp request_flash_message do
+    if Accounts.PasswordResetNotifier.configured?() do
+      "If an account exists for that email, password-reset instructions have been sent."
+    else
+      "Automated password-reset delivery isn't available in this environment. " <>
+        "Contact an administrator for help resetting your password."
     end
   end
 

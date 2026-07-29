@@ -16,13 +16,21 @@ defmodule MiwayCreditCore.Accounts.PasswordResetNotifier do
               :ok | {:error, term()}
 
   def deliver_reset_link(user, reset_url) do
-    adapter =
-      Application.get_env(
-        :miway_credit_core,
-        :password_reset_notifier,
-        MiwayCreditCore.Accounts.PasswordResetNotifier.Unconfigured
-      )
+    adapter().deliver_reset_link(user, reset_url)
+  end
 
-    adapter.deliver_reset_link(user, reset_url)
+  @doc """
+  Whether a real delivery adapter is configured. Deployment-config
+  information, not per-request/per-user data — safe to branch UI copy
+  on without creating an email-enumeration leak.
+  """
+  def configured?, do: adapter() != MiwayCreditCore.Accounts.PasswordResetNotifier.Unconfigured
+
+  defp adapter do
+    Application.get_env(
+      :miway_credit_core,
+      :password_reset_notifier,
+      MiwayCreditCore.Accounts.PasswordResetNotifier.Unconfigured
+    )
   end
 end
