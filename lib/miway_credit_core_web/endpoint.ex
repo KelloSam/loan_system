@@ -1,13 +1,16 @@
 defmodule MiwayCreditCoreWeb.Endpoint do
   use Phoenix.Endpoint, otp_app: :miway_credit_core
 
+  # secure: true only in prod — dev/test are served over plain
+  # http://localhost, and a Secure cookie is never sent by the browser
+  # over plain HTTP, which would break login locally.
   @session_options [
     store: :cookie,
     key: "_miway_credit_core_key",
     signing_salt: "loan_sys_sign",
     encryption_salt: "loan_sys_enc",
     same_site: "Lax"
-  ]
+  ] ++ if Mix.env() == :prod, do: [secure: true], else: []
 
   socket "/live", Phoenix.LiveView.Socket, websocket: [connect_info: [session: @session_options]]
 
