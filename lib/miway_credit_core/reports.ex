@@ -7,22 +7,49 @@ defmodule MiwayCreditCore.Reports do
   """
 
   import Ecto.Query
-  alias MiwayCreditCore.{Repo, Applications, Lending, Customers}
+  alias MiwayCreditCore.{Repo, Applications, Lending, Customers, Collections, Accounting}
   alias MiwayCreditCore.Applications.LoanApplication
   alias MiwayCreditCore.Lending.RepaymentScheduleInstallment
   alias MiwayCreditCore.Accounts.Scope
 
   @doc "Portfolio-wide numbers for the Reports overview, scoped to the caller's organisation."
   def portfolio_summary(%Scope{} = scope) do
+    outstanding_balance = Lending.total_outstanding_balance(scope)
+    overdue_amount = Lending.total_overdue_amount(scope)
+
     %{
       total_customers: Customers.count_customers(scope),
       total_loans: Applications.count_applications(scope),
       active_loans: Lending.count_active_accounts(scope),
-      outstanding_balance: Lending.total_outstanding_balance(scope),
+      outstanding_balance: outstanding_balance,
       overdue_count: Lending.count_overdue_installments(scope),
-      overdue_amount: Lending.total_overdue_amount(scope)
+      overdue_amount: overdue_amount,
+      par_percent: par_percent(overdue_amount, outstanding_balance),
+      open_collection_cases: Collections.count_open_cases(scope)
     }
   end
+
+  @doc """
+  Portfolio at risk — the standard lending KPI, overdue amount as a
+  percentage of outstanding balance. Zero-safe: an empty portfolio has
+  nothing at risk, not a division error.
+  """
+  def par_percent(overdue_amount, outstanding_balance) do
+    if Decimal.equal?(outstanding_balance, Decimal.new("0")) do
+      Decimal.new("0")
+    else
+      overdue_amount
+      |> Decimal.div(outstanding_balance)
+      |> Decimal.mult(Decimal.new("100"))
+      |> Decimal.round(1)
+    end
+  end
+
+  @doc "Trial balance (balanced?/total_debits/total_credits) for the caller's organisation — Step 14's ledger, surfaced in reporting."
+  defdelegate ledger_health(scope), to: Accounting, as: :trial_balance
+
+  @doc "Per-cash-account-type balances for the caller's organisation — Step 14's reconciliation baseline, surfaced in reporting."
+  defdelegate cash_position(scope), to: Accounting
 
   @doc "Every overdue installment, oldest due_date (most urgent) first, with account + customer preloaded."
   def overdue_payments(%Scope{} = scope) do

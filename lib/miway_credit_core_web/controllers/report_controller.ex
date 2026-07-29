@@ -12,7 +12,9 @@ defmodule MiwayCreditCoreWeb.ReportController do
     render(conn, :index,
       summary: Reports.portfolio_summary(scope),
       overdue_payments: Reports.overdue_payments(scope),
-      payments_due_soon: Reports.payments_due_soon(scope)
+      payments_due_soon: Reports.payments_due_soon(scope),
+      ledger_health: Reports.ledger_health(scope),
+      cash_position: Reports.cash_position(scope)
     )
   end
 

@@ -54,6 +54,34 @@ defmodule MiwayCreditCore.CollectionsTest do
     end
   end
 
+  describe "count_open_cases/1" do
+    test "counts open/in_progress/escalated cases but not resolved or closed ones" do
+      application = approved_application_fixture()
+      scope = %Scope{organisation_id: application.organisation_id}
+      account = application.loan_account
+      {:ok, open_case} = Collections.ensure_case_opened(account)
+
+      assert Collections.count_open_cases(scope) == 1
+
+      {:ok, escalated} = Collections.escalate_case(open_case)
+      assert Collections.count_open_cases(scope) == 1
+
+      {:ok, _closed} = Collections.close_case(escalated, "Resolved")
+      assert Collections.count_open_cases(scope) == 0
+    end
+
+    test "never counts another organisation's cases" do
+      application = approved_application_fixture()
+      scope = %Scope{organisation_id: application.organisation_id}
+      {:ok, _case} = Collections.ensure_case_opened(application.loan_account)
+
+      other_organisation = organisation_fixture()
+      other_scope = %Scope{organisation_id: other_organisation.id}
+      assert Collections.count_open_cases(other_scope) == 0
+      assert Collections.count_open_cases(scope) == 1
+    end
+  end
+
   describe "case lifecycle" do
     test "escalate_case/1 and close_case/2" do
       application = approved_application_fixture()

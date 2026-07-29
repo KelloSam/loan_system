@@ -108,6 +108,28 @@
   <div class="space-y-6">
 
   <div class="card p-5">
+    <h2 class="section-title mb-3">Portfolio Health</h2>
+    <div class="space-y-2 text-sm">
+      <div class="flex items-center justify-between">
+        <span class="text-gray-500">Portfolio at Risk</span>
+        <span class={if Decimal.compare(@stats.par_percent, Decimal.new("5")) == :gt, do: "font-medium text-red-600", else: "font-medium text-navy-900"}>
+          <%= @stats.par_percent %>%
+        </span>
+      </div>
+      <div class="flex items-center justify-between">
+        <span class="text-gray-500">Open Collection Cases</span>
+        <span class="font-medium text-navy-900"><%= @stats.open_collection_cases %></span>
+      </div>
+      <div class="flex items-center justify-between">
+        <span class="text-gray-500">Ledger</span>
+        <span class={"badge #{if @ledger_health.balanced?, do: "badge-disbursed", else: "badge-rejected"}"}>
+          <%= if @ledger_health.balanced?, do: "Balanced", else: "Out of balance" %>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card p-5">
     <h2 class="section-title mb-4">Quick Actions</h2>
     <div class="space-y-3">
       <a href={~p"/admin/customers/new"} class="quick-action">

@@ -53,6 +53,15 @@ defmodule MiwayCreditCore.Collections do
     |> Repo.all()
   end
 
+  @doc "Count of cases still under active collection effort (not resolved or closed), scoped to the caller's organisation."
+  def count_open_cases(%Scope{} = scope) do
+    CollectionCase
+    |> scope_organisation(scope)
+    |> where([c], c.status in ["open", "in_progress", "escalated"])
+    |> select([c], count(c.id))
+    |> Repo.one()
+  end
+
   def get_open_case_for_account(%Scope{} = scope, loan_account_id) do
     CollectionCase
     |> scope_organisation(scope)

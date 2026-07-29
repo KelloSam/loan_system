@@ -75,6 +75,52 @@ defmodule MiwayCreditCore.ReportsTest do
     end
   end
 
+  describe "par_percent/2" do
+    test "is 0 when outstanding balance is 0" do
+      assert Decimal.equal?(Reports.par_percent(Decimal.new("0"), Decimal.new("0")), Decimal.new("0"))
+    end
+
+    test "computes overdue as a percentage of outstanding, rounded to 1 decimal" do
+      result = Reports.par_percent(Decimal.new("25.00"), Decimal.new("200.00"))
+      assert Decimal.equal?(result, Decimal.new("12.5"))
+    end
+  end
+
+  describe "portfolio_summary/1 — par_percent and open_collection_cases" do
+    test "reflects real overdue/outstanding amounts and open collection cases" do
+      application = approved_application_fixture(%{"requested_term_months" => "1"})
+      scope = %Scope{organisation_id: application.organisation_id}
+      account = application.loan_account
+      [installment] = Lending.list_installments_for_account(scope, account.id)
+
+      installment |> Ecto.Changeset.change(due_date: Date.add(Date.utc_today(), -3)) |> Repo.update!()
+      Lending.mark_overdue_installments()
+
+      summary = Reports.portfolio_summary(scope)
+      assert Decimal.compare(summary.par_percent, Decimal.new("0")) == :gt
+      assert summary.open_collection_cases == 1
+    end
+  end
+
+  describe "ledger_health/1" do
+    test "reports a balanced trial balance for a fresh organisation" do
+      organisation = organisation_fixture()
+      scope = %Scope{organisation_id: organisation.id}
+
+      health = Reports.ledger_health(scope)
+      assert health.balanced? == true
+      assert Decimal.equal?(health.total_debits, health.total_credits)
+    end
+
+    test "stays balanced after a real disbursement" do
+      application = approved_application_fixture()
+      scope = %Scope{organisation_id: application.organisation_id}
+
+      health = Reports.ledger_health(scope)
+      assert health.balanced? == true
+    end
+  end
+
   describe "loans_csv/1" do
     test "produces a header row plus one row per application" do
       organisation = organisation_fixture()
