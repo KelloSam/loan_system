@@ -233,6 +233,36 @@ defmodule MiwayCreditCore.CustomersKycTest do
       assert File.ls!(upload_dir) == []
     end
 
+    test "an infected upload is blocked before storage — no file, no DB row" do
+      customer = customer_fixture()
+      admin = admin_fixture()
+      upload = build_upload("eicar test string", "id.pdf", "application/pdf")
+
+      MiwayCreditCore.Customers.MalwareScanner.Test.set_result({:infected, "Test.Signature"})
+
+      assert {:error, {:blocked, "Test.Signature"}} = Customers.create_kyc_document(customer, upload, "nrc_copy", admin.id)
+
+      upload_dir =
+        MiwayCreditCore.Customers.DocumentStorage.read_path(customer.organisation_id, customer.id, "placeholder")
+        |> Path.dirname()
+
+      assert not File.exists?(upload_dir) or File.ls!(upload_dir) == []
+      assert Customers.list_kyc_documents_for_customer(%Scope{organisation_id: customer.organisation_id}, customer.id) == []
+    end
+
+    test "a scanner error also blocks the upload — fails closed, not open" do
+      customer = customer_fixture()
+      admin = admin_fixture()
+      upload = build_upload("content", "id.pdf", "application/pdf")
+
+      MiwayCreditCore.Customers.MalwareScanner.Test.set_result({:error, :scanner_unavailable})
+
+      assert {:error, {:blocked, :scanner_unavailable}} =
+               Customers.create_kyc_document(customer, upload, "nrc_copy", admin.id)
+
+      assert Customers.list_kyc_documents_for_customer(%Scope{organisation_id: customer.organisation_id}, customer.id) == []
+    end
+
     test "a real PDF upload still succeeds" do
       customer = customer_fixture()
       admin = admin_fixture()

@@ -106,6 +106,33 @@ defmodule MiwayCreditCoreWeb.CustomerKycAuditTest do
     refute metadata_contains?(entry, "sensitive document bytes")
   end
 
+  test "an upload blocked by the malware scanner is audited and never reaches disk", %{
+    conn: conn,
+    org_admin: org_admin,
+    customer: customer
+  } do
+    conn = login(conn, org_admin)
+    path = Path.join(System.tmp_dir!(), "blocked_test_upload_#{System.unique_integer([:positive])}")
+    File.write!(path, "eicar test string")
+    upload = %Plug.Upload{path: path, filename: "nrc.jpg", content_type: "image/jpeg"}
+
+    MiwayCreditCore.Customers.MalwareScanner.Test.set_result({:infected, "Test.Signature"})
+
+    conn =
+      post(conn, ~p"/admin/customers/#{customer.id}/kyc_documents",
+        kyc_document: %{"document_type" => "nrc_copy", "file" => upload}
+      )
+
+    assert redirected_to(conn) == ~p"/admin/customers/#{customer.id}"
+    assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "security scan"
+
+    entry = AuditLogs.list_recent(%Scope{organisation_id: customer.organisation_id}, 1) |> hd()
+    assert entry.event == "kyc_document_scan_blocked"
+    refute metadata_contains?(entry, "eicar test string")
+
+    assert MiwayCreditCore.Customers.list_kyc_documents_for_customer(%Scope{organisation_id: customer.organisation_id}, customer.id) == []
+  end
+
   test "downloading a KYC document returns the original bytes, decrypted end-to-end", %{
     conn: conn,
     org_admin: org_admin,

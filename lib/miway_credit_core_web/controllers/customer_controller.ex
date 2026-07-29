@@ -288,6 +288,21 @@ defmodule MiwayCreditCoreWeb.CustomerController do
         |> put_flash(:info, "Document uploaded.")
         |> redirect(to: ~p"/admin/customers/#{customer}")
 
+      {:error, {:blocked, reason}} ->
+        AuditLogs.log("kyc_document_scan_blocked",
+          actor_id: conn.assigns.current_user.id,
+          actor_email: conn.assigns.current_user.email,
+          target_type: "customer",
+          target_id: customer.id,
+          ip_address: get_ip(conn),
+          organisation_id: customer.organisation_id,
+          metadata: %{document_type: document_type, reason: inspect(reason)}
+        )
+
+        conn
+        |> put_flash(:error, "This file could not be uploaded — it failed a security scan.")
+        |> redirect(to: ~p"/admin/customers/#{customer}")
+
       {:error, changeset} ->
         render_show_with_errors(conn, customer, kyc_document_changeset: changeset)
     end

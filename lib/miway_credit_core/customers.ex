@@ -1,7 +1,7 @@
 defmodule MiwayCreditCore.Customers do
   import Ecto.Query
   alias MiwayCreditCore.Repo
-  alias MiwayCreditCore.Customers.{Customer, NextOfKin, Guarantor, KycDocument, Consent, DocumentStorage}
+  alias MiwayCreditCore.Customers.{Customer, NextOfKin, Guarantor, KycDocument, Consent, DocumentStorage, MalwareScanner}
   alias MiwayCreditCore.Accounts.Scope
 
   @doc """
@@ -245,8 +245,22 @@ defmodule MiwayCreditCore.Customers do
     |> Repo.get!(id)
   end
 
-  @doc "organisation_id derives from the Customer, never from attrs. Stores the file on disk first, then its metadata."
+  @doc """
+  organisation_id derives from the Customer, never from attrs. Scans
+  the upload (still plaintext, before DocumentStorage encrypts it —
+  a scanner can't meaningfully inspect ciphertext) before ever storing
+  it; a blocked upload never touches disk, so there's nothing to clean
+  up. Otherwise stores the file first, then its metadata.
+  """
   def create_kyc_document(%Customer{} = customer, %Plug.Upload{} = upload, document_type, uploaded_by_id) do
+    case MalwareScanner.scan(upload.path) do
+      :clean -> do_create_kyc_document(customer, upload, document_type, uploaded_by_id)
+      {:infected, reason} -> {:error, {:blocked, reason}}
+      {:error, reason} -> {:error, {:blocked, reason}}
+    end
+  end
+
+  defp do_create_kyc_document(%Customer{} = customer, %Plug.Upload{} = upload, document_type, uploaded_by_id) do
     {stored_filename, size_bytes} = DocumentStorage.store(upload, customer.organisation_id, customer.id)
 
     attrs = %{

@@ -19,7 +19,7 @@ defmodule MiwayCreditCore.AuditLogs do
     credit_report_recorded
     customer_created customer_deleted customer_updated
     guarantor_added guarantor_removed
-    kyc_document_removed kyc_document_uploaded kyc_rejected kyc_submitted_for_review kyc_verified
+    kyc_document_removed kyc_document_scan_blocked kyc_document_uploaded kyc_rejected kyc_submitted_for_review kyc_verified
     loan_account_disbursement_reversed
     loan_application_approved loan_application_assessed loan_application_conditionally_approved
     loan_application_conditions_cleared loan_application_created loan_application_disbursed
