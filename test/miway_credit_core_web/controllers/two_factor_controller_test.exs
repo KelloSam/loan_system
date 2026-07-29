@@ -8,6 +8,16 @@ defmodule MiwayCreditCoreWeb.TwoFactorControllerTest do
 
   @password "CorrectHorse123"
 
+  # Every test in this module posts to /login/verify, which is now
+  # IP-throttled (RateLimitPlug) on top of the account-lockout tests
+  # below doing several posts each — reset the shared ETS counter
+  # before every test so none of them can be pushed over the throttle
+  # by another test's requests landing in the same 60s window.
+  setup do
+    PlugAttack.Storage.Ets.clean(MiwayCreditCoreWeb.RateLimitStorage)
+    :ok
+  end
+
   test "confirming a correct code logs a staff member in and redirects to /admin/dashboard", %{conn: conn} do
     user = staff_member_fixture("loan_officer", %{password: @password})
     secret = Accounts.generate_totp_secret()
