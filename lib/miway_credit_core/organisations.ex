@@ -6,7 +6,9 @@ defmodule MiwayCreditCore.Organisations do
   context depends on nothing else; other contexts depend on it.
   """
 
+  import Ecto.Query
   alias MiwayCreditCore.Repo
+  alias MiwayCreditCore.Accounts.Scope
 
   alias MiwayCreditCore.Organisations.{
     Organisation,
@@ -43,10 +45,39 @@ defmodule MiwayCreditCore.Organisations do
     Repo.get_by(OrganisationSettings, organisation_id: organisation_id)
   end
 
-  def create_branch(attrs \\ %{}) do
+  @doc "All branches for the caller's organisation, newest-name-first — includes inactive ones (an admin needs to see one to reactivate it)."
+  def list_branches(%Scope{} = scope) do
+    Branch
+    |> scope_organisation(scope)
+    |> order_by([b], asc: b.name)
+    |> Repo.all()
+  end
+
+  def get_branch!(%Scope{} = scope, id) do
+    Branch
+    |> scope_organisation(scope)
+    |> Repo.get!(id)
+  end
+
+  def create_branch(%Scope{organisation_id: organisation_id}, _attrs) when organisation_id == :all do
+    raise ArgumentError, "create_branch/2 requires a concrete organisation scope, not :all"
+  end
+
+  def create_branch(%Scope{organisation_id: organisation_id}, attrs) do
+    # attrs may be atom-keyed (internal/fixture callers) or string-keyed
+    # (form params) — normalize before merging so cast/3 never sees a
+    # map with mixed key types.
+    attrs = Map.new(attrs, fn {k, v} -> {to_string(k), v} end)
+
     %Branch{}
-    |> Branch.changeset(attrs)
+    |> Branch.changeset(Map.put(attrs, "organisation_id", organisation_id))
     |> Repo.insert()
+  end
+
+  def update_branch(%Branch{} = branch, attrs) do
+    branch
+    |> Branch.changeset(attrs)
+    |> Repo.update()
   end
 
   def create_department(attrs \\ %{}) do
@@ -79,5 +110,10 @@ defmodule MiwayCreditCore.Organisations do
       branch_id: branch_id
     })
     |> Repo.insert()
+  end
+
+  defp scope_organisation(query, %Scope{organisation_id: :all}), do: query
+  defp scope_organisation(query, %Scope{organisation_id: organisation_id}) do
+    where(query, organisation_id: ^organisation_id)
   end
 end

@@ -2,6 +2,7 @@ defmodule MiwayCreditCore.OrganisationsFixtures do
   @moduledoc "Test helpers for creating MiwayCreditCore.Organisations entities."
 
   alias MiwayCreditCore.{Organisations, Authorization}
+  alias MiwayCreditCore.Accounts.Scope
 
   def valid_organisation_attrs(attrs \\ %{}) do
     Enum.into(attrs, %{name: "Test Org #{System.unique_integer([:positive])}"})
@@ -14,14 +15,15 @@ defmodule MiwayCreditCore.OrganisationsFixtures do
   end
 
   def branch_fixture(%Organisations.Organisation{} = organisation, attrs \\ %{}) do
+    scope = %Scope{organisation_id: organisation.id}
+
     {:ok, branch} =
       attrs
       |> Enum.into(%{
-        organisation_id: organisation.id,
         name: "Test Branch #{System.unique_integer([:positive])}",
         code: "BR#{System.unique_integer([:positive])}"
       })
-      |> Organisations.create_branch()
+      |> then(&Organisations.create_branch(scope, &1))
 
     branch
   end

@@ -105,6 +105,7 @@ defmodule MiwayCreditCoreWeb.Router do
     resources "/products", ProductController, except: [:show, :delete]
     patch "/products/:id/retire", ProductController, :retire
     patch "/products/:id/activate", ProductController, :activate
+    resources "/branches", BranchController, except: [:show, :delete]
     resources "/loans", LoanController
     patch "/loans/:id/assess", LoanController, :assess
     patch "/loans/:id/approve", LoanController, :approve

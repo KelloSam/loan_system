@@ -600,6 +600,47 @@ defmodule MiwayCreditCoreWeb.PermissionEnforcementTest do
     end
   end
 
+  describe "branches.view / branches.manage — loan_officer can see, only org_admin can write" do
+    test "loan_officer can list branches (granted branches.view by default)", %{conn: conn, loan_officer: loan_officer} do
+      conn = conn |> login(loan_officer) |> get(~p"/admin/branches")
+      assert html_response(conn, 200)
+    end
+
+    test "loan_officer is refused a real 403 creating a branch", %{conn: conn, loan_officer: loan_officer} do
+      conn = conn |> login(loan_officer) |> get(~p"/admin/branches/new")
+      assert conn.status == 403
+    end
+
+    test "loan_officer is refused a real 403 posting a new branch directly, not just hidden from the menu", %{
+      conn: conn,
+      loan_officer: loan_officer
+    } do
+      conn =
+        conn
+        |> login(loan_officer)
+        |> post(~p"/admin/branches", branch: valid_branch_attrs())
+
+      assert conn.status == 403
+    end
+
+    test "org_admin can create and edit a branch", %{conn: conn, org_admin: org_admin} do
+      conn = conn |> login(org_admin)
+
+      conn = post(conn, ~p"/admin/branches", branch: valid_branch_attrs())
+      assert redirected_to(conn) == ~p"/admin/branches"
+
+      branch = MiwayCreditCore.Repo.get_by!(MiwayCreditCore.Organisations.Branch, code: valid_branch_attrs()["code"])
+
+      conn = put(conn, ~p"/admin/branches/#{branch.id}", branch: %{"name" => "Renamed Branch"})
+      assert redirected_to(conn) == ~p"/admin/branches"
+      assert MiwayCreditCore.Repo.get!(MiwayCreditCore.Organisations.Branch, branch.id).name == "Renamed Branch"
+    end
+  end
+
+  defp valid_branch_attrs do
+    %{"name" => "Permission Test Branch", "code" => "PTB1"}
+  end
+
   defp valid_product_attrs do
     %{
       "name" => "Permission Test Product",

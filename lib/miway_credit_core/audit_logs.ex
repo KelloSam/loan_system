@@ -11,6 +11,7 @@ defmodule MiwayCreditCore.AuditLogs do
   # Authorization module's @permission_keys precedent.
   @event_names ~w(
     2fa_blocked_lockout 2fa_disabled 2fa_enabled 2fa_failure 2fa_success
+    branch_created branch_updated
     collateral_added collateral_removed
     collection_activity_logged collection_case_closed collection_case_escalated
     collection_recovery_status_set

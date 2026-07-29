@@ -42,6 +42,8 @@ defmodule MiwayCreditCore.Authorization do
     collateral.manage
     products.view
     products.manage
+    branches.view
+    branches.manage
     reports.view
     audit.view
     collections.view
@@ -73,6 +75,7 @@ defmodule MiwayCreditCore.Authorization do
       customers.manage
       customers.view
       products.view
+      branches.view
       reports.view
       collections.view
       collections.manage

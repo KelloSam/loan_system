@@ -1,0 +1,49 @@
+<div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+  <div>
+    <h1 class="text-2xl font-bold text-navy-900">Branches</h1>
+    <p class="mt-0.5 text-sm text-gray-500">Physical locations belonging to your organisation</p>
+  </div>
+  <%= link "New Branch", to: ~p"/admin/branches/new", class: "btn-primary self-start" %>
+</div>
+
+<div class="card overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="min-w-full">
+      <thead>
+        <tr class="bg-gray-50 border-b border-gray-100">
+          <th class="th">Name</th>
+          <th class="th">Code</th>
+          <th class="th hidden sm:table-cell">Address</th>
+          <th class="th">Status</th>
+          <th class="th text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        <%= for branch <- @branches do %>
+          <tr class="hover:bg-gray-50 transition-colors">
+            <td class="td">
+              <p class="font-medium text-navy-900"><%= branch.name %></p>
+            </td>
+            <td class="td text-gray-700"><%= branch.code %></td>
+            <td class="td text-gray-500 hidden sm:table-cell"><%= branch.address %></td>
+            <td class="td">
+              <%= if branch.active do %>
+                <span class="badge badge-active">Active</span>
+              <% else %>
+                <span class="badge badge-inactive">Inactive</span>
+              <% end %>
+            </td>
+            <td class="td text-right">
+              <%= link "Edit", to: ~p"/admin/branches/#{branch}/edit", class: "text-sm font-medium text-navy-600 hover:text-navy-900" %>
+            </td>
+          </tr>
+        <% end %>
+        <%= if Enum.empty?(@branches) do %>
+          <tr>
+            <td colspan="5" class="py-12 text-center text-sm text-gray-400">No branches configured yet.</td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+</div>

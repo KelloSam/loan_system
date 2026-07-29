@@ -6,6 +6,7 @@ defmodule MiwayCreditCore.OrganisationsTest do
 
   alias MiwayCreditCore.{Organisations, Accounts, Repo}
   alias MiwayCreditCore.Organisations.{Organisation, OrganisationSettings}
+  alias MiwayCreditCore.Accounts.Scope
 
   describe "create_organisation/1" do
     test "creates an Organisation and its default OrganisationSettings" do
@@ -29,19 +30,62 @@ defmodule MiwayCreditCore.OrganisationsTest do
     assert Organisations.get_organisation!(organisation.id).id == organisation.id
   end
 
-  describe "create_branch/1" do
-    test "creates a branch under an organisation" do
+  describe "create_branch/2" do
+    test "creates a branch under the scope's organisation" do
       organisation = organisation_fixture()
-      assert {:ok, branch} = Organisations.create_branch(%{organisation_id: organisation.id, name: "HQ", code: "HQ1"})
+      scope = %Scope{organisation_id: organisation.id}
+
+      assert {:ok, branch} = Organisations.create_branch(scope, %{"name" => "HQ", "code" => "HQ1"})
       assert branch.organisation_id == organisation.id
     end
 
     test "rejects a duplicate code within the same organisation" do
       organisation = organisation_fixture()
+      scope = %Scope{organisation_id: organisation.id}
       branch_fixture(organisation, %{code: "DUP"})
-      assert {:error, changeset} =
-               Organisations.create_branch(%{organisation_id: organisation.id, name: "Other", code: "DUP"})
+
+      assert {:error, changeset} = Organisations.create_branch(scope, %{"name" => "Other", "code" => "DUP"})
       assert errors_on(changeset).organisation_id
+    end
+
+    test "requires a concrete organisation scope, not :all" do
+      assert_raise ArgumentError, ~r/not :all/, fn ->
+        Organisations.create_branch(%Scope{organisation_id: :all}, %{"name" => "HQ", "code" => "HQ1"})
+      end
+    end
+  end
+
+  describe "list_branches/1 and get_branch!/2" do
+    test "lists only the scope's organisation's branches, newest-name-first" do
+      org_a = organisation_fixture()
+      org_b = organisation_fixture()
+      branch_a = branch_fixture(org_a, %{name: "Alpha"})
+      _branch_b = branch_fixture(org_b, %{name: "Beta"})
+
+      scope_a = %Scope{organisation_id: org_a.id}
+      assert [found] = Organisations.list_branches(scope_a)
+      assert found.id == branch_a.id
+    end
+
+    test "platform-administrator :all scope sees every organisation's branches" do
+      org_a = organisation_fixture()
+      org_b = organisation_fixture()
+      branch_a = branch_fixture(org_a)
+      branch_b = branch_fixture(org_b)
+
+      all_scope = %Scope{organisation_id: :all}
+      ids = Organisations.list_branches(all_scope) |> Enum.map(& &1.id)
+      assert branch_a.id in ids
+      assert branch_b.id in ids
+    end
+
+    test "get_branch!/2 raises for a different organisation's branch" do
+      org_a = organisation_fixture()
+      org_b = organisation_fixture()
+      branch = branch_fixture(org_a)
+      other_scope = %Scope{organisation_id: org_b.id}
+
+      assert_raise Ecto.NoResultsError, fn -> Organisations.get_branch!(other_scope, branch.id) end
     end
   end
 
