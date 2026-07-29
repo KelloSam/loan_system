@@ -26,6 +26,11 @@ defmodule MiwayCreditCore.Payments.PaymentTransaction do
     field :voided_at, :utc_datetime
     field :void_reason, :string
 
+    # A client-supplied nonce, one per form render — lets record_payment/2
+    # tell a genuine second payment apart from a double-submit of the
+    # same one. Optional: only form-originated payments carry it.
+    field :idempotency_key, :string
+
     field :failed_at, :utc_datetime
     field :fail_reason, :string
 
@@ -43,7 +48,7 @@ defmodule MiwayCreditCore.Payments.PaymentTransaction do
   def changeset(payment_transaction, attrs) do
     payment_transaction
     |> cast(attrs, [:organisation_id, :loan_account_id, :amount, :payable_amount, :overpayment_amount,
-                   :received_at, :method, :reference, :recorded_by_id, :notes])
+                   :received_at, :method, :reference, :recorded_by_id, :notes, :idempotency_key])
     |> validate_required([:organisation_id, :loan_account_id, :amount, :payable_amount, :received_at, :method,
                           :recorded_by_id])
     |> validate_inclusion(:method, @methods)
@@ -53,6 +58,7 @@ defmodule MiwayCreditCore.Payments.PaymentTransaction do
     |> foreign_key_constraint(:organisation_id)
     |> foreign_key_constraint(:loan_account_id)
     |> foreign_key_constraint(:recorded_by_id)
+    |> unique_constraint(:idempotency_key, name: :payment_transactions_loan_account_id_idempotency_key_index)
   end
 
   @doc "Records a payment attempt that never reconciled — no allocation or balance effect."

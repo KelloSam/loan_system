@@ -489,6 +489,7 @@
     <h2 class="section-title mb-4">Record Payment</h2>
     <.form :let={f} for={@payment_changeset} action={~p"/admin/loans/#{@application}/payments"}
            class="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
+      <%= hidden_input f, :idempotency_key %>
       <div>
         <label class="form-label">Amount (ZMW)</label>
         <p class="form-hint -mt-1 mb-1">Max: ZMW <%= @account.outstanding_balance %></p>

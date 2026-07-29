@@ -57,12 +57,32 @@ defmodule MiwayCreditCore.Payments do
   another organisation's account by submitting a foreign id directly.
   """
   def record_payment(%Scope{} = scope, attrs \\ %{}) do
-    loan_account_id = Map.get(attrs, :loan_account_id) || Map.get(attrs, "loan_account_id")
+    loan_account_id  = Map.get(attrs, :loan_account_id) || Map.get(attrs, "loan_account_id")
+    idempotency_key  = Map.get(attrs, :idempotency_key) || Map.get(attrs, "idempotency_key")
     amount           = decimal(Map.get(attrs, :amount) || Map.get(attrs, "amount"))
     account          = loan_account_id && get_scoped_account(scope, loan_account_id)
     payable          = account && amount && decimal_min(amount, account.outstanding_balance)
     overpayment      = payable && Decimal.sub(amount, payable)
 
+    existing =
+      loan_account_id && idempotency_key &&
+        find_by_idempotency_key(scope, loan_account_id, idempotency_key)
+
+    if existing do
+      {:ok, existing}
+    else
+      do_record_payment(attrs, account, payable, overpayment)
+    end
+  end
+
+  defp find_by_idempotency_key(%Scope{} = scope, loan_account_id, idempotency_key) do
+    PaymentTransaction
+    |> scope_organisation(scope)
+    |> where([t], t.loan_account_id == ^loan_account_id and t.idempotency_key == ^idempotency_key)
+    |> Repo.one()
+  end
+
+  defp do_record_payment(attrs, account, payable, overpayment) do
     attrs =
       attrs
       |> stringify_keys()

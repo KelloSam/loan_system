@@ -292,6 +292,45 @@ defmodule MiwayCreditCore.PaymentsTest do
     end
   end
 
+  describe "record_payment/2 idempotency" do
+    test "the same idempotency_key submitted twice returns the same transaction, not a duplicate" do
+      application = approved_application_fixture()
+      scope = %Scope{organisation_id: application.organisation_id}
+      account = application.loan_account
+      attrs = valid_payment_attrs(account, %{"idempotency_key" => "dup-key-1"})
+
+      assert {:ok, first} = Payments.record_payment(scope, attrs)
+      assert {:ok, second} = Payments.record_payment(scope, attrs)
+      assert second.id == first.id
+
+      assert Payments.list_transactions_for_account(scope, account.id) |> length() == 1
+    end
+
+    test "a different idempotency_key on the same account still creates a second transaction" do
+      application = approved_application_fixture()
+      scope = %Scope{organisation_id: application.organisation_id}
+      account = application.loan_account
+
+      assert {:ok, first} = Payments.record_payment(scope, valid_payment_attrs(account, %{"idempotency_key" => "key-a"}))
+      assert {:ok, second} = Payments.record_payment(scope, valid_payment_attrs(account, %{"idempotency_key" => "key-b"}))
+
+      assert first.id != second.id
+      assert Payments.list_transactions_for_account(scope, account.id) |> length() == 2
+    end
+
+    test "no idempotency_key at all behaves exactly as before — every call inserts" do
+      application = approved_application_fixture()
+      scope = %Scope{organisation_id: application.organisation_id}
+      account = application.loan_account
+
+      assert {:ok, first} = payment_result(scope, account, "50.00")
+      assert {:ok, second} = payment_result(scope, account, "50.00")
+
+      assert first.id != second.id
+      assert Payments.list_transactions_for_account(scope, account.id) |> length() == 2
+    end
+  end
+
   defp payment_result(scope, account, amount) do
     Payments.record_payment(scope, valid_payment_attrs(account, %{"amount" => amount}))
   end

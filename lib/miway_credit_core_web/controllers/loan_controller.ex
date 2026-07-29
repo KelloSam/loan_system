@@ -27,7 +27,7 @@ defmodule MiwayCreditCoreWeb.LoanController do
     scope = conn.assigns.current_scope
     application = Applications.get_application!(scope, id)
     fraud_signals = Applications.fraud_signals(application)
-    payment_changeset = PaymentTransaction.changeset(%PaymentTransaction{}, %{})
+    payment_changeset = PaymentTransaction.changeset(%PaymentTransaction{}, %{idempotency_key: Ecto.UUID.generate()})
     failed_payment_changeset = PaymentTransaction.failed_attempt_changeset(%PaymentTransaction{}, %{})
     collateral_changeset = Collateral.changeset(%Collateral{}, %{})
 
@@ -735,7 +735,7 @@ defmodule MiwayCreditCoreWeb.LoanController do
         interest: interest,
         installments: installments,
         transactions: transactions,
-        payment_changeset: PaymentTransaction.changeset(%PaymentTransaction{}, %{}),
+        payment_changeset: PaymentTransaction.changeset(%PaymentTransaction{}, %{idempotency_key: Ecto.UUID.generate()}),
         failed_payment_changeset: PaymentTransaction.failed_attempt_changeset(%PaymentTransaction{}, %{}),
         collateral_changeset: Collateral.changeset(%Collateral{}, %{}),
         collaterals: collaterals,
