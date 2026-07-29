@@ -65,7 +65,9 @@ defmodule MiwayCreditCore.Accounts do
   end
 
   # ---------------------------------------------------------------------------
-  # Authentication with lockout protection
+  # Authentication with lockout protection — shared by the password step
+  # (authenticate_user/2 below) and the TOTP step
+  # (TwoFactorController.confirm/2), so a lockout blocks both stages of login.
   # ---------------------------------------------------------------------------
 
   @max_attempts 5
@@ -103,13 +105,19 @@ defmodule MiwayCreditCore.Accounts do
     end
   end
 
-  defp account_locked?(%User{locked_until: nil}), do: false
+  @doc "Returns true if the account is currently locked out of both the password and TOTP login steps."
+  def account_locked?(%User{locked_until: nil}), do: false
 
-  defp account_locked?(%User{locked_until: locked_until}) do
+  def account_locked?(%User{locked_until: locked_until}) do
     NaiveDateTime.compare(NaiveDateTime.utc_now(), locked_until) == :lt
   end
 
-  defp increment_failed_attempts(user) do
+  @doc """
+  Records a failed authentication attempt (wrong password or wrong TOTP
+  code — both feed the same counter) and locks the account for
+  @lockout_minutes once @max_attempts is reached.
+  """
+  def increment_failed_attempts(user) do
     new_attempts = (user.failed_attempts || 0) + 1
 
     attrs =
@@ -127,9 +135,10 @@ defmodule MiwayCreditCore.Accounts do
     user |> User.security_changeset(attrs) |> Repo.update()
   end
 
-  defp reset_failed_attempts(%User{failed_attempts: 0, locked_until: nil}), do: :ok
+  @doc "Clears failed_attempts/locked_until after a successful password or TOTP check."
+  def reset_failed_attempts(%User{failed_attempts: 0, locked_until: nil}), do: :ok
 
-  defp reset_failed_attempts(user) do
+  def reset_failed_attempts(user) do
     user
     |> User.security_changeset(%{failed_attempts: 0, locked_until: nil})
     |> Repo.update()

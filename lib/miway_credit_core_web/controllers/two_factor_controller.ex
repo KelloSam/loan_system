@@ -26,33 +26,68 @@ defmodule MiwayCreditCoreWeb.TwoFactorController do
       user = Accounts.get_user!(user_id)
       clean_code = String.replace(code, " ", "")
 
-      if Accounts.valid_totp?(user, clean_code) do
-        AuditLogs.log("2fa_success",
-          actor_id: user.id,
-          actor_email: user.email,
-          ip_address: get_ip(conn)
-        )
+      cond do
+        Accounts.account_locked?(user) ->
+          locked_response(conn, user)
 
-        conn
-        |> delete_session(:pending_2fa_user_id)
-        |> put_session(:user_id, user.id)
-        |> put_session(:user_email, user.email)
-        |> put_session(:authenticated_at, NaiveDateTime.utc_now())
-        |> put_flash(:info, "Welcome back!")
-        |> redirect(to: user_redirect_path(user))
-      else
-        AuditLogs.log("2fa_failure",
-          actor_id: user.id,
-          actor_email: user.email,
-          ip_address: get_ip(conn)
-        )
+        Accounts.valid_totp?(user, clean_code) ->
+          success_response(conn, user)
 
-        conn
-        |> put_layout(html: false)
-        |> put_flash(:error, "Invalid code. Please try again.")
-        |> render(:verify)
+        true ->
+          failure_response(conn, user)
       end
     end
+  end
+
+  defp success_response(conn, user) do
+    Accounts.reset_failed_attempts(user)
+
+    AuditLogs.log("2fa_success",
+      actor_id: user.id,
+      actor_email: user.email,
+      ip_address: get_ip(conn)
+    )
+
+    conn
+    |> delete_session(:pending_2fa_user_id)
+    |> put_session(:user_id, user.id)
+    |> put_session(:user_email, user.email)
+    |> put_session(:authenticated_at, NaiveDateTime.utc_now())
+    |> put_flash(:info, "Welcome back!")
+    |> redirect(to: user_redirect_path(user))
+  end
+
+  defp failure_response(conn, user) do
+    Accounts.increment_failed_attempts(user)
+
+    AuditLogs.log("2fa_failure",
+      actor_id: user.id,
+      actor_email: user.email,
+      ip_address: get_ip(conn)
+    )
+
+    conn
+    |> put_layout(html: false)
+    |> put_flash(:error, "Invalid code. Please try again.")
+    |> render(:verify)
+  end
+
+  # Same wording as SessionController.create/2's lockout message — the
+  # user experience should be indistinguishable regardless of whether
+  # the password step or this TOTP step triggered the lock.
+  defp locked_response(conn, user) do
+    remaining = max(1, div(NaiveDateTime.diff(user.locked_until, NaiveDateTime.utc_now(), :second), 60))
+
+    AuditLogs.log("2fa_blocked_lockout",
+      actor_id: user.id,
+      actor_email: user.email,
+      ip_address: get_ip(conn)
+    )
+
+    conn
+    |> put_layout(html: false)
+    |> put_flash(:error, "Account locked after too many failed attempts. Try again in #{remaining} minute(s).")
+    |> render(:verify)
   end
 
   # ---------------------------------------------------------------------------

@@ -159,6 +159,37 @@ defmodule MiwayCreditCore.AccountsTest do
     end
   end
 
+  describe "account_locked?/1, increment_failed_attempts/1, reset_failed_attempts/1 (now public — shared with the TOTP step)" do
+    test "account_locked?/1 is false for a fresh user, true once locked_until is in the future" do
+      user = user_fixture(%{password: "CorrectHorse123"})
+      refute Accounts.account_locked?(user)
+
+      user = %{user | locked_until: NaiveDateTime.utc_now() |> NaiveDateTime.add(60, :second)}
+      assert Accounts.account_locked?(user)
+    end
+
+    test "increment_failed_attempts/1 locks the account on the 5th call" do
+      user = user_fixture(%{password: "CorrectHorse123"})
+
+      user =
+        Enum.reduce(1..5, user, fn _, acc ->
+          {:ok, updated} = Accounts.increment_failed_attempts(acc)
+          updated
+        end)
+
+      assert Accounts.account_locked?(user)
+    end
+
+    test "reset_failed_attempts/1 clears failed_attempts and locked_until" do
+      user = user_fixture(%{password: "CorrectHorse123"})
+      {:ok, user} = Accounts.increment_failed_attempts(user)
+
+      {:ok, reset} = Accounts.reset_failed_attempts(user)
+      assert reset.failed_attempts == 0
+      assert reset.locked_until == nil
+    end
+  end
+
   describe "TOTP" do
     test "generate_totp_secret/0 returns a 20-byte binary" do
       secret = Accounts.generate_totp_secret()

@@ -44,13 +44,14 @@ defmodule MiwayCreditCoreWeb.Router do
     plug MiwayCreditCoreWeb.Plugs.RateLimitPlug
   end
 
-  # Rate-limited (login and password-reset-request POSTs only) — guards
-  # against credential-stuffing / reset-spam across many accounts from
-  # a single IP.
+  # Rate-limited (login, TOTP-verify, and password-reset-request POSTs
+  # only) — guards against credential-stuffing / TOTP brute-forcing /
+  # reset-spam across many accounts from a single IP.
   scope "/", MiwayCreditCoreWeb do
     pipe_through [:browser, :rate_limited]
 
     post "/login", SessionController, :create
+    post "/login/verify", TwoFactorController, :confirm
     post "/password-reset", PasswordResetController, :create
   end
 
@@ -62,7 +63,6 @@ defmodule MiwayCreditCoreWeb.Router do
     get "/login", SessionController, :new
     delete "/logout", SessionController, :delete
     get "/login/verify", TwoFactorController, :verify
-    post "/login/verify", TwoFactorController, :confirm
     get "/password-reset", PasswordResetController, :new
     get "/password-reset/:token", PasswordResetController, :edit
     put "/password-reset/:token", PasswordResetController, :update
