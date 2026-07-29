@@ -61,6 +61,7 @@ defmodule MiwayCreditCoreWeb.CustomerController do
           target_type: "customer",
           target_id: customer.id,
           ip_address: get_ip(conn),
+          organisation_id: customer.organisation_id,
           metadata: %{name: customer.name, phone: customer.phone}
         )
 
@@ -90,6 +91,7 @@ defmodule MiwayCreditCoreWeb.CustomerController do
           target_type: "customer",
           target_id: customer.id,
           ip_address: get_ip(conn),
+          organisation_id: customer.organisation_id,
           metadata: %{name: customer.name}
         )
 
@@ -113,6 +115,7 @@ defmodule MiwayCreditCoreWeb.CustomerController do
           target_type: "customer",
           target_id: customer.id,
           ip_address: get_ip(conn),
+          organisation_id: customer.organisation_id,
           metadata: %{name: customer.name}
         )
 
@@ -142,6 +145,7 @@ defmodule MiwayCreditCoreWeb.CustomerController do
           target_type: "next_of_kin",
           target_id: next_of_kin.id,
           ip_address: get_ip(conn),
+          organisation_id: customer.organisation_id,
           metadata: %{customer_id: customer.id, name: next_of_kin.name}
         )
 
@@ -167,6 +171,7 @@ defmodule MiwayCreditCoreWeb.CustomerController do
       target_type: "next_of_kin",
       target_id: next_of_kin.id,
       ip_address: get_ip(conn),
+      organisation_id: customer.organisation_id,
       metadata: %{customer_id: customer.id, name: next_of_kin.name}
     )
 
@@ -190,6 +195,7 @@ defmodule MiwayCreditCoreWeb.CustomerController do
           target_type: "guarantor",
           target_id: guarantor.id,
           ip_address: get_ip(conn),
+          organisation_id: customer.organisation_id,
           metadata: %{customer_id: customer.id, name: guarantor.name}
         )
 
@@ -214,6 +220,7 @@ defmodule MiwayCreditCoreWeb.CustomerController do
           target_type: "credit_report",
           target_id: credit_report.id,
           ip_address: get_ip(conn),
+          organisation_id: customer.organisation_id,
           metadata: %{customer_id: customer.id, outcome: credit_report.outcome}
         )
 
@@ -244,6 +251,7 @@ defmodule MiwayCreditCoreWeb.CustomerController do
       target_type: "guarantor",
       target_id: guarantor.id,
       ip_address: get_ip(conn),
+      organisation_id: customer.organisation_id,
       metadata: %{customer_id: customer.id, name: guarantor.name}
     )
 
@@ -272,6 +280,7 @@ defmodule MiwayCreditCoreWeb.CustomerController do
           target_type: "kyc_document",
           target_id: document.id,
           ip_address: get_ip(conn),
+          organisation_id: customer.organisation_id,
           metadata: %{customer_id: customer.id, document_type: document.document_type}
         )
 
@@ -320,6 +329,7 @@ defmodule MiwayCreditCoreWeb.CustomerController do
       target_type: "kyc_document",
       target_id: document.id,
       ip_address: get_ip(conn),
+      organisation_id: customer.organisation_id,
       metadata: %{customer_id: customer.id, document_type: document.document_type}
     )
 
@@ -343,6 +353,7 @@ defmodule MiwayCreditCoreWeb.CustomerController do
           target_type: "consent",
           target_id: consent.id,
           ip_address: get_ip(conn),
+          organisation_id: customer.organisation_id,
           metadata: %{customer_id: customer.id, consent_type: consent.consent_type}
         )
 
@@ -368,6 +379,7 @@ defmodule MiwayCreditCoreWeb.CustomerController do
       target_type: "consent",
       target_id: consent.id,
       ip_address: get_ip(conn),
+      organisation_id: customer.organisation_id,
       metadata: %{customer_id: customer.id, consent_type: consent.consent_type}
     )
 
@@ -391,7 +403,8 @@ defmodule MiwayCreditCoreWeb.CustomerController do
       actor_email: conn.assigns.current_user.email,
       target_type: "customer",
       target_id: customer.id,
-      ip_address: get_ip(conn)
+      ip_address: get_ip(conn),
+      organisation_id: customer.organisation_id
     )
 
     conn
@@ -410,7 +423,8 @@ defmodule MiwayCreditCoreWeb.CustomerController do
       actor_email: conn.assigns.current_user.email,
       target_type: "customer",
       target_id: customer.id,
-      ip_address: get_ip(conn)
+      ip_address: get_ip(conn),
+      organisation_id: customer.organisation_id
     )
 
     conn
@@ -431,6 +445,7 @@ defmodule MiwayCreditCoreWeb.CustomerController do
       target_type: "customer",
       target_id: customer.id,
       ip_address: get_ip(conn),
+      organisation_id: customer.organisation_id,
       metadata: %{reason: reason}
     )
 

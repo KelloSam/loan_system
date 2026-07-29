@@ -88,7 +88,8 @@ defmodule MiwayCreditCoreWeb.TwoFactorController do
         AuditLogs.log("2fa_enabled",
           actor_id: user.id,
           actor_email: user.email,
-          ip_address: get_ip(conn)
+          ip_address: get_ip(conn),
+          organisation_id: scope_organisation_id(conn)
         )
 
         conn
@@ -110,7 +111,8 @@ defmodule MiwayCreditCoreWeb.TwoFactorController do
     AuditLogs.log("2fa_disabled",
       actor_id: user.id,
       actor_email: user.email,
-      ip_address: get_ip(conn)
+      ip_address: get_ip(conn),
+      organisation_id: scope_organisation_id(conn)
     )
 
     conn
@@ -123,4 +125,16 @@ defmodule MiwayCreditCoreWeb.TwoFactorController do
   end
 
   defp get_ip(conn), do: conn.remote_ip |> :inet.ntoa() |> to_string()
+
+  # These 2FA-settings actions run behind the :auth pipeline (unlike
+  # verify/confirm, the login-step actions, which are genuinely
+  # pre-auth), so a real scope is always assigned — except for a
+  # platform administrator, whose :all scope isn't a single org.
+  defp scope_organisation_id(conn) do
+    case conn.assigns[:current_scope] do
+      %{organisation_id: :all} -> nil
+      %{organisation_id: organisation_id} -> organisation_id
+      _ -> nil
+    end
+  end
 end

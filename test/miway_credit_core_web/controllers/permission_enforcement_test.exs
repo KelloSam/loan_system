@@ -189,6 +189,11 @@ defmodule MiwayCreditCoreWeb.PermissionEnforcementTest do
       assert conn.status == 403
     end
 
+    test "audit log CSV export: refused with a real 403", %{conn: conn, loan_officer: loan_officer} do
+      conn = conn |> login(loan_officer) |> get(~p"/admin/audit-logs/export.csv")
+      assert conn.status == 403
+    end
+
     test "Collections: log activity and record promise granted (collections.manage)", %{
       conn: conn, loan_officer: loan_officer, organisation: organisation, customer: customer
     } do
@@ -352,6 +357,12 @@ defmodule MiwayCreditCoreWeb.PermissionEnforcementTest do
     test "audit log: granted", %{conn: conn, org_admin: org_admin} do
       conn = conn |> login(org_admin)
       assert conn |> get(~p"/admin/audit-logs") |> html_response(200)
+    end
+
+    test "audit log CSV export: granted", %{conn: conn, org_admin: org_admin} do
+      conn = conn |> login(org_admin) |> get(~p"/admin/audit-logs/export.csv")
+      assert conn.status == 200
+      assert get_resp_header(conn, "content-type") |> hd() =~ "text/csv"
     end
 
     test "Restructuring: can approve a request filed by a different officer", %{

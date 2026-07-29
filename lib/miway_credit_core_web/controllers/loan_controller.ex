@@ -80,6 +80,7 @@ defmodule MiwayCreditCoreWeb.LoanController do
           target_type: "loan_application",
           target_id: application.id,
           ip_address: get_ip(conn),
+          organisation_id: application.organisation_id,
           metadata: %{requested_amount: application.requested_amount, customer_id: application.customer_id}
         )
 
@@ -182,6 +183,7 @@ defmodule MiwayCreditCoreWeb.LoanController do
           target_type: "loan_application",
           target_id: application.id,
           ip_address: get_ip(conn),
+          organisation_id: application.organisation_id,
           metadata: %{customer_id: application.customer_id}
         )
 
@@ -213,6 +215,7 @@ defmodule MiwayCreditCoreWeb.LoanController do
           target_type: "loan_application",
           target_id: application.id,
           ip_address: get_ip(conn),
+          organisation_id: application.organisation_id,
           metadata: %{requested_amount: application.requested_amount, customer_id: application.customer_id, level_status: application.status}
         )
 
@@ -245,6 +248,7 @@ defmodule MiwayCreditCoreWeb.LoanController do
           target_type: "loan_application",
           target_id: application.id,
           ip_address: get_ip(conn),
+          organisation_id: application.organisation_id,
           metadata: %{requested_amount: application.requested_amount, customer_id: application.customer_id, decline_reason_category: decline_reason_category}
         )
 
@@ -272,6 +276,7 @@ defmodule MiwayCreditCoreWeb.LoanController do
           target_type: "loan_application",
           target_id: application.id,
           ip_address: get_ip(conn),
+          organisation_id: application.organisation_id,
           metadata: %{customer_id: application.customer_id, conditions: conditions}
         )
 
@@ -298,6 +303,7 @@ defmodule MiwayCreditCoreWeb.LoanController do
           target_type: "loan_application",
           target_id: application.id,
           ip_address: get_ip(conn),
+          organisation_id: application.organisation_id,
           metadata: %{customer_id: application.customer_id, reason: reason}
         )
 
@@ -323,6 +329,7 @@ defmodule MiwayCreditCoreWeb.LoanController do
           target_type: "loan_application",
           target_id: application.id,
           ip_address: get_ip(conn),
+          organisation_id: application.organisation_id,
           metadata: %{customer_id: application.customer_id}
         )
 
@@ -376,6 +383,7 @@ defmodule MiwayCreditCoreWeb.LoanController do
           target_type: "loan_account",
           target_id: account.id,
           ip_address: get_ip(conn),
+          organisation_id: account.organisation_id,
           metadata: %{
             principal_amount: account.principal_amount,
             customer_id: account.customer_id,
@@ -424,6 +432,7 @@ defmodule MiwayCreditCoreWeb.LoanController do
           target_type: "loan_account",
           target_id: reversed_account.id,
           ip_address: get_ip(conn),
+          organisation_id: reversed_account.organisation_id,
           metadata: %{contract_reference: reversed_account.contract_reference, reason: reason}
         )
 
@@ -459,6 +468,7 @@ defmodule MiwayCreditCoreWeb.LoanController do
           target_type: "loan_application",
           target_id: application.id,
           ip_address: get_ip(conn),
+          organisation_id: application.organisation_id,
           metadata: %{customer_id: application.customer_id}
         )
 
@@ -502,6 +512,7 @@ defmodule MiwayCreditCoreWeb.LoanController do
             target_type: "payment_transaction",
             target_id: transaction.id,
             ip_address: get_ip(conn),
+            organisation_id: transaction.organisation_id,
             metadata: %{amount: transaction.amount, loan_account_id: account.id}
           )
 
@@ -547,6 +558,7 @@ defmodule MiwayCreditCoreWeb.LoanController do
             target_type: "payment_transaction",
             target_id: transaction.id,
             ip_address: get_ip(conn),
+            organisation_id: transaction.organisation_id,
             metadata: %{amount: transaction.amount, loan_account_id: account.id, fail_reason: transaction.fail_reason}
           )
 
@@ -578,6 +590,7 @@ defmodule MiwayCreditCoreWeb.LoanController do
               target_type: "payment_transaction",
               target_id: voided.id,
               ip_address: get_ip(conn),
+              organisation_id: voided.organisation_id,
               metadata: %{amount: voided.amount, void_reason: reason}
             )
 
@@ -616,6 +629,7 @@ defmodule MiwayCreditCoreWeb.LoanController do
               target_type: "payment_transaction",
               target_id: failed.id,
               ip_address: get_ip(conn),
+              organisation_id: failed.organisation_id,
               metadata: %{amount: failed.amount, fail_reason: reason}
             )
 
@@ -659,6 +673,7 @@ defmodule MiwayCreditCoreWeb.LoanController do
           target_type: "collateral",
           target_id: collateral.id,
           ip_address: get_ip(conn),
+          organisation_id: collateral.organisation_id,
           metadata: %{type: collateral.type, estimated_value: collateral.estimated_value, loan_account_id: account.id}
         )
 
@@ -684,6 +699,7 @@ defmodule MiwayCreditCoreWeb.LoanController do
       target_type: "collateral",
       target_id: collateral.id,
       ip_address: get_ip(conn),
+      organisation_id: collateral.organisation_id,
       metadata: %{type: collateral.type, estimated_value: collateral.estimated_value}
     )
 

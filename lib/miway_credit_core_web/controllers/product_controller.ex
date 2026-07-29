@@ -27,6 +27,7 @@ defmodule MiwayCreditCoreWeb.ProductController do
           target_type: "product",
           target_id: product.id,
           ip_address: get_ip(conn),
+          organisation_id: product.organisation_id,
           metadata: %{name: product.name, interest_rate: product.interest_rate}
         )
 
@@ -56,6 +57,7 @@ defmodule MiwayCreditCoreWeb.ProductController do
           target_type: "product",
           target_id: product.id,
           ip_address: get_ip(conn),
+          organisation_id: product.organisation_id,
           metadata: %{name: product.name}
         )
 
@@ -77,7 +79,8 @@ defmodule MiwayCreditCoreWeb.ProductController do
       actor_email: conn.assigns.current_user.email,
       target_type: "product",
       target_id: product.id,
-      ip_address: get_ip(conn)
+      ip_address: get_ip(conn),
+      organisation_id: product.organisation_id
     )
 
     conn
@@ -94,7 +97,8 @@ defmodule MiwayCreditCoreWeb.ProductController do
       actor_email: conn.assigns.current_user.email,
       target_type: "product",
       target_id: product.id,
-      ip_address: get_ip(conn)
+      ip_address: get_ip(conn),
+      organisation_id: product.organisation_id
     )
 
     conn

@@ -10,6 +10,7 @@ defmodule MiwayCreditCoreWeb.CustomerKycAuditTest do
 
   import MiwayCreditCore.{CustomersFixtures, OrganisationsFixtures}
   alias MiwayCreditCore.AuditLogs
+  alias MiwayCreditCore.Accounts.Scope
 
   setup do
     organisation = organisation_fixture()
@@ -35,7 +36,7 @@ defmodule MiwayCreditCoreWeb.CustomerKycAuditTest do
 
     assert redirected_to(conn) =~ ~r{^/admin/customers/}
 
-    entry = AuditLogs.list_recent(1) |> hd()
+    entry = AuditLogs.list_recent(%Scope{organisation_id: organisation.id}, 1) |> hd()
     assert entry.event == "customer_created"
     assert entry.target_type == "customer"
     refute metadata_contains?(entry, "888888/12/3")
@@ -51,7 +52,7 @@ defmodule MiwayCreditCoreWeb.CustomerKycAuditTest do
 
     assert redirected_to(conn) == ~p"/admin/customers/#{customer.id}"
 
-    entry = AuditLogs.list_recent(1) |> hd()
+    entry = AuditLogs.list_recent(%Scope{organisation_id: customer.organisation_id}, 1) |> hd()
     assert entry.event == "next_of_kin_added"
     assert entry.target_type == "next_of_kin"
   end
@@ -76,7 +77,7 @@ defmodule MiwayCreditCoreWeb.CustomerKycAuditTest do
 
     assert redirected_to(conn) == ~p"/admin/customers/#{customer.id}"
 
-    entry = AuditLogs.list_recent(1) |> hd()
+    entry = AuditLogs.list_recent(%Scope{organisation_id: customer.organisation_id}, 1) |> hd()
     assert entry.event == "guarantor_added"
     assert entry.target_type == "guarantor"
     refute metadata_contains?(entry, "777777/12/3")
@@ -99,7 +100,7 @@ defmodule MiwayCreditCoreWeb.CustomerKycAuditTest do
 
     assert redirected_to(conn) == ~p"/admin/customers/#{customer.id}"
 
-    entry = AuditLogs.list_recent(1) |> hd()
+    entry = AuditLogs.list_recent(%Scope{organisation_id: customer.organisation_id}, 1) |> hd()
     assert entry.event == "kyc_document_uploaded"
     assert entry.target_type == "kyc_document"
     refute metadata_contains?(entry, "sensitive document bytes")
@@ -113,7 +114,7 @@ defmodule MiwayCreditCoreWeb.CustomerKycAuditTest do
     conn = patch(conn, ~p"/admin/customers/#{customer.id}/kyc/verify")
     assert redirected_to(conn) == ~p"/admin/customers/#{customer.id}"
 
-    entry = AuditLogs.list_recent(1) |> hd()
+    entry = AuditLogs.list_recent(%Scope{organisation_id: customer.organisation_id}, 1) |> hd()
     assert entry.event == "kyc_verified"
     assert entry.target_type == "customer"
   end

@@ -76,6 +76,7 @@ defmodule MiwayCreditCoreWeb.Router do
     get "/reports", ReportController, :index
     get "/reports/export.csv", ReportController, :export_csv
     get "/audit-logs", AuditLogController, :index
+    get "/audit-logs/export.csv", AuditLogController, :export_csv
     get "/settings/2fa", TwoFactorController, :setup
     post "/settings/2fa/enable", TwoFactorController, :enable
     delete "/settings/2fa/disable", TwoFactorController, :disable

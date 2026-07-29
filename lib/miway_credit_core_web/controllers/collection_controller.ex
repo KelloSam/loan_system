@@ -31,6 +31,7 @@ defmodule MiwayCreditCoreWeb.CollectionController do
           target_type: "collection_activity",
           target_id: activity.id,
           ip_address: get_ip(conn),
+          organisation_id: application.organisation_id,
           metadata: %{activity_type: activity.activity_type, outcome: activity.outcome}
         )
 
@@ -56,6 +57,7 @@ defmodule MiwayCreditCoreWeb.CollectionController do
           target_type: "promise_to_pay",
           target_id: promise.id,
           ip_address: get_ip(conn),
+          organisation_id: application.organisation_id,
           metadata: %{promised_amount: promise.promised_amount, promised_date: promise.promised_date}
         )
 
@@ -78,7 +80,8 @@ defmodule MiwayCreditCoreWeb.CollectionController do
       actor_email: conn.assigns.current_user.email,
       target_type: "collection_case",
       target_id: collection_case.id,
-      ip_address: get_ip(conn)
+      ip_address: get_ip(conn),
+      organisation_id: application.organisation_id
     )
 
     conn |> put_flash(:info, "Case escalated.") |> redirect(to: ~p"/admin/loans/#{application}")
@@ -98,6 +101,7 @@ defmodule MiwayCreditCoreWeb.CollectionController do
       target_type: "collection_case",
       target_id: collection_case.id,
       ip_address: get_ip(conn),
+      organisation_id: application.organisation_id,
       metadata: %{reason: reason}
     )
 
@@ -117,6 +121,7 @@ defmodule MiwayCreditCoreWeb.CollectionController do
           target_type: "collection_case",
           target_id: collection_case.id,
           ip_address: get_ip(conn),
+          organisation_id: application.organisation_id,
           metadata: %{recovery_status: recovery_status}
         )
 
@@ -140,6 +145,7 @@ defmodule MiwayCreditCoreWeb.CollectionController do
           target_type: "restructuring_request",
           target_id: request.id,
           ip_address: get_ip(conn),
+          organisation_id: application.organisation_id,
           metadata: %{additional_term_months: request.additional_term_months}
         )
 
@@ -162,7 +168,8 @@ defmodule MiwayCreditCoreWeb.CollectionController do
           actor_email: conn.assigns.current_user.email,
           target_type: "restructuring_request",
           target_id: approved.id,
-          ip_address: get_ip(conn)
+          ip_address: get_ip(conn),
+          organisation_id: application.organisation_id
         )
 
         conn |> put_flash(:info, "Restructuring approved — a new schedule has been generated.") |> redirect(to: ~p"/admin/loans/#{application}")
@@ -189,6 +196,7 @@ defmodule MiwayCreditCoreWeb.CollectionController do
       target_type: "restructuring_request",
       target_id: request.id,
       ip_address: get_ip(conn),
+      organisation_id: application.organisation_id,
       metadata: %{notes: notes}
     )
 
@@ -208,6 +216,7 @@ defmodule MiwayCreditCoreWeb.CollectionController do
           target_type: "write_off_request",
           target_id: request.id,
           ip_address: get_ip(conn),
+          organisation_id: application.organisation_id,
           metadata: %{requested_amount: request.requested_amount}
         )
 
@@ -230,7 +239,8 @@ defmodule MiwayCreditCoreWeb.CollectionController do
           actor_email: conn.assigns.current_user.email,
           target_type: "write_off_request",
           target_id: approved.id,
-          ip_address: get_ip(conn)
+          ip_address: get_ip(conn),
+          organisation_id: application.organisation_id
         )
 
         conn |> put_flash(:info, "Write-off approved — the balance has been zeroed.") |> redirect(to: ~p"/admin/loans/#{application}")
@@ -257,6 +267,7 @@ defmodule MiwayCreditCoreWeb.CollectionController do
       target_type: "write_off_request",
       target_id: request.id,
       ip_address: get_ip(conn),
+      organisation_id: application.organisation_id,
       metadata: %{notes: notes}
     )
 
