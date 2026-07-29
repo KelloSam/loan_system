@@ -6,9 +6,13 @@ defmodule MiwayCreditCore.CustomersKycTest do
   alias MiwayCreditCore.Accounts.Scope
 
   defp build_upload(content, filename \\ "id.jpg") do
+    build_upload(content, filename, "image/jpeg")
+  end
+
+  defp build_upload(content, filename, content_type) do
     path = Path.join(System.tmp_dir!(), "upload_test_#{System.unique_integer([:positive])}")
     File.write!(path, content)
-    %Plug.Upload{path: path, filename: filename, content_type: "image/jpeg"}
+    %Plug.Upload{path: path, filename: filename, content_type: content_type}
   end
 
   describe "customer_type / id_type validation" do
@@ -211,6 +215,49 @@ defmodule MiwayCreditCore.CustomersKycTest do
 
       other_scope = %Scope{organisation_id: organisation_fixture().id}
       assert_raise Ecto.NoResultsError, fn -> Customers.get_kyc_document!(other_scope, document.id) end
+    end
+
+    test "an unsupported content_type is rejected and the just-stored file is cleaned up" do
+      customer = customer_fixture()
+      admin = admin_fixture()
+      upload = build_upload("MZ...fake executable bytes", "malware.exe", "application/x-msdownload")
+
+      assert {:error, changeset} = Customers.create_kyc_document(customer, upload, "nrc_copy", admin.id)
+      assert errors_on(changeset).content_type
+
+      upload_dir =
+        MiwayCreditCore.Customers.DocumentStorage.read_path(customer.organisation_id, customer.id, "placeholder")
+        |> Path.dirname()
+
+      assert File.ls!(upload_dir) == []
+    end
+
+    test "a real PDF upload still succeeds" do
+      customer = customer_fixture()
+      admin = admin_fixture()
+      upload = build_upload("%PDF-1.4 fake but whitelisted content", "id.pdf", "application/pdf")
+
+      assert {:ok, document} = Customers.create_kyc_document(customer, upload, "nrc_copy", admin.id)
+      assert document.content_type == "application/pdf"
+    end
+
+    test "an oversized upload is rejected by the changeset" do
+      attrs = %{
+        organisation_id: Ecto.UUID.generate(),
+        customer_id: Ecto.UUID.generate(),
+        document_type: "nrc_copy",
+        stored_filename: "big.pdf",
+        original_filename: "big.pdf",
+        content_type: "application/pdf",
+        size_bytes: 10_000_001,
+        status: "active",
+        uploaded_by_id: admin_fixture().id,
+        uploaded_at: DateTime.utc_now() |> DateTime.truncate(:second)
+      }
+
+      changeset = MiwayCreditCore.Customers.KycDocument.changeset(%MiwayCreditCore.Customers.KycDocument{}, attrs)
+      refute changeset.valid?
+      assert changeset.errors[:size_bytes]
     end
   end
 

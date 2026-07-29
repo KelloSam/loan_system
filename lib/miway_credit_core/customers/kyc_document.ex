@@ -16,6 +16,8 @@ defmodule MiwayCreditCore.Customers.KycDocument do
 
   @document_types ~w(nrc_copy passport_copy proof_of_address payslip business_registration_certificate other)
   @statuses ~w(active removed)
+  @allowed_content_types ~w(application/pdf image/jpeg image/png)
+  @max_size_bytes 10_000_000
 
   @primary_key {:id, :binary_id, autogenerate: true}
   schema "kyc_documents" do
@@ -48,6 +50,10 @@ defmodule MiwayCreditCore.Customers.KycDocument do
     ])
     |> validate_inclusion(:document_type, @document_types)
     |> validate_inclusion(:status, @statuses)
+    |> validate_inclusion(:content_type, @allowed_content_types,
+      message: "must be a PDF, JPEG, or PNG file"
+    )
+    |> validate_number(:size_bytes, greater_than: 0, less_than_or_equal_to: @max_size_bytes)
     |> foreign_key_constraint(:organisation_id)
     |> foreign_key_constraint(:customer_id)
     |> foreign_key_constraint(:uploaded_by_id)
