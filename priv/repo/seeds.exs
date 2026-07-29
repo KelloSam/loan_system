@@ -3,6 +3,21 @@
 #     mix run priv/repo/seeds.exs
 #
 
+if Mix.env() == :prod do
+  raise """
+  Refusing to run this seed script against a production database.
+
+  These accounts use published, well-known passwords committed to source
+  control and must never exist in a real pilot's database. To create the
+  first real admin account, use:
+
+      ADMIN_EMAIL=you@realdomain.com ADMIN_PASSWORD='...' \\
+        bin/miway_credit_core eval "MiwayCreditCore.Release.create_platform_administrator"
+
+  See docs/MIWAY_CREDITCORE_DEPLOYMENT_RUNBOOK.md.
+  """
+end
+
 alias MiwayCreditCore.{Accounts, Customers, Authorization}
 alias MiwayCreditCore.Organisations.Organisation
 alias MiwayCreditCore.Accounts.Scope
