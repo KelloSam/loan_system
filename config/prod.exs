@@ -4,7 +4,17 @@ import Config
 
 config :miway_credit_core, MiwayCreditCore.Repo,
   # pool_size and DATABASE_URL are set via env vars in runtime.exs
-  ssl: true
+  #
+  # ssl_opts is required, not optional — bare ssl: true alone fails
+  # every connection, since Postgrex defaults verify: :verify_peer once
+  # SSL is on but supplies no CA store to verify against. cacerts_get/0
+  # loads the OTP-bundled trusted CA store, which validates any
+  # publicly-trusted managed Postgres cert (RDS, DigitalOcean, Render,
+  # Supabase, etc). A private/self-signed-CA deployment instead needs
+  # cacertfile: "/path/to/ca.pem" in place of cacerts: below — see
+  # docs/MIWAY_CREDITCORE_DEPLOYMENT_RUNBOOK.md.
+  ssl: true,
+  ssl_opts: [verify: :verify_peer, cacerts: :public_key.cacerts_get()]
 
 config :miway_credit_core, MiwayCreditCoreWeb.Endpoint,
   # Force HTTPS in production
