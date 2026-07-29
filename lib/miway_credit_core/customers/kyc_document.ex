@@ -8,14 +8,17 @@ defmodule MiwayCreditCore.Customers.KycDocument do
   Never hard-deleted — a mis-uploaded or superseded document is marked
   `status: "removed"` instead, the same "voided, not deleted" principle
   `PaymentTransaction` uses, so the audit trail always has something to
-  point at.
+  point at. Once removed, a retention window applies — see
+  `MiwayCreditCore.Customers.purge_expired_kyc_documents/0` — after
+  which the bytes are deleted from disk (`status: "purged"`) but this
+  row is kept as a tombstone, never the row itself.
   """
 
   use Ecto.Schema
   import Ecto.Changeset
 
   @document_types ~w(nrc_copy passport_copy proof_of_address payslip business_registration_certificate other)
-  @statuses ~w(active removed)
+  @statuses ~w(active removed purged)
   @allowed_content_types ~w(application/pdf image/jpeg image/png)
   @max_size_bytes 10_000_000
 
@@ -28,6 +31,7 @@ defmodule MiwayCreditCore.Customers.KycDocument do
     field :size_bytes, :integer
     field :status, :string, default: "active"
     field :uploaded_at, :utc_datetime
+    field :removed_at, :utc_datetime
 
     belongs_to :organisation, MiwayCreditCore.Organisations.Organisation, type: :binary_id
     belongs_to :customer, MiwayCreditCore.Customers.Customer, type: :binary_id
@@ -60,6 +64,11 @@ defmodule MiwayCreditCore.Customers.KycDocument do
   end
 
   def void_changeset(kyc_document) do
-    change(kyc_document, status: "removed")
+    change(kyc_document, status: "removed", removed_at: DateTime.utc_now() |> DateTime.truncate(:second))
+  end
+
+  @doc "The retention window has elapsed — the bytes are gone from disk, but this row (and stored_filename, as a historical pointer) stays, matching this schema's own tombstone philosophy."
+  def purge_changeset(kyc_document) do
+    change(kyc_document, status: "purged")
   end
 end

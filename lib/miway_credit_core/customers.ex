@@ -301,6 +301,37 @@ defmodule MiwayCreditCore.Customers do
     |> Repo.update()
   end
 
+  @doc """
+  Deletes the on-disk bytes (not the row — see `KycDocument`'s
+  moduledoc) for every "removed" document whose retention window has
+  elapsed. System-wide, no scope — the same shape as
+  `Lending.mark_overdue_installments/0`, a background job that isn't
+  triggered by any one organisation's request. Returns the list of
+  now-purged documents, so the caller (`KycRetentionScheduler`) can
+  audit-log each one — matching this codebase's own convention that
+  `AuditLogs.log/2` is only ever called from the web/scheduler layer,
+  never from inside a context.
+  """
+  def purge_expired_kyc_documents do
+    cutoff =
+      DateTime.utc_now()
+      |> DateTime.add(-retention_days() * 24 * 60 * 60, :second)
+      |> DateTime.truncate(:second)
+
+    KycDocument
+    |> where([d], d.status == "removed" and d.removed_at < ^cutoff)
+    |> Repo.all()
+    |> Enum.map(fn document ->
+      DocumentStorage.delete(document.organisation_id, document.customer_id, document.stored_filename)
+      {:ok, purged} = document |> KycDocument.purge_changeset() |> Repo.update()
+      purged
+    end)
+  end
+
+  defp retention_days do
+    Application.get_env(:miway_credit_core, :kyc_retention_days, 2555)
+  end
+
   # ---------------------------------------------------------------------------
   # Consent — never hard-deleted: revoke_consent/1 sets revoked_at.
   # ---------------------------------------------------------------------------

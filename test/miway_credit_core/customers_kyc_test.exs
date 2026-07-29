@@ -292,6 +292,52 @@ defmodule MiwayCreditCore.CustomersKycTest do
     end
   end
 
+  describe "purge_expired_kyc_documents/0" do
+    test "a removed document older than the retention window is purged — file gone, row kept as a tombstone" do
+      customer = customer_fixture()
+      admin = admin_fixture()
+      {:ok, document} = Customers.create_kyc_document(customer, build_upload("old content"), "nrc_copy", admin.id)
+      {:ok, removed} = Customers.remove_kyc_document(document)
+      backdate_removed_at(removed, 2556)
+
+      path = Customers.kyc_document_path(removed)
+      assert File.exists?(path)
+
+      assert [purged] = Customers.purge_expired_kyc_documents()
+      assert purged.id == document.id
+      assert purged.status == "purged"
+      refute File.exists?(path)
+    end
+
+    test "a removed document within the retention window is left alone" do
+      customer = customer_fixture()
+      admin = admin_fixture()
+      {:ok, document} = Customers.create_kyc_document(customer, build_upload("recent content"), "nrc_copy", admin.id)
+      {:ok, removed} = Customers.remove_kyc_document(document)
+      backdate_removed_at(removed, 10)
+
+      assert Customers.purge_expired_kyc_documents() == []
+      assert File.exists?(Customers.kyc_document_path(removed))
+    end
+
+    test "an active document is never purged regardless of age" do
+      customer = customer_fixture()
+      admin = admin_fixture()
+      {:ok, document} = Customers.create_kyc_document(customer, build_upload("active content"), "nrc_copy", admin.id)
+
+      assert Customers.purge_expired_kyc_documents() == []
+      assert File.exists?(Customers.kyc_document_path(document))
+    end
+
+    defp backdate_removed_at(document, days_ago) do
+      removed_at = DateTime.utc_now() |> DateTime.add(-days_ago * 24 * 60 * 60, :second) |> DateTime.truncate(:second)
+
+      document
+      |> Ecto.Changeset.change(removed_at: removed_at)
+      |> MiwayCreditCore.Repo.update!()
+    end
+  end
+
   describe "consents" do
     test "create/revoke and has_active_consent?/3" do
       customer = customer_fixture()

@@ -19,6 +19,17 @@ config :elixir, :time_zone_database, Tzdata.TimeZoneDatabase
 # Configure Decimal precision for money operations
 config :decimal, :precision, 28
 
+# How long a "removed" KYC document's on-disk bytes are kept before
+# KycRetentionScheduler purges them — 2555 days (~7 years) is a common
+# AML/KYC record-retention baseline in a number of jurisdictions, but
+# this is NOT a legal determination. This app is for a Zambian lending
+# operation — confirm the real applicable regulation (e.g. Bank of
+# Zambia / the relevant financial-sector regulator's KYC/AML retention
+# rules) before relying on this default in a real production
+# deployment. A developer should not be the one deciding this number
+# for a live compliance control.
+config :miway_credit_core, :kyc_retention_days, 2555
+
 # Use Jason for JSON parsing
 config :phoenix, :json_library, Jason
 
