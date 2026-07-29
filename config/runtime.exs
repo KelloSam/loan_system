@@ -35,6 +35,19 @@ if config_env() == :prod do
 
   config :miway_credit_core, :kyc_encryption_key, kyc_encryption_key
 
+  kyc_upload_dir =
+    System.get_env("KYC_UPLOAD_DIR") ||
+      raise """
+      environment variable KYC_UPLOAD_DIR is missing.
+      Must be a persistent path outside the release directory — a
+      release deploy replaces the release directory, so the default
+      dev/test path (priv/kyc_uploads/ inside it) would lose every
+      stored KYC document on the next deploy. See
+      docs/MIWAY_CREDITCORE_DEPLOYMENT_RUNBOOK.md.
+      """
+
+  config :miway_credit_core, :kyc_upload_dir, kyc_upload_dir
+
   config :miway_credit_core, MiwayCreditCore.Repo,
     url: database_url,
     pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10")
