@@ -88,6 +88,67 @@ new backend concepts. Candidate shape once it's time to plan for real
   route through the reserved `Notifications` context
   (`context_boundaries.md`), not a bespoke mobile-only mechanism.
 
+#### Candidate initial screen list (illustrative, not a spec)
+
+Mirrors **only** the read-only capability the web portal has actually
+validated today (confirmed directly against `CustomerDashboardController`
+and `CustomerLoanController`, not assumed) — nothing here invents a
+capability the portal hasn't had a chance to prove out first, per this
+section's own principle above:
+
+- Application list and next-payment-due summary — exactly what
+  `/client/dashboard` (`CustomerDashboardController.index/2`) renders
+  today.
+- Loan detail: account status/outstanding balance, interest detail,
+  and the full repayment schedule — exactly what `/client/loans/:id`
+  (`CustomerLoanController.show/2`) already renders today via
+  `Lending.compound_interest_details/1` and
+  `Lending.list_installments_for_account/2`.
+
+Explicitly **not** on this list yet, each for the same reason — none
+of these exist on the web portal (confirmed: no KYC status and no
+payment/transaction data is shown to a customer anywhere today), so
+there's no validated behavior yet for a mobile screen to mirror:
+
+- KYC document status or upload.
+- Payment transaction history.
+- Customer-initiated loan applications.
+- Customer self-service payment submission.
+
+If and when the web portal grows any of this surface, this list grows
+with it — not before. As stated above, none of this is a commitment
+to build a mobile app on any particular timeline; it's only a
+placeholder for what a first screen list would plausibly draw from.
+
+## API boundary for customer operations — decision
+
+A prior planning document asked for "clear API boundaries around
+customer operations" as part of mobile groundwork. Decision: **no
+versioned JSON API is being built now.**
+
+Today's API boundary already exists — it's the bounded-context
+discipline this app has followed since Step 3: `Applications`,
+`Risk`, `Lending`, `Payments`, `Accounting`/`GeneralLedger`,
+`AuditLogs` each expose only their own public context functions, and
+the only client calling into them is server-rendered HTML
+(`Phoenix.Controller` + `.heex` templates). There is no JSON API
+surface anywhere in this app today.
+
+Building a real versioned JSON API against zero actual consumers would
+be premature abstraction — exactly the kind of ahead-of-need building
+this project has avoided at every prior step. It waits until a native
+mobile client is actually greenlit and its real data-shape needs are
+known from the web portal's own pilot — the same "pilot before you
+build the next thing" gate Phase 4 above already applies to the mobile
+app itself; the API gets the identical gate, not an earlier one.
+
+**Assumption correction:** that same prior planning document treated
+`Notifications` as if it already delivers messages. It does not —
+`docs/architecture/context_boundaries.md` lists it as `Notifications —
+unscheduled`: reserved, no schema, no implementation, nothing routes
+through it today. Any reference elsewhere assuming otherwise should be
+read as aspirational, not current state.
+
 ## What this document is not
 
 Not a commitment to a timeline, a technology choice (React Native vs.
