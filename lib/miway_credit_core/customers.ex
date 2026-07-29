@@ -271,9 +271,14 @@ defmodule MiwayCreditCore.Customers do
     end
   end
 
-  @doc "The on-disk path to stream for download — callers must check scope/permission before calling this."
+  @doc "The on-disk path — for existence/cleanup checks only, never for reading content directly (bytes are encrypted at rest). Callers must check scope/permission before calling this."
   def kyc_document_path(%KycDocument{} = document) do
     DocumentStorage.read_path(document.organisation_id, document.customer_id, document.stored_filename)
+  end
+
+  @doc "The decrypted file bytes to stream for download — callers must check scope/permission before calling this."
+  def kyc_document_bytes(%KycDocument{} = document) do
+    DocumentStorage.read(document.organisation_id, document.customer_id, document.stored_filename)
   end
 
   def remove_kyc_document(%KycDocument{} = document) do

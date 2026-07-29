@@ -306,7 +306,7 @@ defmodule MiwayCreditCoreWeb.CustomerController do
           "content-disposition",
           ~s(attachment; filename="#{sanitize_header_value(document.original_filename)}")
         )
-        |> send_file(200, Customers.kyc_document_path(document))
+        |> send_resp(200, Customers.kyc_document_bytes(document))
 
       _removed ->
         conn

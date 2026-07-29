@@ -28,3 +28,6 @@ config :miway_credit_core, MiwayCreditCore.ArrearsScheduler, enabled: false
 # tmp dir instead, so the test suite never leaves files behind in the repo.
 config :miway_credit_core, :kyc_upload_dir, Path.join(System.tmp_dir!(), "miway_kyc_test_uploads")
 
+# Fixed, checked-in key — test data is never real customer data.
+config :miway_credit_core, :kyc_encryption_key, "u6lPIl6jo+XwIdtkkHejcYC1qoAWI3icozx+JyKY4Jo="
+

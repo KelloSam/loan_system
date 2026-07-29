@@ -16,6 +16,7 @@ All read by `config/runtime.exs`, nothing here is invented:
 | `PORT` | no | default `4000` |
 | `POOL_SIZE` | no | default `10` |
 | `PHX_SERVER` | yes | must be `true` for the release to actually listen |
+| `KYC_ENCRYPTION_KEY` | yes | base64, 32 raw bytes — generate with `:crypto.strong_rand_bytes(32) \| Base.encode64()`. Encrypts KYC document bytes at rest (AES-256-GCM). Losing this key makes every stored KYC document permanently unreadable — back it up like a secret, separately from the database. |
 
 ## 2. Database SSL
 

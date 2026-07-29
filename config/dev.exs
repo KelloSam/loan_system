@@ -4,6 +4,11 @@ import Config
 # (see docs/architecture/context_boundaries.md) is actually built.
 config :miway_credit_core, :password_reset_notifier, MiwayCreditCore.Accounts.PasswordResetNotifier.Dev
 
+# Fixed, checked-in key for KYC document encryption at rest — safe
+# because dev data is never real customer data. Never reuse this key
+# in prod; config/runtime.exs requires a real KYC_ENCRYPTION_KEY there.
+config :miway_credit_core, :kyc_encryption_key, "e4bafnT8b29F3Nl3cozlz0haxa9xagBbhK57Y5eafGE="
+
 # Configure loan system database
 config :miway_credit_core, MiwayCreditCore.Repo,
   username: "think",

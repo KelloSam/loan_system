@@ -185,7 +185,8 @@ defmodule MiwayCreditCore.CustomersKycTest do
 
       path = Customers.kyc_document_path(document)
       assert File.exists?(path)
-      assert File.read!(path) == "hello world"
+      assert Customers.kyc_document_bytes(document) == "hello world"
+      refute File.read!(path) == "hello world"
 
       assert {:ok, removed} = Customers.remove_kyc_document(document)
       assert removed.status == "removed"

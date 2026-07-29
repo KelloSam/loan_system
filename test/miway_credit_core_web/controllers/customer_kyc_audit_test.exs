@@ -106,6 +106,36 @@ defmodule MiwayCreditCoreWeb.CustomerKycAuditTest do
     refute metadata_contains?(entry, "sensitive document bytes")
   end
 
+  test "downloading a KYC document returns the original bytes, decrypted end-to-end", %{
+    conn: conn,
+    org_admin: org_admin,
+    customer: customer
+  } do
+    conn = login(conn, org_admin)
+    path = Path.join(System.tmp_dir!(), "download_test_upload_#{System.unique_integer([:positive])}")
+    original_bytes = "%PDF-1.4 the real content of this document, byte for byte"
+    File.write!(path, original_bytes)
+    upload = %Plug.Upload{path: path, filename: "id.pdf", content_type: "application/pdf"}
+
+    conn =
+      post(conn, ~p"/admin/customers/#{customer.id}/kyc_documents",
+        kyc_document: %{"document_type" => "nrc_copy", "file" => upload}
+      )
+
+    assert redirected_to(conn) == ~p"/admin/customers/#{customer.id}"
+
+    document = MiwayCreditCore.Customers.list_kyc_documents_for_customer(%Scope{organisation_id: customer.organisation_id}, customer.id) |> hd()
+
+    conn =
+      build_conn()
+      |> Plug.Test.init_test_session(%{})
+      |> login(org_admin)
+      |> get(~p"/admin/customers/#{customer.id}/kyc_documents/#{document.id}/download")
+
+    assert conn.status == 200
+    assert conn.resp_body == original_bytes
+  end
+
   test "verifying KYC is audited", %{conn: conn, org_admin: org_admin, customer: customer} do
     conn = login(conn, org_admin)
     conn = patch(conn, ~p"/admin/customers/#{customer.id}/kyc/submit")

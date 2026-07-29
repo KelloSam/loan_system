@@ -26,6 +26,15 @@ if config_env() == :prod do
 
   host = System.get_env("PHX_HOST") || raise "environment variable PHX_HOST is missing."
 
+  kyc_encryption_key =
+    System.get_env("KYC_ENCRYPTION_KEY") ||
+      raise """
+      environment variable KYC_ENCRYPTION_KEY is missing.
+      Generate one with: :crypto.strong_rand_bytes(32) |> Base.encode64()
+      """
+
+  config :miway_credit_core, :kyc_encryption_key, kyc_encryption_key
+
   config :miway_credit_core, MiwayCreditCore.Repo,
     url: database_url,
     pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10")
