@@ -28,12 +28,13 @@ defmodule MiwayCreditCoreWeb.Router do
     plug :accepts, ["json"]
   end
 
-  # Liveness check for load balancers / uptime monitors — no session,
-  # CSRF, or CSP machinery needed for this.
+  # Liveness/readiness checks for load balancers / uptime monitors — no
+  # session, CSRF, or CSP machinery needed for this.
   scope "/", MiwayCreditCoreWeb do
     pipe_through :api
 
     get "/up", HealthController, :show
+    get "/ready", HealthController, :ready
   end
 
   pipeline :auth do

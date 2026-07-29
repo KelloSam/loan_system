@@ -5,4 +5,9 @@ defmodule MiwayCreditCoreWeb.HealthControllerTest do
     conn = get(conn, ~p"/up")
     assert json_response(conn, 200) == %{"status" => "ok"}
   end
+
+  test "GET /ready returns 200 when the database is reachable", %{conn: conn} do
+    conn = get(conn, ~p"/ready")
+    assert json_response(conn, 200) == %{"status" => "ok"}
+  end
 end
