@@ -56,6 +56,8 @@ defmodule MiwayCreditCore.KycRetentionScheduler do
       end)
     end
 
+    MiwayCreditCore.Monitoring.record_tick(:kyc_retention_scheduler)
+
     Process.send_after(self(), :purge_expired_kyc_documents, state.interval_ms)
     {:noreply, state}
   end

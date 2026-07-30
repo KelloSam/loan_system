@@ -43,6 +43,8 @@ defmodule MiwayCreditCore.ArrearsScheduler do
       Logger.info("ArrearsScheduler: evaluated #{promises_evaluated} due promise(s) to pay")
     end
 
+    MiwayCreditCore.Monitoring.record_tick(:arrears_scheduler)
+
     Process.send_after(self(), :check_overdue, state.interval_ms)
     {:noreply, state}
   end
