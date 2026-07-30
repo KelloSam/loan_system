@@ -233,33 +233,54 @@ through before a pilot, not a description of something already running.
 
 ## 11. Monitoring
 
-Beyond `/up`/`/ready` (§7), not yet built — a checklist for pilot
-readiness:
+Beyond `/up`/`/ready` (§7): a self-contained `MiwayCreditCore.Monitoring`
+layer (no new dependency — hand-rolled `:telemetry.attach/4` against
+events Phoenix/Ecto already emit) plus `/admin/system-health`, a
+platform-administrator-only page surfacing all of it in one place
+instead of a log-grep exercise.
+
+**Built:**
 
 - Point an uptime monitor at `/up`, and an orchestrator/load-balancer
   readiness probe at `/ready`.
-- Error/exception monitoring (e.g. Sentry, AppSignal, or Phoenix's own
-  `Logger`-based alerting) — nothing currently forwards unhandled
-  exceptions anywhere but the log.
-- Database connection-pool monitoring — `POOL_SIZE` (§1) is fixed;
-  watch for exhaustion under real load, which would surface as slow
-  requests before `/ready` itself starts failing.
-- Disk-space monitoring for both the Postgres host and the KYC upload
-  path (§9) — both fail destructively when full (writes fail; ClamAV's
-  `freshclam` can't update signatures).
-- Alert on `KycRetentionScheduler`/`ArrearsScheduler` failures — both
-  are GenServers with no external alerting today; a silently-crashed
-  scheduler (e.g. arrears stop accruing penalties, KYC purge stops
-  running) would currently only be visible in application logs.
-- Alert on repeated `MalwareScanner.Local` `{:error, :scanner_unavailable}`
-  results — this is the earliest signal of a broken ClamAV install
-  (§8), and currently only visible as a spike of rejected uploads.
+- Error/exception capture — `Monitoring.ErrorReporter` (a swappable
+  behaviour, same shape as `PasswordResetNotifier`) attached to
+  Phoenix's `[:phoenix, :error_rendered]` telemetry event. The
+  `Default` adapter logs a structured, greppable `[error_reporter]`
+  line — the real, shippable default in every environment, not a
+  placeholder. Configure `config :miway_credit_core, :error_reporter`
+  to point at a real Sentry/AppSignal adapter later; none is built
+  here, since there's no such account/dependency to build against.
+- Database connection-pool visibility — `Monitoring.pool_stats/0`
+  tracks sample count/last/max queue time via Ecto's own
+  `[:miway_credit_core, :repo, :query]` telemetry, visible on
+  `/admin/system-health`. `POOL_SIZE` (§1) is still fixed; a
+  persistently rising max is the earliest sign of exhaustion, before
+  `/ready` itself starts failing.
+- `KycRetentionScheduler`/`ArrearsScheduler` heartbeats —
+  `Monitoring.record_tick/1`/`stale?/2`, visible on
+  `/admin/system-health` as an OK/Stale badge per scheduler.
+- `MalwareScanner` failure counter — every `{:error, reason}` result
+  from any adapter increments `Monitoring.recent_scanner_failure_count/1`,
+  visible on `/admin/system-health` — a rising count is the earliest
+  signal of a broken ClamAV install (§8).
+- KYC upload directory disk space — `Monitoring.disk_free_bytes/1`,
+  visible on `/admin/system-health`.
+
+**Still needs real infrastructure — not built, not faked:**
+
+- Disk-space monitoring for the Postgres host itself — a separate
+  machine in most real deployments, not observable from this app;
+  monitor it directly at the host level.
 - Alert on backup failures (§10) once a backup job exists to monitor.
 - Audit-log monitoring — `AuditLogs` (Step 16) records
   `login_failure`/`2fa_blocked_lockout`/etc., but nothing currently
   watches this table for a spike indicating an attack in progress; add
   alerting once real traffic exists to set a meaningful threshold
   against.
+- Wiring any of the above into an actual paging/alerting product
+  (PagerDuty, Opsgenie, a Slack webhook, ...) — this app exposes the
+  data; routing it to a human is a deployment-specific decision.
 
 ## 12. Password-reset email delivery (SMTP)
 
