@@ -1,0 +1,78 @@
+<div class="mb-6 flex items-center justify-between">
+  <div>
+    <h1 class="text-2xl font-bold text-navy-900">System Health</h1>
+    <p class="mt-0.5 text-sm text-gray-500">
+      Platform-wide operational diagnostics — visible to platform administrators only.
+    </p>
+  </div>
+  <%= link "Dashboard", to: ~p"/admin/dashboard", class: "text-sm font-medium text-gray-400 hover:text-navy-600" %>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+  <div class="card p-5">
+    <h2 class="section-title mb-3">Scheduler Heartbeats</h2>
+    <div class="space-y-3 text-sm">
+      <%= for scheduler <- @schedulers do %>
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="font-medium text-navy-900"><%= format_scheduler_name(scheduler.name) %></div>
+            <div class="text-xs text-gray-400"><%= format_last_tick(scheduler.last_tick) %></div>
+          </div>
+          <span class={status_badge_class(scheduler.stale?)}>
+            <%= if scheduler.stale?, do: "Stale", else: "OK" %>
+          </span>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <div class="card p-5">
+    <h2 class="section-title mb-3">Malware Scanner</h2>
+    <div class="space-y-2 text-sm">
+      <div class="flex items-center justify-between">
+        <span class="text-gray-500">Failures (last hour)</span>
+        <span class={status_badge_class(@scanner_failure_count > 0)}>
+          <%= @scanner_failure_count %>
+        </span>
+      </div>
+      <p class="text-xs text-gray-400">
+        A rising count is the earliest signal of a broken ClamAV install — see the deployment runbook §8.
+      </p>
+    </div>
+  </div>
+
+  <div class="card p-5">
+    <h2 class="section-title mb-3">Database Pool</h2>
+    <div class="space-y-2 text-sm">
+      <div class="flex items-center justify-between">
+        <span class="text-gray-500">Samples observed</span>
+        <span class="font-medium text-navy-900"><%= @pool_stats.sample_count %></span>
+      </div>
+      <div class="flex items-center justify-between">
+        <span class="text-gray-500">Last queue time</span>
+        <span class="font-medium text-navy-900"><%= @pool_stats.last_queue_time_ms || "—" %> ms</span>
+      </div>
+      <div class="flex items-center justify-between">
+        <span class="text-gray-500">Max queue time observed</span>
+        <span class="font-medium text-navy-900"><%= @pool_stats.max_queue_time_ms || "—" %> ms</span>
+      </div>
+      <p class="text-xs text-gray-400">
+        A persistently rising max is the earliest signal of pool exhaustion, before /ready itself starts failing.
+      </p>
+    </div>
+  </div>
+
+  <div class="card p-5">
+    <h2 class="section-title mb-3">Disk Space</h2>
+    <div class="space-y-2 text-sm">
+      <div class="flex items-center justify-between">
+        <span class="text-gray-500">KYC upload directory</span>
+        <span class="font-medium text-navy-900"><%= format_bytes(@kyc_disk) %></span>
+      </div>
+      <p class="text-xs text-gray-400">
+        The Postgres host's own disk space is a separate machine in most real deployments and isn't observable from
+        this app — monitor it directly at the host level.
+      </p>
+    </div>
+  </div>
+</div>
