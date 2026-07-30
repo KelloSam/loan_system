@@ -30,7 +30,11 @@ defmodule MiwayCreditCore.Application do
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: MiwayCreditCore.Supervisor]
-    Supervisor.start_link(children, opts)
+
+    with {:ok, pid} <- Supervisor.start_link(children, opts) do
+      MiwayCreditCore.Monitoring.attach_telemetry_handlers()
+      {:ok, pid}
+    end
   end
 
   # Configure Phoenix endpoint

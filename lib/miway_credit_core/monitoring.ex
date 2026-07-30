@@ -6,9 +6,12 @@ defmodule MiwayCreditCore.Monitoring do
   restarting (a scheduler tick, a telemetry handler).
   """
 
+  require Logger
+
   alias MiwayCreditCore.Monitoring.Store
 
   @scheduler_names [:arrears_scheduler, :kyc_retention_scheduler]
+  @repo_query_event [:miway_credit_core, :repo, :query]
 
   @doc "The scheduler names this module tracks heartbeats for."
   def scheduler_names, do: @scheduler_names
@@ -80,4 +83,61 @@ defmodule MiwayCreditCore.Monitoring do
   end
 
   defp parse_df({_output, _status}), do: {:error, :df_failed}
+
+  @doc "Attaches this module's telemetry handlers. Called once from Application.start/2, after the supervision tree (including Monitoring.Store) is already up."
+  def attach_telemetry_handlers do
+    :telemetry.attach(
+      "miway-credit-core-monitoring-repo-query",
+      @repo_query_event,
+      &__MODULE__.handle_repo_query/4,
+      nil
+    )
+  end
+
+  @doc false
+  def handle_repo_query(_event_name, measurements, _metadata, _config) do
+    case Map.get(measurements, :queue_time) do
+      nil ->
+        :ok
+
+      queue_time_native ->
+        record_query_sample(System.convert_time_unit(queue_time_native, :native, :millisecond))
+    end
+  rescue
+    error -> Logger.error("Monitoring repo-query telemetry handler failed: #{inspect(error)}")
+  catch
+    kind, reason ->
+      Logger.error("Monitoring repo-query telemetry handler failed: #{kind} #{inspect(reason)}")
+  end
+
+  @doc "Records one query's queue-time sample (milliseconds), updating the running count/last/max."
+  def record_query_sample(queue_time_ms) do
+    :ets.update_counter(Store.table(), {:query_stats, :count}, 1, {{:query_stats, :count}, 0})
+    :ets.insert(Store.table(), {{:query_stats, :last_ms}, queue_time_ms})
+    update_max_queue_time(queue_time_ms)
+    :ok
+  end
+
+  @doc "Aggregate DB pool queue-time stats observed since the last reset — a spike or a persistently rising max is the earliest signal of pool exhaustion, before /ready itself starts failing."
+  def pool_stats do
+    %{
+      sample_count: lookup_query_stat(:count, 0),
+      last_queue_time_ms: lookup_query_stat(:last_ms, nil),
+      max_queue_time_ms: lookup_query_stat(:max_ms, nil)
+    }
+  end
+
+  defp update_max_queue_time(queue_time_ms) do
+    case :ets.lookup(Store.table(), {:query_stats, :max_ms}) do
+      [{_key, current_max}] when current_max >= queue_time_ms -> :ok
+      _ -> :ets.insert(Store.table(), {{:query_stats, :max_ms}, queue_time_ms})
+    end
+  end
+
+  defp lookup_query_stat(field, default) do
+    case :ets.lookup(Store.table(), {:query_stats, field}) do
+      [{_key, value}] -> value
+      [] -> default
+    end
+  end
 end

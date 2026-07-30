@@ -51,6 +51,67 @@ defmodule MiwayCreditCore.MonitoringTest do
     end
   end
 
+  describe "pool_stats/0 and record_query_sample/1" do
+    test "starts empty after a reset" do
+      assert Monitoring.pool_stats() == %{
+               sample_count: 0,
+               last_queue_time_ms: nil,
+               max_queue_time_ms: nil
+             }
+    end
+
+    test "tracks sample count, last, and running max" do
+      Monitoring.record_query_sample(5)
+      Monitoring.record_query_sample(20)
+      Monitoring.record_query_sample(3)
+
+      assert Monitoring.pool_stats() == %{
+               sample_count: 3,
+               last_queue_time_ms: 3,
+               max_queue_time_ms: 20
+             }
+    end
+  end
+
+  describe "handle_repo_query/4 (the telemetry handler)" do
+    test "records a sample when :queue_time is present, converting native time to ms" do
+      one_ms_native = System.convert_time_unit(1, :millisecond, :native)
+
+      Monitoring.handle_repo_query(
+        [:miway_credit_core, :repo, :query],
+        %{queue_time: one_ms_native},
+        %{},
+        nil
+      )
+
+      assert %{sample_count: 1, last_queue_time_ms: 1} = Monitoring.pool_stats()
+    end
+
+    test "is a no-op, not a crash, when :queue_time is absent" do
+      assert Monitoring.handle_repo_query([:miway_credit_core, :repo, :query], %{}, %{}, nil) ==
+               :ok
+
+      assert Monitoring.pool_stats().sample_count == 0
+    end
+
+    test "never raises even given measurements that would break unit conversion" do
+      assert Monitoring.handle_repo_query(
+               [:miway_credit_core, :repo, :query],
+               %{queue_time: :not_a_number},
+               %{},
+               nil
+             ) == :ok
+
+      assert Monitoring.pool_stats().sample_count == 0
+    end
+
+    test "a real Repo query, live, fires the attached telemetry handler and increases the sample count" do
+      before = Monitoring.pool_stats().sample_count
+      MiwayCreditCore.Repo.query!("SELECT 1")
+      assert Monitoring.pool_stats().sample_count > before
+    end
+  end
+
   describe "disk_free_bytes/1" do
     test "returns a positive byte count for a real directory" do
       assert {:ok, bytes} = Monitoring.disk_free_bytes(System.tmp_dir!())
