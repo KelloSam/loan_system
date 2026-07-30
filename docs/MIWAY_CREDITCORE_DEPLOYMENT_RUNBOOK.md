@@ -107,7 +107,7 @@ curl -i https://<PHX_HOST>/ready
 is up and Phoenix is routing; deliberately no database dependency (see
 the doc comment on `MiwayCreditCoreWeb.HealthController.show/2`).
 
-`/ready` — expect `200` and `{"status":"ok"}`; `503` means Postgres is
+`/ready` — expect `200` and `{"status":"ready"}`; `503` means Postgres is
 unreachable from this instance (wrong process, not a crash — a load
 balancer should route around it rather than treat it as fully down).
 Point your orchestrator's readiness probe (not its liveness probe) at
