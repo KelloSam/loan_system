@@ -18,6 +18,11 @@ All read by `config/runtime.exs`, nothing here is invented:
 | `PHX_SERVER` | yes | must be `true` for the release to actually listen |
 | `KYC_ENCRYPTION_KEY` | yes | base64, 32 raw bytes — generate with `:crypto.strong_rand_bytes(32) \| Base.encode64()`. Encrypts KYC document bytes at rest (AES-256-GCM). Losing this key makes every stored KYC document permanently unreadable — back it up like a secret, separately from the database. |
 | `KYC_UPLOAD_DIR` | yes | absolute path to a **persistent volume outside the release directory** — see §9. The release refuses to boot without it, specifically so this can't be silently forgotten and only discovered after the first deploy wipes uploaded documents. |
+| `SMTP_HOST` | no | see §12. Password-reset email stays disabled (fails closed, logged server-side) until this is set — safe to boot and pilot without it, then turn delivery on later with no redeploy. |
+| `SMTP_USERNAME`, `SMTP_PASSWORD` | only if `SMTP_HOST` is set | provider SMTP credentials. |
+| `MAIL_FROM_ADDRESS` | only if `SMTP_HOST` is set | the `From:` address on outgoing mail — most providers require this to be a verified sender/domain. |
+| `SMTP_PORT` | no | default `587` (STARTTLS) |
+| `MAIL_FROM_NAME` | no | default `Miway CreditCore` |
 
 ## 2. Database SSL
 
@@ -255,3 +260,72 @@ readiness:
   watches this table for a spike indicating an attack in progress; add
   alerting once real traffic exists to set a meaningful threshold
   against.
+
+## 12. Password-reset email delivery (SMTP)
+
+Password-reset links are delivered through `MiwayCreditCore.Notifications`
+(a Swoosh mailer) via any SMTP-speaking provider — SendGrid, Mailgun,
+Postmark, AWS SES, Zoho, a private mail server, etc. There is no
+vendor-specific SDK, so switching providers later is just changing
+env vars, not code.
+
+**Deliberately optional at boot**, unlike `DATABASE_URL`/
+`SECRET_KEY_BASE` (§1): if `SMTP_HOST` is unset, the release still
+boots and runs fine — reset requests are accepted, but delivery fails
+closed server-side (`Accounts.PasswordResetNotifier.Unconfigured`,
+logged, never surfaced to the requester) and the reset-request page
+shows "contact an administrator" instead of "check your email"
+(`PasswordResetNotifier.configured?/0`). This lets a pilot start
+before SMTP is arranged, then turn real delivery on later by setting
+env vars and restarting — no code change, no redeploy.
+
+**Setup:**
+
+1. Get SMTP credentials from your chosen provider (host, port,
+   username, password) and a verified sender address/domain — most
+   providers reject mail from an unverified `From:` address outright.
+2. Set `SMTP_HOST`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `MAIL_FROM_ADDRESS`
+   (required together — see §1), plus optionally `SMTP_PORT` (default
+   `587`) and `MAIL_FROM_NAME`.
+3. Restart the release. `config/runtime.exs` picks these up and
+   switches `:password_reset_notifier` from `Unconfigured` to `Email`
+   automatically — nothing else to configure.
+4. TLS is STARTTLS on port 587 by default, with full certificate
+   verification (`verify: :verify_peer` plus hostname/SNI matching
+   against `SMTP_HOST`, unlike the Postgres SSL follow-up noted in
+   §2 — this connection verifies the hostname too, not just the CA
+   chain). A provider requiring implicit TLS (typically port 465)
+   needs `ssl: true` added to the `Notifications.Mailer` config in
+   `config/runtime.exs` instead of `tls: :always`.
+
+**Delivery testing** (do this before relying on it for a real pilot):
+
+1. Confirm boot picked up the config:
+   `bin/miway_credit_core eval "MiwayCreditCore.Accounts.PasswordResetNotifier.configured?()"`
+   should return `true`.
+2. Trigger a real reset request against a real inbox you control
+   (`POST /password-reset` with that email, or through the UI) and
+   confirm the email actually arrives — including checking spam/junk,
+   since a fresh sending domain with no reputation history often lands
+   there initially.
+3. Confirm the link in the received email works end-to-end (opens the
+   set-new-password form, the new password logs in).
+4. If nothing arrives, check the application log first —
+   `Notifications.deliver_password_reset_email/2` logs the provider's
+   exact rejection reason (auth failure, unverified sender, rate limit,
+   etc.) server-side; the UI never shows this detail, by design.
+
+**Partially live-verified in this environment**: the not-configured
+(fail-closed) and provider-failure (logged, not leaked) paths are
+covered by the test suite; the real SMTP wire protocol itself
+(`Swoosh.Adapters.SMTP`/`gen_smtp` — connect, `MAIL FROM`/`RCPT TO`/
+`DATA`) was confirmed live against a local debug SMTP server, correct
+multipart text+HTML message received byte-for-byte. What could **not**
+be verified here — no real provider account or public sending domain
+exists in this sandbox — is an actual provider round trip: STARTTLS
+against a real cert, auth against real credentials, and inbox
+delivery/reputation (§2's hostname-verification note applies here
+too — confirm TLS actually negotiates against your real provider, not
+just that the code compiles). Confirm all of that against a real
+provider before a pilot, the same way ClamAV's real detection path
+(§8) does.

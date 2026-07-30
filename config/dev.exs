@@ -1,8 +1,18 @@
 import Config
 
-# Password-reset links are logged rather than emailed until Notifications
-# (see docs/architecture/context_boundaries.md) is actually built.
-config :miway_credit_core, :password_reset_notifier, MiwayCreditCore.Accounts.PasswordResetNotifier.Dev
+# Real delivery pipeline, real Swoosh mailer — just captured locally
+# instead of actually sent. View sent mail at /dev/mailbox (see the
+# dev-only routes in router.ex, gated on :dev_routes below).
+config :miway_credit_core,
+       :password_reset_notifier,
+       MiwayCreditCore.Accounts.PasswordResetNotifier.Email
+
+config :miway_credit_core, MiwayCreditCore.Notifications.Mailer, adapter: Swoosh.Adapters.Local
+
+config :miway_credit_core, :mail_from_address, "no-reply@miway.local"
+config :miway_credit_core, :mail_from_name, "Miway CreditCore (dev)"
+
+config :miway_credit_core, :dev_routes, true
 
 # No ClamAV assumed installed in dev — the Local adapter would fail
 # closed and block every KYC upload otherwise.

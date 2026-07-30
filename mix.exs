@@ -42,6 +42,8 @@ defmodule MiwayCreditCore.MixProject do
       {:nimble_totp, "~> 1.0"},   # TOTP 2FA (Google Authenticator compatible)
       {:eqrcode, "~> 0.2"},       # QR code SVG generation for 2FA setup
       {:tzdata, "~> 1.1"},             # Timezone database (required by Tzdata.TimeZoneDatabase)
+      {:swoosh, "~> 1.16"},       # Email composition/delivery (Notifications)
+      {:gen_smtp, "~> 1.2"},      # SMTP adapter backing Swoosh in production
       {:phoenix_live_reload, "~> 1.4", only: :dev},  # Live code reloading in development
       {:ex_doc, "~> 0.29", only: :dev, runtime: false},  # For documentation
       {:esbuild, "~> 0.8", runtime: Mix.env() == :dev},  # Bundles assets/js/app.js for the browser

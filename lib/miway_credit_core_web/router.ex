@@ -138,6 +138,14 @@ defmodule MiwayCreditCoreWeb.Router do
     patch "/loans/:id/write_off_requests/:request_id/reject", CollectionController, :reject_write_off
   end
 
+  if Application.compile_env(:miway_credit_core, :dev_routes) do
+    scope "/dev" do
+      pipe_through :browser
+
+      forward "/mailbox", Plug.Swoosh.MailboxPreview
+    end
+  end
+
   # Customer portal routes — path stays "/client" (naming predates the
   # identity split); the controllers underneath are Customers-domain,
   # hence the Customer* naming. Gated on CustomerUser (a real link to

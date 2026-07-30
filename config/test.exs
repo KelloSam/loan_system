@@ -1,7 +1,17 @@
 import Config
 
 # Delivers to the calling test process instead of sending anything real.
-config :miway_credit_core, :password_reset_notifier, MiwayCreditCore.Accounts.PasswordResetNotifier.Test
+config :miway_credit_core,
+       :password_reset_notifier,
+       MiwayCreditCore.Accounts.PasswordResetNotifier.Test
+
+# Captured in-memory (Swoosh.TestAssertions) rather than sent — used by
+# tests that exercise the Notifications/Email adapter path directly,
+# rather than going through the Test notifier above.
+config :miway_credit_core, MiwayCreditCore.Notifications.Mailer, adapter: Swoosh.Adapters.Test
+
+config :miway_credit_core, :mail_from_address, "no-reply@miway.local"
+config :miway_credit_core, :mail_from_name, "Miway CreditCore"
 
 config :miway_credit_core, :malware_scanner, MiwayCreditCore.Customers.MalwareScanner.Test
 

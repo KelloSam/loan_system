@@ -206,8 +206,8 @@ defmodule MiwayCreditCore.Accounts do
   `reset_url_fun` receives the raw token and must return the full
   reset URL (the controller builds it with `~p`, since Accounts
   doesn't depend on the web layer). The link is handed to the
-  configured PasswordResetNotifier — real delivery is deferred to
-  Notifications; see PasswordResetNotifier's moduledoc.
+  configured PasswordResetNotifier, which delivers through
+  Notifications — see PasswordResetNotifier's moduledoc.
   """
   def request_password_reset(email, reset_url_fun) when is_function(reset_url_fun, 1) do
     case get_user_by_email(email) do

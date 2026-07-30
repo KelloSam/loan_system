@@ -3,6 +3,11 @@ import Config
 # Configure Ecto repos
 config :miway_credit_core, ecto_repos: [MiwayCreditCore.Repo]
 
+# Every configured mail adapter (Local/Test/SMTP) delivers directly —
+# none of them go over Swoosh's HTTP API client, so disable it rather
+# than carry an unused Finch pool.
+config :swoosh, :api_client, false
+
 # Render a real error page/JSON body for exceptions instead of Phoenix's
 # ancient fallback (which looks for a nonexistent MiwayCreditCoreWeb.ErrorView
 # and raises ArgumentError trying to render one) — this mattered concretely
