@@ -18,7 +18,8 @@ defmodule MiwayCreditCore.Customers.DocumentStorage do
   @nonce_bytes 12
   @tag_bytes 16
 
-  defp root do
+  @doc "The configured KYC upload directory root, e.g. for disk-space monitoring."
+  def root do
     Application.get_env(
       :miway_credit_core,
       :kyc_upload_dir,

@@ -7,19 +7,25 @@ defmodule MiwayCreditCore.Application do
 
   @impl true
   def start(_type, _args) do
-    children = [
-      # Start the Ecto repository
-      MiwayCreditCore.Repo,
+    children =
+      [
+        # Owns the ETS table backing MiwayCreditCore.Monitoring — must
+        # exist before Repo/telemetry so nothing can ever write to it
+        # before it's up.
+        MiwayCreditCore.Monitoring.Store,
 
-      # Start the PubSub system
-      {Phoenix.PubSub, name: MiwayCreditCore.PubSub},
+        # Start the Ecto repository
+        MiwayCreditCore.Repo,
 
-      # ETS storage backing the login rate limiter (RateLimitPlug)
-      {PlugAttack.Storage.Ets, name: MiwayCreditCoreWeb.RateLimitStorage, clean_period: 60_000},
+        # Start the PubSub system
+        {Phoenix.PubSub, name: MiwayCreditCore.PubSub},
 
-      # Start the Endpoint (HTTP server)
-      MiwayCreditCoreWeb.Endpoint
-    ] ++ arrears_scheduler_child() ++ kyc_retention_scheduler_child()
+        # ETS storage backing the login rate limiter (RateLimitPlug)
+        {PlugAttack.Storage.Ets, name: MiwayCreditCoreWeb.RateLimitStorage, clean_period: 60_000},
+
+        # Start the Endpoint (HTTP server)
+        MiwayCreditCoreWeb.Endpoint
+      ] ++ arrears_scheduler_child() ++ kyc_retention_scheduler_child()
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
