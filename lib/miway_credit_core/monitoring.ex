@@ -8,10 +8,12 @@ defmodule MiwayCreditCore.Monitoring do
 
   require Logger
 
+  alias MiwayCreditCore.Monitoring.ErrorReporter
   alias MiwayCreditCore.Monitoring.Store
 
   @scheduler_names [:arrears_scheduler, :kyc_retention_scheduler]
   @repo_query_event [:miway_credit_core, :repo, :query]
+  @error_rendered_event [:phoenix, :error_rendered]
 
   @doc "The scheduler names this module tracks heartbeats for."
   def scheduler_names, do: @scheduler_names
@@ -92,6 +94,25 @@ defmodule MiwayCreditCore.Monitoring do
       &__MODULE__.handle_repo_query/4,
       nil
     )
+
+    :telemetry.attach(
+      "miway-credit-core-monitoring-error-rendered",
+      @error_rendered_event,
+      &__MODULE__.handle_error_rendered/4,
+      nil
+    )
+  end
+
+  @doc false
+  def handle_error_rendered(_event_name, _measurements, metadata, _config) do
+    ErrorReporter.report(metadata.kind, metadata.reason, metadata.stacktrace, metadata)
+  rescue
+    error -> Logger.error("Monitoring error-rendered telemetry handler failed: #{inspect(error)}")
+  catch
+    kind, reason ->
+      Logger.error(
+        "Monitoring error-rendered telemetry handler failed: #{kind} #{inspect(reason)}"
+      )
   end
 
   @doc false

@@ -4,6 +4,8 @@ defmodule MiwayCreditCore.MonitoringTest do
   # run async: false with an explicit reset in setup.
   use MiwayCreditCore.DataCase, async: false
 
+  import ExUnit.CaptureLog
+
   alias MiwayCreditCore.Monitoring
   alias MiwayCreditCore.Monitoring.Store
 
@@ -109,6 +111,31 @@ defmodule MiwayCreditCore.MonitoringTest do
       before = Monitoring.pool_stats().sample_count
       MiwayCreditCore.Repo.query!("SELECT 1")
       assert Monitoring.pool_stats().sample_count > before
+    end
+  end
+
+  describe "handle_error_rendered/4 (the telemetry handler)" do
+    test "forwards to the configured ErrorReporter" do
+      metadata = %{
+        kind: :error,
+        reason: %RuntimeError{message: "boom"},
+        stacktrace: [],
+        status: 500
+      }
+
+      log =
+        capture_log(fn ->
+          Monitoring.handle_error_rendered([:phoenix, :error_rendered], %{}, metadata, nil)
+        end)
+
+      assert log =~ "[error_reporter]"
+      assert log =~ "boom"
+    end
+
+    test "never raises even given metadata missing the keys it expects" do
+      capture_log(fn ->
+        assert Monitoring.handle_error_rendered([:phoenix, :error_rendered], %{}, %{}, nil) == :ok
+      end)
     end
   end
 

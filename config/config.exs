@@ -35,6 +35,12 @@ config :decimal, :precision, 28
 # for a live compliance control.
 config :miway_credit_core, :kyc_retention_days, 2555
 
+# Default exception-reporting adapter — see MiwayCreditCore.Monitoring.ErrorReporter.
+# Structured logging is a legitimate terminal action in every environment
+# (unlike e.g. password-reset delivery), so this needs no per-env override
+# and no runtime.exs gating.
+config :miway_credit_core, :error_reporter, MiwayCreditCore.Monitoring.ErrorReporter.Default
+
 # Use Jason for JSON parsing
 config :phoenix, :json_library, Jason
 
@@ -62,4 +68,3 @@ config :tailwind,
 
 # Import environment specific config
 import_config "#{config_env()}.exs"
-
