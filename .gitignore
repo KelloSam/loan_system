@@ -36,3 +36,7 @@ miway_credit_core-*.tar
 # Uploaded KYC document bytes (see MiwayCreditCore.Customers.DocumentStorage)
 # — customer-uploaded files, real or demo, never belong in source control.
 /priv/kyc_uploads/
+
+# Local backup destination default (see MiwayCreditCore.Backup.Destination.Local)
+# — database dumps and KYC archives never belong in source control either.
+/priv/backups/
