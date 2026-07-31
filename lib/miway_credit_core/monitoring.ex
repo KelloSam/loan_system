@@ -1,9 +1,33 @@
 defmodule MiwayCreditCore.Monitoring do
   @moduledoc """
   Operational self-checks — runbook §11's "Monitoring" checklist.
-  State lives in `MiwayCreditCore.Monitoring.Store`'s public ETS
-  table so it survives whatever process wrote it crashing and
-  restarting (a scheduler tick, a telemetry handler).
+  State lives in `MiwayCreditCore.Monitoring.Store`'s ETS table, owned
+  by a process supervised separately from any writer (a scheduler
+  tick, a telemetry handler, `MalwareScanner`), so it survives any
+  *writer* crashing and restarting. It does NOT survive `Store`'s own
+  crash (a fresh empty table is created on restart — see `Store`'s
+  moduledoc), an application/VM/container/host restart, or apply
+  across more than one running instance in a multi-server deployment —
+  this is a runtime indicator, not a permanent record; `AuditLogs`
+  (backed by Postgres) is the durable trail.
+
+  The table is `:public` rather than `:protected` deliberately: five
+  independent processes (two schedulers, `MalwareScanner`, and two
+  telemetry handlers) each write directly, matching the exact
+  multi-writer pattern this codebase's own `PlugAttack.Storage.Ets`
+  already uses for the same reason (routing every write through a
+  single GenServer call would serialize otherwise-independent writers
+  for no correctness benefit). Every write in this codebase goes
+  through this module's public functions below — nothing reaches into
+  `Store`'s table directly — so treat that as the enforced boundary
+  instead.
+
+  Every public write function here (`record_tick/1`,
+  `record_scanner_failure/1`, `record_query_sample/1`) is wrapped so a
+  `Store` hiccup can never raise into its caller: some of those
+  callers (`MalwareScanner.scan/1`, in particular) sit directly in a
+  customer-facing KYC upload path, and a monitoring subsystem must
+  never be able to break the business operation it's observing.
   """
 
   require Logger
@@ -15,13 +39,22 @@ defmodule MiwayCreditCore.Monitoring do
   @repo_query_event [:miway_credit_core, :repo, :query]
   @error_rendered_event [:phoenix, :error_rendered]
 
+  # Milliseconds of (windowed max) queue time at or above this is
+  # flagged on /admin/system-health — an operator-facing threshold,
+  # not an alert (see pool_healthy?/1).
+  @pool_queue_time_warning_ms 200
+
   @doc "The scheduler names this module tracks heartbeats for."
   def scheduler_names, do: @scheduler_names
 
-  @doc "Records a successful tick. Called as the last line of a scheduler's successful `handle_info` body — a tick that raises earlier never reaches this call, which is the staleness signal."
+  @doc "Records a successful tick. Called as the last line of a scheduler's successful `handle_info` body — a tick that raises earlier never reaches this call, which is the staleness signal. Never raises: a Store hiccup here must not crash the scheduler that just did real work."
   def record_tick(scheduler_name) when scheduler_name in @scheduler_names do
     :ets.insert(Store.table(), {{:tick, scheduler_name}, System.system_time(:second)})
     :ok
+  rescue
+    error -> log_write_failure("record_tick", error)
+  catch
+    kind, reason -> log_write_failure("record_tick", {kind, reason})
   end
 
   @doc "The last recorded successful tick, or `:never` if none has been recorded since the table was last reset (fresh boot, or test reset)."
@@ -40,11 +73,17 @@ defmodule MiwayCreditCore.Monitoring do
     end
   end
 
-  @doc "Records a malware-scanner adapter failure (e.g. ClamAV unavailable) — called from `MalwareScanner.scan/1` itself, not its callers, so every adapter is covered without touching call sites."
+  @doc "Records a malware-scanner adapter failure (e.g. ClamAV unavailable) — called from `MalwareScanner.scan/1` itself, not its callers, so every adapter is covered without touching call sites. Never raises: this sits directly in the KYC upload path, and a Store hiccup must not block or crash a real upload."
   def record_scanner_failure(reason) do
+    now = System.system_time(:second)
     key = {:scanner_failure, System.unique_integer([:positive, :monotonic])}
-    :ets.insert(Store.table(), {key, System.system_time(:second), reason})
+    :ets.insert(Store.table(), {key, now, reason})
+    :ets.insert(Store.table(), {:scanner_failure_last_at, now})
     :ok
+  rescue
+    error -> log_write_failure("record_scanner_failure", error)
+  catch
+    kind, reason -> log_write_failure("record_scanner_failure", {kind, reason})
   end
 
   @doc "Count of scanner failures recorded within the last `window_seconds` (default 1 hour)."
@@ -56,6 +95,14 @@ defmodule MiwayCreditCore.Monitoring do
     ]
 
     :ets.select_count(Store.table(), ms)
+  end
+
+  @doc "The most recent scanner failure's timestamp, regardless of window — a count alone can't distinguish 'failed once an hour ago' from 'still failing right now'."
+  def last_scanner_failure_at do
+    case :ets.lookup(Store.table(), :scanner_failure_last_at) do
+      [{_key, timestamp}] -> {:ok, DateTime.from_unix!(timestamp)}
+      [] -> :never
+    end
   end
 
   @doc "Free bytes on the filesystem backing `path`, via `df`. Returns `{:error, :path_not_found}` for a directory that doesn't exist yet rather than shelling out to a nonexistent path."
@@ -131,21 +178,65 @@ defmodule MiwayCreditCore.Monitoring do
       Logger.error("Monitoring repo-query telemetry handler failed: #{kind} #{inspect(reason)}")
   end
 
-  @doc "Records one query's queue-time sample (milliseconds), updating the running count/last/max."
+  @doc "Records one query's queue-time sample (milliseconds), updating the running count/last-window-max. Never raises: called from a telemetry handler that already can't let anything escape, but this stays defensive independently since it's a public function other callers could reach too."
   def record_query_sample(queue_time_ms) do
     :ets.update_counter(Store.table(), {:query_stats, :count}, 1, {{:query_stats, :count}, 0})
     :ets.insert(Store.table(), {{:query_stats, :last_ms}, queue_time_ms})
+    ensure_max_window_started()
     update_max_queue_time(queue_time_ms)
     :ok
+  rescue
+    error -> log_write_failure("record_query_sample", error)
+  catch
+    kind, reason -> log_write_failure("record_query_sample", {kind, reason})
   end
 
-  @doc "Aggregate DB pool queue-time stats observed since the last reset — a spike or a persistently rising max is the earliest signal of pool exhaustion, before /ready itself starts failing."
+  @doc """
+  Aggregate DB pool queue-time stats. `sample_count`/`last_queue_time_ms`
+  are lifetime-since-boot (an ever-growing counter and the single most
+  recent sample are both fine to never reset). `max_queue_time_ms` is
+  windowed instead — reset by `Store`'s periodic clean cycle
+  (`Store.max_queue_time_window_seconds/0`) alongside its scanner-failure
+  prune, so a resolved historical spike doesn't sit there looking like
+  an ongoing problem forever; `max_queue_time_window_started_at` says
+  since when the current max is being measured.
+  """
   def pool_stats do
     %{
       sample_count: lookup_query_stat(:count, 0),
       last_queue_time_ms: lookup_query_stat(:last_ms, nil),
-      max_queue_time_ms: lookup_query_stat(:max_ms, nil)
+      max_queue_time_ms: lookup_query_stat(:max_ms, nil),
+      max_queue_time_window_started_at: max_window_started_at(),
+      warning_threshold_ms: @pool_queue_time_warning_ms
     }
+  end
+
+  @doc "Whether the current windowed max queue time is at or above the warning threshold — the badge shown on /admin/system-health, not itself an alert."
+  def pool_healthy? do
+    case lookup_query_stat(:max_ms, nil) do
+      nil -> true
+      max_ms -> max_ms < @pool_queue_time_warning_ms
+    end
+  end
+
+  defp ensure_max_window_started do
+    case :ets.lookup(Store.table(), {:query_stats, :max_window_started_at}) do
+      [{_key, _timestamp}] ->
+        :ok
+
+      [] ->
+        :ets.insert(
+          Store.table(),
+          {{:query_stats, :max_window_started_at}, System.system_time(:second)}
+        )
+    end
+  end
+
+  defp max_window_started_at do
+    case :ets.lookup(Store.table(), {:query_stats, :max_window_started_at}) do
+      [{_key, timestamp}] -> {:ok, DateTime.from_unix!(timestamp)}
+      [] -> :never
+    end
   end
 
   defp update_max_queue_time(queue_time_ms) do
@@ -160,5 +251,10 @@ defmodule MiwayCreditCore.Monitoring do
       [{_key, value}] -> value
       [] -> default
     end
+  end
+
+  defp log_write_failure(function_name, error) do
+    Logger.error("Monitoring.#{function_name} failed to write, ignoring: #{inspect(error)}")
+    :ok
   end
 end

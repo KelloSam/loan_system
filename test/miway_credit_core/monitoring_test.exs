@@ -51,27 +51,48 @@ defmodule MiwayCreditCore.MonitoringTest do
       :ets.insert(Store.table(), {key, System.system_time(:second) - 120, :scanner_unavailable})
       assert Monitoring.recent_scanner_failure_count(60) == before
     end
+
+    test "last_scanner_failure_at/0 is :never before any failure, then the most recent failure's time" do
+      assert Monitoring.last_scanner_failure_at() == :never
+
+      Monitoring.record_scanner_failure(:scanner_unavailable)
+      assert {:ok, %DateTime{} = first} = Monitoring.last_scanner_failure_at()
+
+      Monitoring.record_scanner_failure(:scanner_unavailable)
+      assert {:ok, %DateTime{} = second} = Monitoring.last_scanner_failure_at()
+      assert DateTime.compare(second, first) in [:eq, :gt]
+    end
   end
 
   describe "pool_stats/0 and record_query_sample/1" do
     test "starts empty after a reset" do
-      assert Monitoring.pool_stats() == %{
+      assert %{
                sample_count: 0,
                last_queue_time_ms: nil,
-               max_queue_time_ms: nil
-             }
+               max_queue_time_ms: nil,
+               max_queue_time_window_started_at: :never
+             } = Monitoring.pool_stats()
     end
 
-    test "tracks sample count, last, and running max" do
+    test "tracks sample count, last, running max, and starts the max window on the first sample" do
       Monitoring.record_query_sample(5)
       Monitoring.record_query_sample(20)
       Monitoring.record_query_sample(3)
 
-      assert Monitoring.pool_stats() == %{
+      assert %{
                sample_count: 3,
                last_queue_time_ms: 3,
-               max_queue_time_ms: 20
-             }
+               max_queue_time_ms: 20,
+               max_queue_time_window_started_at: {:ok, %DateTime{}}
+             } = Monitoring.pool_stats()
+    end
+
+    test "pool_healthy?/0 is true below the warning threshold, false at or above it" do
+      Monitoring.record_query_sample(1)
+      assert Monitoring.pool_healthy?()
+
+      Monitoring.record_query_sample(Monitoring.pool_stats().warning_threshold_ms)
+      refute Monitoring.pool_healthy?()
     end
   end
 
@@ -150,4 +171,20 @@ defmodule MiwayCreditCore.MonitoringTest do
                {:error, :path_not_found}
     end
   end
+
+  # No dedicated test for record_tick/1, record_scanner_failure/1, or
+  # record_query_sample/1's rescue/catch wrapping itself: their bodies
+  # are 1-3 plain :ets.insert/update_counter calls against values that
+  # are always well-formed by construction (nothing about a caller's
+  # input can make an :ets.insert with a valid table raise), so the
+  # only realistic trigger is Store's table not existing at all — and
+  # deliberately deleting/replacing the real shared Store table to
+  # simulate that was tried and reverted: the replacement table ends
+  # up owned by the *test* process rather than Store's own GenServer,
+  # so it's destroyed the instant that test exits, corrupting every
+  # later test in the suite (reproduced live: 13 unrelated failures
+  # elsewhere). The `handle_repo_query/4`/`handle_error_rendered/4`
+  # tests above already prove this exact rescue/catch pattern works
+  # against a real trigger — same construct, read the source for the
+  # rest.
 end

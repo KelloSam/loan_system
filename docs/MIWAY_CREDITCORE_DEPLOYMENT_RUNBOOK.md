@@ -233,13 +233,31 @@ through before a pilot, not a description of something already running.
 
 ## 11. Monitoring
 
-Beyond `/up`/`/ready` (§7): a self-contained `MiwayCreditCore.Monitoring`
-layer (no new dependency — hand-rolled `:telemetry.attach/4` against
-events Phoenix/Ecto already emit) plus `/admin/system-health`, a
-platform-administrator-only page surfacing all of it in one place
-instead of a log-grep exercise.
+This section deliberately separates three different things, since
+conflating them is how a real deployment ends up with a green
+dashboard nobody actually watches:
 
-**Built:**
+1. **Application health visibility** — the app can tell you whether
+   it, and the things it depends on internally, look healthy. Fully
+   built (below).
+2. **External alerting** — something watching that visibility and
+   waking a human up. Not built here — this app exposes data, it does
+   not page anyone. See "Still needs real infrastructure" below.
+3. **Host/infrastructure monitoring** — the Postgres server, the
+   container/VM, the network — things genuinely outside this
+   application's process boundary. Also not built here, and can't be:
+   an app can't reliably observe the disk of a different machine.
+
+### Application health visibility (built)
+
+A self-contained `MiwayCreditCore.Monitoring` layer (no new
+dependency — hand-rolled `:telemetry.attach/4` against events
+Phoenix/Ecto already emit) plus `/admin/system-health`, a
+platform-administrator-only page surfacing all of it in one place
+instead of a log-grep exercise. Every value visible is diagnostic
+only (timestamps, counts, byte counts, ms) — no exception text,
+stack traces, credentials, SQL, customer data, or file paths are ever
+rendered.
 
 - Point an uptime monitor at `/up`, and an orchestrator/load-balancer
   readiness probe at `/ready`.
@@ -252,35 +270,109 @@ instead of a log-grep exercise.
   to point at a real Sentry/AppSignal adapter later; none is built
   here, since there's no such account/dependency to build against.
 - Database connection-pool visibility — `Monitoring.pool_stats/0`
-  tracks sample count/last/max queue time via Ecto's own
-  `[:miway_credit_core, :repo, :query]` telemetry, visible on
-  `/admin/system-health`. `POOL_SIZE` (§1) is still fixed; a
+  tracks lifetime sample count/last queue time (ms) plus a **windowed**
+  max (resets every 5 minutes alongside the scanner-failure prune —
+  see `Store.max_queue_time_window_seconds/0` — so a resolved spike
+  doesn't sit there looking like an ongoing problem forever) via
+  Ecto's own `[:miway_credit_core, :repo, :query]` telemetry.
+  `Monitoring.pool_healthy?/0` flags the current window's max at or
+  above 200ms (an operator-facing threshold shown as an OK/Warning
+  badge, not itself an alert). `POOL_SIZE` (§1) is still fixed; a
   persistently rising max is the earliest sign of exhaustion, before
   `/ready` itself starts failing.
 - `KycRetentionScheduler`/`ArrearsScheduler` heartbeats —
-  `Monitoring.record_tick/1`/`stale?/2`, visible on
-  `/admin/system-health` as an OK/Stale badge per scheduler.
-- `MalwareScanner` failure counter — every `{:error, reason}` result
-  from any adapter increments `Monitoring.recent_scanner_failure_count/1`,
-  visible on `/admin/system-health` — a rising count is the earliest
-  signal of a broken ClamAV install (§8).
-- KYC upload directory disk space — `Monitoring.disk_free_bytes/1`,
-  visible on `/admin/system-health`.
+  `Monitoring.record_tick/1`/`stale?/2`, visible as an OK/Stale badge
+  per scheduler. A scheduler is flagged stale once its last tick is
+  older than 2x its own default tick interval (ArrearsScheduler: 2h;
+  KycRetentionScheduler: 48h — a hardcoded diagnostics constant in
+  `SystemHealthController`, not a config surface).
+- `MalwareScanner` failure counter and last-failure time — every
+  `{:error, reason}` result from any adapter increments
+  `Monitoring.recent_scanner_failure_count/1` and updates
+  `Monitoring.last_scanner_failure_at/0`, both shown together — a
+  count alone can't distinguish "failed once an hour ago" from "still
+  failing right now." A rising count is the earliest signal of a
+  broken ClamAV install (§8).
+- KYC upload directory disk space — `Monitoring.disk_free_bytes/1`.
+- SMTP delivery failures — already logged (`Logger.error`, in
+  `Notifications.deliver_password_reset_email/3`) but deliberately
+  **not** given a `Monitoring` counter of its own: email delivery is a
+  low-volume, non-critical-path operation (unlike KYC uploads or
+  scheduler ticks), and its existing log line is left to the same
+  log-based/external monitoring this section's "Still needs real
+  infrastructure" items already depend on, rather than adding a
+  disproportionate amount of new instrumentation for it.
+- **A monitoring failure can never crash or block a lending
+  operation.** `Monitoring.record_tick/1`, `record_scanner_failure/1`,
+  and `record_query_sample/1` — the only write functions anything
+  outside `Monitoring` itself calls — each catch and log their own
+  failures internally rather than let them propagate; this matters
+  concretely for `record_scanner_failure/1`, which is called directly
+  from `MalwareScanner.scan/1`, sitting in the real KYC upload path.
+  Both telemetry handlers (`handle_repo_query/4`,
+  `handle_error_rendered/4`) are wrapped the same way, since
+  `:telemetry` permanently (and silently) detaches a handler forever
+  the instant it raises once.
+- `/admin/system-health` is tested end-to-end: a platform administrator
+  gets a real 200 with real data; an organisation administrator and a
+  loan officer both get a real 403 (a genuine server-side deny, not a
+  hidden UI element — confirmed by hitting the route directly); an
+  unauthenticated request is redirected to `/login`.
 
-**Still needs real infrastructure — not built, not faked:**
+**Known limitations of `Monitoring.Store` (the ETS table backing all
+of this), worth restating precisely:**
+
+- It survives a *writer* process crashing and restarting (a scheduler,
+  a telemetry handler) because `Store` is supervised separately from
+  them. It does **not** survive `Store`'s own process crashing (ETS
+  tables are destroyed when their owner terminates; no `:heir` is
+  configured — not worth the complexity for diagnostics-only data), an
+  application/VM/container/host restart, or a redeploy. All of it is a
+  **runtime indicator, not a permanent record** — `AuditLogs`, backed
+  by Postgres, is the durable trail for anything that needs one.
+- The table is `:public`, not `:protected` — a deliberate choice, not
+  an oversight: five independent processes write to it directly
+  (two schedulers, `MalwareScanner`, two telemetry handlers), mirroring
+  this codebase's own `PlugAttack.Storage.Ets` precedent for the same
+  multi-writer reason. Every write in the codebase goes through
+  `Monitoring`'s public functions — nothing reaches into the table
+  directly — so treat that module boundary as the actual guarantee,
+  not the ETS access mode.
+- All of it is **local to one running instance**. In a multi-server
+  deployment, each instance has its own independent counters/heartbeats
+  — there is no cross-instance aggregation. This app has no
+  horizontal-scaling story today (single `POOL_SIZE`, single set of
+  schedulers assumed), so this is a latent limitation to revisit if
+  that ever changes, not an active gap.
+- `/admin/system-health` provides visibility. **It does not alert
+  anyone by itself** — nothing pages an operator just because a badge
+  turns red. Wiring it (or the structured log lines it's built on)
+  into something that does is exactly the next section.
+
+### Still needs real infrastructure — not built, not faked
 
 - Disk-space monitoring for the Postgres host itself — a separate
-  machine in most real deployments, not observable from this app;
-  monitor it directly at the host level.
-- Alert on backup failures (§10) once a backup job exists to monitor.
+  machine in most real deployments, and not reliably observable from
+  inside this application's process even when co-located; monitor it
+  directly at the host level.
+- Alert on backup failures (§10) once a real scheduled backup process
+  exists to monitor (see the recommended next step below).
 - Audit-log monitoring — `AuditLogs` (Step 16) records
   `login_failure`/`2fa_blocked_lockout`/etc., but nothing currently
-  watches this table for a spike indicating an attack in progress; add
-  alerting once real traffic exists to set a meaningful threshold
-  against.
-- Wiring any of the above into an actual paging/alerting product
-  (PagerDuty, Opsgenie, a Slack webhook, ...) — this app exposes the
-  data; routing it to a human is a deployment-specific decision.
+  watches this table for a spike indicating an attack in progress.
+  This needs defined rules and thresholds calibrated against real
+  traffic, not a number picked in the abstract — add once that traffic
+  exists.
+- An external uptime monitor actually pointed at `/up`, and an
+  orchestrator/load-balancer actually configured to use `/ready` as
+  its readiness probe — both endpoints exist and work today, but
+  nothing is watching them until a real deployment target does.
+- Wiring any of the above — plus `/admin/system-health`'s data and
+  `ErrorReporter`'s structured log lines — into an actual
+  paging/alerting product (PagerDuty, Opsgenie, a Slack webhook, ...)
+  so a human actually gets woken up. This app exposes the data;
+  routing it to a person is a deployment-specific decision this
+  sandbox can't make.
 
 ## 12. Password-reset email delivery (SMTP)
 

@@ -35,6 +35,7 @@
           <%= @scanner_failure_count %>
         </span>
       </div>
+      <div class="text-xs text-gray-400"><%= format_scanner_last_failure(@scanner_last_failure_at) %></div>
       <p class="text-xs text-gray-400">
         A rising count is the earliest signal of a broken ClamAV install — see the deployment runbook §8.
       </p>
@@ -42,7 +43,12 @@
   </div>
 
   <div class="card p-5">
-    <h2 class="section-title mb-3">Database Pool</h2>
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="section-title">Database Pool</h2>
+      <span class={status_badge_class(not @pool_healthy?)}>
+        <%= if @pool_healthy?, do: "OK", else: "Warning" %>
+      </span>
+    </div>
     <div class="space-y-2 text-sm">
       <div class="flex items-center justify-between">
         <span class="text-gray-500">Samples observed</span>
@@ -53,11 +59,11 @@
         <span class="font-medium text-navy-900"><%= @pool_stats.last_queue_time_ms || "—" %> ms</span>
       </div>
       <div class="flex items-center justify-between">
-        <span class="text-gray-500">Max queue time observed</span>
+        <span class="text-gray-500">Max queue time (current window)</span>
         <span class="font-medium text-navy-900"><%= @pool_stats.max_queue_time_ms || "—" %> ms</span>
       </div>
       <p class="text-xs text-gray-400">
-        A persistently rising max is the earliest signal of pool exhaustion, before /ready itself starts failing.
+        Warns at <%= @pool_stats.warning_threshold_ms %> ms. The max resets every 5 minutes (window started <%= format_timestamp(@pool_stats.max_queue_time_window_started_at) %>) so a resolved spike doesn't sit here looking like an ongoing problem.
       </p>
     </div>
   </div>

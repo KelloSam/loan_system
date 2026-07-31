@@ -6,10 +6,12 @@ defmodule MiwayCreditCoreWeb.SystemHealthHTML do
   def format_scheduler_name(:kyc_retention_scheduler), do: "KYC Retention Scheduler"
 
   def format_last_tick(:never), do: "Never ticked"
+  def format_last_tick({:ok, %DateTime{}} = timestamp), do: format_timestamp(timestamp)
 
-  def format_last_tick({:ok, %DateTime{} = last}) do
-    Calendar.strftime(last, "%d %b %Y %H:%M:%S UTC")
-  end
+  def format_timestamp(:never), do: "n/a"
+
+  def format_timestamp({:ok, %DateTime{} = value}),
+    do: Calendar.strftime(value, "%d %b %Y %H:%M:%S UTC")
 
   def format_bytes({:error, :path_not_found}), do: "Directory not found"
   def format_bytes({:error, _reason}), do: "Unavailable"
@@ -23,6 +25,12 @@ defmodule MiwayCreditCoreWeb.SystemHealthHTML do
   end
 
   def format_bytes({:ok, bytes}), do: "#{bytes} bytes free"
+
+  def format_scanner_last_failure(:never), do: "No failures recorded"
+
+  def format_scanner_last_failure({:ok, %DateTime{} = last}) do
+    "Last failure: #{Calendar.strftime(last, "%d %b %Y %H:%M:%S UTC")}"
+  end
 
   def status_badge_class(true), do: "badge badge-rejected"
   def status_badge_class(false), do: "badge badge-disbursed"

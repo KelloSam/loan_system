@@ -33,7 +33,9 @@ defmodule MiwayCreditCoreWeb.SystemHealthController do
     render(conn, :show,
       schedulers: schedulers,
       scanner_failure_count: Monitoring.recent_scanner_failure_count(),
+      scanner_last_failure_at: Monitoring.last_scanner_failure_at(),
       pool_stats: Monitoring.pool_stats(),
+      pool_healthy?: Monitoring.pool_healthy?(),
       kyc_disk: Monitoring.disk_free_bytes(DocumentStorage.root())
     )
   end
