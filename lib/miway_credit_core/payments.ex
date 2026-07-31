@@ -57,12 +57,12 @@ defmodule MiwayCreditCore.Payments do
   another organisation's account by submitting a foreign id directly.
   """
   def record_payment(%Scope{} = scope, attrs \\ %{}) do
-    loan_account_id  = Map.get(attrs, :loan_account_id) || Map.get(attrs, "loan_account_id")
-    idempotency_key  = Map.get(attrs, :idempotency_key) || Map.get(attrs, "idempotency_key")
-    amount           = decimal(Map.get(attrs, :amount) || Map.get(attrs, "amount"))
-    account          = loan_account_id && get_scoped_account(scope, loan_account_id)
-    payable          = account && amount && decimal_min(amount, account.outstanding_balance)
-    overpayment      = payable && Decimal.sub(amount, payable)
+    loan_account_id = Map.get(attrs, :loan_account_id) || Map.get(attrs, "loan_account_id")
+    idempotency_key = Map.get(attrs, :idempotency_key) || Map.get(attrs, "idempotency_key")
+    amount = decimal(Map.get(attrs, :amount) || Map.get(attrs, "amount"))
+    account = loan_account_id && get_scoped_account(scope, loan_account_id)
+    payable = account && amount && decimal_min(amount, account.outstanding_balance)
+    overpayment = payable && Decimal.sub(amount, payable)
 
     existing =
       loan_account_id && idempotency_key &&
@@ -132,7 +132,10 @@ defmodule MiwayCreditCore.Payments do
         occurred_at: now,
         recorded_by_id: transaction.recorded_by_id,
         lines: [
-          %{account_code: GeneralLedger.cash_account_code(transaction.method), debit: transaction.payable_amount},
+          %{
+            account_code: GeneralLedger.cash_account_code(transaction.method),
+            debit: transaction.payable_amount
+          },
           %{account_code: "1100", credit: transaction.payable_amount}
         ]
       })
@@ -156,7 +159,7 @@ defmodule MiwayCreditCore.Payments do
   """
   def record_failed_payment(%Scope{} = scope, attrs \\ %{}) do
     loan_account_id = Map.get(attrs, :loan_account_id) || Map.get(attrs, "loan_account_id")
-    account          = loan_account_id && get_scoped_account(scope, loan_account_id)
+    account = loan_account_id && get_scoped_account(scope, loan_account_id)
 
     attrs =
       attrs
@@ -222,17 +225,25 @@ defmodule MiwayCreditCore.Payments do
     attrs = stringify_keys(attrs)
 
     Ecto.Multi.new()
-    |> Ecto.Multi.update(:transaction, opts.changeset_fun.(transaction, Map.merge(attrs, %{
-      "status" => opts.status,
-      opts.timestamp_field => now
-    })))
+    |> Ecto.Multi.update(
+      :transaction,
+      opts.changeset_fun.(
+        transaction,
+        Map.merge(attrs, %{
+          "status" => opts.status,
+          opts.timestamp_field => now
+        })
+      )
+    )
     |> Ecto.Multi.run(:reversed_installments, fn repo, _ ->
       reverse_allocations(repo, transaction)
     end)
     |> Ecto.Multi.run(:account, fn repo, _ ->
       restored = transaction.payable_amount || transaction.amount
       new_balance = Decimal.add(account.outstanding_balance, restored)
-      reopen? = account.status == "closed" and Decimal.compare(new_balance, Decimal.new("0")) == :gt
+
+      reopen? =
+        account.status == "closed" and Decimal.compare(new_balance, Decimal.new("0")) == :gt
 
       account
       |> LoanAccount.changeset(%{
@@ -284,7 +295,9 @@ defmodule MiwayCreditCore.Payments do
   defp allocate(repo, %LoanAccount{} = account, transaction, payable) do
     installments =
       from(i in RepaymentScheduleInstallment,
-        where: i.loan_account_id == ^account.id and i.status in ["upcoming", "overdue", "partially_paid"],
+        where:
+          i.loan_account_id == ^account.id and
+            i.status in ["upcoming", "overdue", "partially_paid"],
         order_by: [asc: i.due_date]
       )
       |> repo.all()
@@ -381,8 +394,11 @@ defmodule MiwayCreditCore.Payments do
     Decimal.sub(installment.scheduled_principal, paid_principal)
   end
 
-  defp apply_component("penalty", current, take), do: %{current | penalty_paid: Decimal.add(current.penalty_paid, take)}
-  defp apply_component(_interest_or_principal, current, take), do: %{current | paid_amount: Decimal.add(current.paid_amount, take)}
+  defp apply_component("penalty", current, take),
+    do: %{current | penalty_paid: Decimal.add(current.penalty_paid, take)}
+
+  defp apply_component(_interest_or_principal, current, take),
+    do: %{current | paid_amount: Decimal.add(current.paid_amount, take)}
 
   defp allocation_order(organisation_id) do
     case Organisations.get_settings(organisation_id) do
@@ -408,12 +424,16 @@ defmodule MiwayCreditCore.Payments do
       installment = repo.get!(RepaymentScheduleInstallment, installment_id)
 
       {new_paid, new_penalty_paid} =
-        Enum.reduce(allocations, {installment.paid_amount, installment.penalty_paid}, fn allocation, {paid, penalty_paid} ->
-          case allocation.component do
-            "penalty" -> {paid, Decimal.sub(penalty_paid, allocation.allocated_amount)}
-            _ -> {Decimal.sub(paid, allocation.allocated_amount), penalty_paid}
+        Enum.reduce(
+          allocations,
+          {installment.paid_amount, installment.penalty_paid},
+          fn allocation, {paid, penalty_paid} ->
+            case allocation.component do
+              "penalty" -> {paid, Decimal.sub(penalty_paid, allocation.allocated_amount)}
+              _ -> {Decimal.sub(paid, allocation.allocated_amount), penalty_paid}
+            end
           end
-        end)
+        )
 
       status =
         cond do
@@ -454,6 +474,7 @@ defmodule MiwayCreditCore.Payments do
   end
 
   defp scope_organisation(query, %Scope{organisation_id: :all}), do: query
+
   defp scope_organisation(query, %Scope{organisation_id: organisation_id}) do
     where(query, organisation_id: ^organisation_id)
   end

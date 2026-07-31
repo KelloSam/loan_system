@@ -37,7 +37,10 @@ defmodule MiwayCreditCore.CustomersFixtures do
     customer_fixture_in_organisation(organisation, attrs)
   end
 
-  def customer_fixture_in_organisation(%MiwayCreditCore.Organisations.Organisation{} = organisation, attrs \\ %{}) do
+  def customer_fixture_in_organisation(
+        %MiwayCreditCore.Organisations.Organisation{} = organisation,
+        attrs \\ %{}
+      ) do
     scope = %Scope{organisation_id: organisation.id}
 
     {:ok, customer} =

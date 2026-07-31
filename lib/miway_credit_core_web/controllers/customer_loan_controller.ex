@@ -5,7 +5,10 @@ defmodule MiwayCreditCoreWeb.CustomerLoanController do
 
   def index(conn, _params) do
     customer = conn.assigns.current_customer
-    applications = Applications.get_applications_for_customer(conn.assigns.current_scope, customer.id)
+
+    applications =
+      Applications.get_applications_for_customer(conn.assigns.current_scope, customer.id)
+
     render(conn, :index, applications: applications)
   end
 
@@ -23,14 +26,20 @@ defmodule MiwayCreditCoreWeb.CustomerLoanController do
     else
       {account, interest, installments} =
         case application.loan_account do
-          nil -> {nil, nil, []}
+          nil ->
+            {nil, nil, []}
+
           account ->
             {account, Lending.compound_interest_details(account),
              Lending.list_installments_for_account(scope, account.id)}
         end
 
-      render(conn, :show, application: application, account: account, interest: interest,
-        installments: installments)
+      render(conn, :show,
+        application: application,
+        account: account,
+        interest: interest,
+        installments: installments
+      )
     end
   end
 end

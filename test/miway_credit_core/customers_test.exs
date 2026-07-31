@@ -102,6 +102,7 @@ defmodule MiwayCreditCore.CustomersTest do
 
     test "get_customer!/2 raises for an unknown id" do
       scope = %Scope{organisation_id: organisation_fixture().id}
+
       assert_raise Ecto.NoResultsError, fn ->
         Customers.get_customer!(scope, Ecto.UUID.generate())
       end
@@ -115,7 +116,10 @@ defmodule MiwayCreditCore.CustomersTest do
   describe "update_customer/2" do
     test "updates allowed fields" do
       customer = customer_fixture()
-      assert {:ok, updated} = Customers.update_customer(customer, %{name: "Renamed", address_line: "Lusaka"})
+
+      assert {:ok, updated} =
+               Customers.update_customer(customer, %{name: "Renamed", address_line: "Lusaka"})
+
       assert updated.name == "Renamed"
       assert updated.address_line == "Lusaka"
     end

@@ -19,18 +19,30 @@ defmodule MiwayCreditCore.Payments.PaymentAllocation do
 
     belongs_to :organisation, MiwayCreditCore.Organisations.Organisation, type: :binary_id
     belongs_to :payment_transaction, MiwayCreditCore.Payments.PaymentTransaction, type: :binary_id
-    belongs_to :repayment_schedule_installment, MiwayCreditCore.Lending.RepaymentScheduleInstallment,
-      type: :binary_id
+
+    belongs_to :repayment_schedule_installment,
+               MiwayCreditCore.Lending.RepaymentScheduleInstallment,
+               type: :binary_id
 
     timestamps(updated_at: false)
   end
 
   def changeset(allocation, attrs) do
     allocation
-    |> cast(attrs, [:organisation_id, :payment_transaction_id, :repayment_schedule_installment_id,
-                   :allocated_amount, :component])
-    |> validate_required([:organisation_id, :payment_transaction_id, :repayment_schedule_installment_id,
-                          :allocated_amount, :component])
+    |> cast(attrs, [
+      :organisation_id,
+      :payment_transaction_id,
+      :repayment_schedule_installment_id,
+      :allocated_amount,
+      :component
+    ])
+    |> validate_required([
+      :organisation_id,
+      :payment_transaction_id,
+      :repayment_schedule_installment_id,
+      :allocated_amount,
+      :component
+    ])
     |> validate_number(:allocated_amount, greater_than: 0)
     |> validate_inclusion(:component, @components)
     |> foreign_key_constraint(:organisation_id)

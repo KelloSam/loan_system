@@ -75,14 +75,22 @@ defmodule MiwayCreditCore.Customers.DocumentStorage do
 
   defp encrypt(plaintext) do
     nonce = :crypto.strong_rand_bytes(@nonce_bytes)
-    {ciphertext, tag} = :crypto.crypto_one_time_aead(:aes_256_gcm, key(), nonce, plaintext, "", true)
+
+    {ciphertext, tag} =
+      :crypto.crypto_one_time_aead(:aes_256_gcm, key(), nonce, plaintext, "", true)
+
     nonce <> tag <> ciphertext
   end
 
-  defp decrypt(<<nonce::binary-size(@nonce_bytes), tag::binary-size(@tag_bytes), ciphertext::binary>>) do
+  defp decrypt(
+         <<nonce::binary-size(@nonce_bytes), tag::binary-size(@tag_bytes), ciphertext::binary>>
+       ) do
     case :crypto.crypto_one_time_aead(:aes_256_gcm, key(), nonce, ciphertext, "", tag, false) do
-      :error -> raise "KYC document failed to decrypt — the file may be corrupted or tampered with"
-      plaintext -> plaintext
+      :error ->
+        raise "KYC document failed to decrypt — the file may be corrupted or tampered with"
+
+      plaintext ->
+        plaintext
     end
   end
 

@@ -12,7 +12,10 @@ defmodule MiwayCreditCore.Accounts.PasswordResetNotifier.Unconfigured do
 
   @impl true
   def deliver_reset_link(user, _reset_url) do
-    Logger.error("Password reset requested for #{user.email} but no PasswordResetNotifier adapter is configured")
+    Logger.error(
+      "Password reset requested for #{user.email} but no PasswordResetNotifier adapter is configured"
+    )
+
     {:error, :not_configured}
   end
 end

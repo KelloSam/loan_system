@@ -29,7 +29,14 @@ defmodule MiwayCreditCore.Accounting.JournalEntry do
 
   def changeset(journal_entry, attrs) do
     journal_entry
-    |> cast(attrs, [:organisation_id, :description, :source_type, :source_id, :occurred_at, :recorded_by_id])
+    |> cast(attrs, [
+      :organisation_id,
+      :description,
+      :source_type,
+      :source_id,
+      :occurred_at,
+      :recorded_by_id
+    ])
     |> validate_required([:organisation_id, :description, :source_type, :occurred_at])
     |> foreign_key_constraint(:organisation_id)
     |> foreign_key_constraint(:recorded_by_id)

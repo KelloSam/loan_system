@@ -38,7 +38,9 @@ defmodule MiwayCreditCore.Applications.LoanApplication do
     belongs_to :disbursed_by, MiwayCreditCore.Accounts.User
     belongs_to :loan_product, MiwayCreditCore.Products.LoanProduct, type: :binary_id
     has_one :loan_account, MiwayCreditCore.Lending.LoanAccount
-    has_many :approval_decisions, MiwayCreditCore.Applications.ApprovalDecision, preload_order: [asc: :level, asc: :inserted_at]
+
+    has_many :approval_decisions, MiwayCreditCore.Applications.ApprovalDecision,
+      preload_order: [asc: :level, asc: :inserted_at]
 
     timestamps()
   end
@@ -56,9 +58,24 @@ defmodule MiwayCreditCore.Applications.LoanApplication do
   """
   def changeset(loan_application, attrs) do
     loan_application
-    |> cast(attrs, [:organisation_id, :customer_id, :created_by_id, :loan_product_id, :requested_amount,
-                   :requested_term_months, :purpose, :risk_level, :risk_score])
-    |> validate_required([:organisation_id, :customer_id, :loan_product_id, :requested_amount, :requested_term_months])
+    |> cast(attrs, [
+      :organisation_id,
+      :customer_id,
+      :created_by_id,
+      :loan_product_id,
+      :requested_amount,
+      :requested_term_months,
+      :purpose,
+      :risk_level,
+      :risk_score
+    ])
+    |> validate_required([
+      :organisation_id,
+      :customer_id,
+      :loan_product_id,
+      :requested_amount,
+      :requested_term_months
+    ])
     |> validate_inclusion(:risk_level, @risk_levels)
     |> validate_number(:requested_amount, greater_than: 0)
     |> validate_number(:requested_term_months, greater_than: 0)
@@ -79,10 +96,17 @@ defmodule MiwayCreditCore.Applications.LoanApplication do
   def decision_changeset(loan_application, attrs) do
     loan_application
     |> cast(attrs, [
-      :status, :decided_at, :decided_by_id, :rejection_reason,
-      :assessed_at, :assessed_by_id, :assessment_notes,
-      :disbursed_at, :disbursed_by_id,
-      :conditions, :conditions_cleared_at
+      :status,
+      :decided_at,
+      :decided_by_id,
+      :rejection_reason,
+      :assessed_at,
+      :assessed_by_id,
+      :assessment_notes,
+      :disbursed_at,
+      :disbursed_by_id,
+      :conditions,
+      :conditions_cleared_at
     ])
     |> validate_required([:status])
     |> validate_inclusion(:status, @statuses)

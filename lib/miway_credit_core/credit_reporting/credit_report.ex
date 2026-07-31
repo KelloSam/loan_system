@@ -40,10 +40,24 @@ defmodule MiwayCreditCore.CreditReporting.CreditReport do
   def changeset(credit_report, attrs) do
     credit_report
     |> cast(attrs, [
-      :organisation_id, :customer_id, :requested_by_id,
-      :provider, :outcome, :score, :reference_number, :summary, :checked_at
+      :organisation_id,
+      :customer_id,
+      :requested_by_id,
+      :provider,
+      :outcome,
+      :score,
+      :reference_number,
+      :summary,
+      :checked_at
     ])
-    |> validate_required([:organisation_id, :customer_id, :requested_by_id, :provider, :outcome, :checked_at])
+    |> validate_required([
+      :organisation_id,
+      :customer_id,
+      :requested_by_id,
+      :provider,
+      :outcome,
+      :checked_at
+    ])
     |> validate_inclusion(:provider, @providers)
     |> validate_inclusion(:outcome, @outcomes)
     |> foreign_key_constraint(:organisation_id)

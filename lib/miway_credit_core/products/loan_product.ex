@@ -74,26 +74,47 @@ defmodule MiwayCreditCore.Products.LoanProduct do
   def changeset(product, attrs) do
     product
     |> cast(attrs, [
-      :organisation_id, :created_by_id, :name, :description,
-      :minimum_principal, :maximum_principal,
-      :interest_method, :interest_rate,
-      :minimum_term_months, :maximum_term_months,
+      :organisation_id,
+      :created_by_id,
+      :name,
+      :description,
+      :minimum_principal,
+      :maximum_principal,
+      :interest_method,
+      :interest_rate,
+      :minimum_term_months,
+      :maximum_term_months,
       :repayment_frequency,
-      :origination_fee_percent, :late_payment_penalty_percent, :grace_period_days,
-      :requires_collateral, :requires_guarantor, :minimum_guarantors, :requires_crb_check,
-      :requires_affordability_check, :max_debt_to_income_percent,
+      :origination_fee_percent,
+      :late_payment_penalty_percent,
+      :grace_period_days,
+      :requires_collateral,
+      :requires_guarantor,
+      :minimum_guarantors,
+      :requires_crb_check,
+      :requires_affordability_check,
+      :max_debt_to_income_percent,
       :minimum_approval_role,
-      :requires_second_level_approval, :second_level_minimum_role,
-      :requires_committee_decision, :committee_size, :committee_quorum,
+      :requires_second_level_approval,
+      :second_level_minimum_role,
+      :requires_committee_decision,
+      :committee_size,
+      :committee_quorum,
       :requires_separation_of_duties,
-      :effective_from, :effective_until
+      :effective_from,
+      :effective_until
     ])
     |> validate_required([
-      :organisation_id, :name,
-      :minimum_principal, :maximum_principal,
-      :interest_method, :interest_rate,
-      :minimum_term_months, :maximum_term_months,
-      :repayment_frequency, :effective_from
+      :organisation_id,
+      :name,
+      :minimum_principal,
+      :maximum_principal,
+      :interest_method,
+      :interest_rate,
+      :minimum_term_months,
+      :maximum_term_months,
+      :repayment_frequency,
+      :effective_from
     ])
     |> validate_number(:minimum_principal, greater_than: 0)
     |> validate_number(:maximum_principal, greater_than: 0)
@@ -147,9 +168,14 @@ defmodule MiwayCreditCore.Products.LoanProduct do
     max = get_field(changeset, max_field)
 
     cond do
-      is_nil(min) or is_nil(max) -> changeset
-      compare(min, max) == :gt -> add_error(changeset, max_field, "must be greater than or equal to #{min_field}")
-      true -> changeset
+      is_nil(min) or is_nil(max) ->
+        changeset
+
+      compare(min, max) == :gt ->
+        add_error(changeset, max_field, "must be greater than or equal to #{min_field}")
+
+      true ->
+        changeset
     end
   end
 

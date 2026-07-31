@@ -41,7 +41,9 @@ defmodule MiwayCreditCore.AccountsFixtures do
 
     if role != "platform_administrator" do
       organisation = MiwayCreditCore.OrganisationsFixtures.organisation_fixture()
-      {:ok, _membership} = MiwayCreditCore.Authorization.enroll_staff_member(staff_member, organisation.id)
+
+      {:ok, _membership} =
+        MiwayCreditCore.Authorization.enroll_staff_member(staff_member, organisation.id)
     end
 
     user

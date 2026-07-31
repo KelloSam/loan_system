@@ -23,7 +23,13 @@ defmodule MiwayCreditCore.Accounting.JournalLine do
 
   def changeset(journal_line, attrs) do
     journal_line
-    |> cast(attrs, [:organisation_id, :journal_entry_id, :account_id, :debit_amount, :credit_amount])
+    |> cast(attrs, [
+      :organisation_id,
+      :journal_entry_id,
+      :account_id,
+      :debit_amount,
+      :credit_amount
+    ])
     |> validate_required([:organisation_id, :journal_entry_id, :account_id])
     |> validate_number(:debit_amount, greater_than: 0)
     |> validate_number(:credit_amount, greater_than: 0)

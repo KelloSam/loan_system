@@ -35,5 +35,7 @@ defmodule MiwayCreditCore.Risk do
   `{:error, :affordability_exceeded}` otherwise — see
   `MiwayCreditCore.Risk.AffordabilityCalculator.assess/3`.
   """
-  defdelegate assess_affordability(scope, application, product), to: AffordabilityCalculator, as: :assess
+  defdelegate assess_affordability(scope, application, product),
+    to: AffordabilityCalculator,
+    as: :assess
 end

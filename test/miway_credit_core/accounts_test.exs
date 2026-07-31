@@ -45,7 +45,10 @@ defmodule MiwayCreditCore.AccountsTest do
   describe "register_staff_member/2" do
     test "creates a User and a StaffMember in one transaction" do
       attrs = valid_user_attrs()
-      assert {:ok, %User{} = user, staff_member} = Accounts.register_staff_member(attrs, "loan_officer")
+
+      assert {:ok, %User{} = user, staff_member} =
+               Accounts.register_staff_member(attrs, "loan_officer")
+
       assert staff_member.user_id == user.id
       assert staff_member.role == "loan_officer"
       assert Accounts.get_staff_member(user.id).id == staff_member.id
@@ -127,7 +130,9 @@ defmodule MiwayCreditCore.AccountsTest do
 
     test "fails for a wrong password and increments failed_attempts" do
       user = user_fixture(%{password: "CorrectHorse123"})
-      assert {:error, :invalid_credentials} = Accounts.authenticate_user(user.email, "WrongPassword1")
+
+      assert {:error, :invalid_credentials} =
+               Accounts.authenticate_user(user.email, "WrongPassword1")
 
       reloaded = Accounts.get_user!(user.id)
       assert reloaded.failed_attempts == 1

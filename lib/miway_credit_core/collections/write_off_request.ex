@@ -31,8 +31,20 @@ defmodule MiwayCreditCore.Collections.WriteOffRequest do
 
   def changeset(request, attrs) do
     request
-    |> cast(attrs, [:organisation_id, :loan_account_id, :requested_by_id, :requested_amount, :reason])
-    |> validate_required([:organisation_id, :loan_account_id, :requested_by_id, :requested_amount, :reason])
+    |> cast(attrs, [
+      :organisation_id,
+      :loan_account_id,
+      :requested_by_id,
+      :requested_amount,
+      :reason
+    ])
+    |> validate_required([
+      :organisation_id,
+      :loan_account_id,
+      :requested_by_id,
+      :requested_amount,
+      :reason
+    ])
     |> validate_number(:requested_amount, greater_than: 0)
     |> foreign_key_constraint(:organisation_id)
     |> foreign_key_constraint(:loan_account_id)

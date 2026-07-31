@@ -23,7 +23,9 @@ defmodule MiwayCreditCore.CreditReportingTest do
       admin = admin_fixture()
       grant_credit_check_consent(customer, admin.id)
 
-      assert {:ok, report} = ManualAdapter.record_report(scope, customer, valid_report_attrs(), admin.id)
+      assert {:ok, report} =
+               ManualAdapter.record_report(scope, customer, valid_report_attrs(), admin.id)
+
       assert report.customer_id == customer.id
       assert report.organisation_id == customer.organisation_id
       assert report.provider == "manual"
@@ -37,7 +39,9 @@ defmodule MiwayCreditCore.CreditReportingTest do
       admin = admin_fixture()
       consent = grant_credit_check_consent(customer, admin.id)
 
-      {:ok, _report} = ManualAdapter.record_report(scope, customer, valid_report_attrs(), admin.id)
+      {:ok, _report} =
+        ManualAdapter.record_report(scope, customer, valid_report_attrs(), admin.id)
+
       {:ok, _} = Customers.revoke_consent(consent)
 
       assert {:error, :consent_required} =
@@ -53,10 +57,20 @@ defmodule MiwayCreditCore.CreditReportingTest do
       grant_credit_check_consent(customer, admin.id)
 
       {:ok, older} =
-        ManualAdapter.record_report(scope, customer, valid_report_attrs(%{"checked_at" => "2026-01-01"}), admin.id)
+        ManualAdapter.record_report(
+          scope,
+          customer,
+          valid_report_attrs(%{"checked_at" => "2026-01-01"}),
+          admin.id
+        )
 
       {:ok, newer} =
-        ManualAdapter.record_report(scope, customer, valid_report_attrs(%{"checked_at" => "2026-06-01"}), admin.id)
+        ManualAdapter.record_report(
+          scope,
+          customer,
+          valid_report_attrs(%{"checked_at" => "2026-06-01"}),
+          admin.id
+        )
 
       latest = CreditReporting.get_latest_report_for_customer(scope, customer.id)
       assert latest.id == newer.id
@@ -73,10 +87,20 @@ defmodule MiwayCreditCore.CreditReportingTest do
       same_day = Date.utc_today() |> Date.to_iso8601()
 
       {:ok, first} =
-        ManualAdapter.record_report(scope, customer, valid_report_attrs(%{"outcome" => "adverse", "checked_at" => same_day}), admin.id)
+        ManualAdapter.record_report(
+          scope,
+          customer,
+          valid_report_attrs(%{"outcome" => "adverse", "checked_at" => same_day}),
+          admin.id
+        )
 
       {:ok, second} =
-        ManualAdapter.record_report(scope, customer, valid_report_attrs(%{"outcome" => "clear", "checked_at" => same_day}), admin.id)
+        ManualAdapter.record_report(
+          scope,
+          customer,
+          valid_report_attrs(%{"outcome" => "clear", "checked_at" => same_day}),
+          admin.id
+        )
 
       latest = CreditReporting.get_latest_report_for_customer(scope, customer.id)
       assert latest.id == second.id
@@ -100,7 +124,12 @@ defmodule MiwayCreditCore.CreditReportingTest do
       grant_credit_check_consent(customer, admin.id)
 
       {:ok, _report} =
-        ManualAdapter.record_report(%Scope{organisation_id: other.id}, customer, valid_report_attrs(), admin.id)
+        ManualAdapter.record_report(
+          %Scope{organisation_id: other.id},
+          customer,
+          valid_report_attrs(),
+          admin.id
+        )
 
       scope = %Scope{organisation_id: organisation.id}
       assert CreditReporting.get_latest_report_for_customer(scope, customer.id) == nil
@@ -111,7 +140,11 @@ defmodule MiwayCreditCore.CreditReportingTest do
     {:ok, consent} =
       Customers.create_consent(
         customer,
-        %{"consent_type" => "credit_check", "method" => "signed_form", "granted_at" => DateTime.utc_now()},
+        %{
+          "consent_type" => "credit_check",
+          "method" => "signed_form",
+          "granted_at" => DateTime.utc_now()
+        },
         recorded_by_id
       )
 

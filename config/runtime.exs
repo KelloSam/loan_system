@@ -54,7 +54,10 @@ if config_env() == :prod do
 
   config :miway_credit_core, MiwayCreditCoreWeb.Endpoint,
     url: [host: host],
-    http: [ip: {0, 0, 0, 0, 0, 0, 0, 0}, port: String.to_integer(System.get_env("PORT") || "4000")],
+    http: [
+      ip: {0, 0, 0, 0, 0, 0, 0, 0},
+      port: String.to_integer(System.get_env("PORT") || "4000")
+    ],
     secret_key_base: secret_key_base
 
   # Password-reset email delivery. Deliberately optional, unlike

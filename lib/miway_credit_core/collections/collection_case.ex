@@ -41,10 +41,25 @@ defmodule MiwayCreditCore.Collections.CollectionCase do
   def changeset(collection_case, attrs) do
     collection_case
     |> cast(attrs, [
-      :organisation_id, :loan_account_id, :customer_id, :status, :recovery_status,
-      :assigned_to_id, :opened_at, :opened_by_id, :closed_at, :close_reason
+      :organisation_id,
+      :loan_account_id,
+      :customer_id,
+      :status,
+      :recovery_status,
+      :assigned_to_id,
+      :opened_at,
+      :opened_by_id,
+      :closed_at,
+      :close_reason
     ])
-    |> validate_required([:organisation_id, :loan_account_id, :customer_id, :status, :recovery_status, :opened_at])
+    |> validate_required([
+      :organisation_id,
+      :loan_account_id,
+      :customer_id,
+      :status,
+      :recovery_status,
+      :opened_at
+    ])
     |> validate_inclusion(:status, @statuses)
     |> validate_inclusion(:recovery_status, @recovery_statuses)
     |> foreign_key_constraint(:organisation_id)

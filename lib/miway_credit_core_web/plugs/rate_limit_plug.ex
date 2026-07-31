@@ -7,10 +7,11 @@ defmodule MiwayCreditCoreWeb.Plugs.RateLimitPlug do
   # many accounts from a single source.
   rule "login by ip", conn do
     if conn.method == "POST" and conn.request_path == "/login" do
-      throttle conn.remote_ip,
+      throttle(conn.remote_ip,
         period: 60_000,
         limit: 10,
         storage: {PlugAttack.Storage.Ets, MiwayCreditCoreWeb.RateLimitStorage}
+      )
     end
   end
 
@@ -19,10 +20,11 @@ defmodule MiwayCreditCoreWeb.Plugs.RateLimitPlug do
   # from a single IP.
   rule "password reset request by ip", conn do
     if conn.method == "POST" and conn.request_path == "/password-reset" do
-      throttle conn.remote_ip,
+      throttle(conn.remote_ip,
         period: 60_000,
         limit: 10,
         storage: {PlugAttack.Storage.Ets, MiwayCreditCoreWeb.RateLimitStorage}
+      )
     end
   end
 
@@ -34,10 +36,11 @@ defmodule MiwayCreditCoreWeb.Plugs.RateLimitPlug do
   # the password step's defense.
   rule "2fa verify by ip", conn do
     if conn.method == "POST" and conn.request_path == "/login/verify" do
-      throttle conn.remote_ip,
+      throttle(conn.remote_ip,
         period: 60_000,
         limit: 10,
         storage: {PlugAttack.Storage.Ets, MiwayCreditCoreWeb.RateLimitStorage}
+      )
     end
   end
 
@@ -57,7 +60,10 @@ defmodule MiwayCreditCoreWeb.Plugs.RateLimitPlug do
       end
 
     conn
-    |> Phoenix.Controller.put_flash(:error, "Too many attempts. Please wait a minute and try again.")
+    |> Phoenix.Controller.put_flash(
+      :error,
+      "Too many attempts. Please wait a minute and try again."
+    )
     |> Phoenix.Controller.redirect(to: redirect_to)
     |> Plug.Conn.halt()
   end

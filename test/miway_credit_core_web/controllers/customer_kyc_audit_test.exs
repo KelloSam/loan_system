@@ -20,7 +20,11 @@ defmodule MiwayCreditCoreWeb.CustomerKycAuditTest do
     %{organisation: organisation, org_admin: org_admin, customer: customer}
   end
 
-  test "creating a customer is audited and never logs the raw id_number", %{conn: conn, org_admin: org_admin, organisation: organisation} do
+  test "creating a customer is audited and never logs the raw id_number", %{
+    conn: conn,
+    org_admin: org_admin,
+    organisation: organisation
+  } do
     conn = login(conn, org_admin)
 
     conn =
@@ -112,7 +116,10 @@ defmodule MiwayCreditCoreWeb.CustomerKycAuditTest do
     customer: customer
   } do
     conn = login(conn, org_admin)
-    path = Path.join(System.tmp_dir!(), "blocked_test_upload_#{System.unique_integer([:positive])}")
+
+    path =
+      Path.join(System.tmp_dir!(), "blocked_test_upload_#{System.unique_integer([:positive])}")
+
     File.write!(path, "eicar test string")
     upload = %Plug.Upload{path: path, filename: "nrc.jpg", content_type: "image/jpeg"}
 
@@ -130,7 +137,10 @@ defmodule MiwayCreditCoreWeb.CustomerKycAuditTest do
     assert entry.event == "kyc_document_scan_blocked"
     refute metadata_contains?(entry, "eicar test string")
 
-    assert MiwayCreditCore.Customers.list_kyc_documents_for_customer(%Scope{organisation_id: customer.organisation_id}, customer.id) == []
+    assert MiwayCreditCore.Customers.list_kyc_documents_for_customer(
+             %Scope{organisation_id: customer.organisation_id},
+             customer.id
+           ) == []
   end
 
   test "downloading a KYC document returns the original bytes, decrypted end-to-end", %{
@@ -139,7 +149,10 @@ defmodule MiwayCreditCoreWeb.CustomerKycAuditTest do
     customer: customer
   } do
     conn = login(conn, org_admin)
-    path = Path.join(System.tmp_dir!(), "download_test_upload_#{System.unique_integer([:positive])}")
+
+    path =
+      Path.join(System.tmp_dir!(), "download_test_upload_#{System.unique_integer([:positive])}")
+
     original_bytes = "%PDF-1.4 the real content of this document, byte for byte"
     File.write!(path, original_bytes)
     upload = %Plug.Upload{path: path, filename: "id.pdf", content_type: "application/pdf"}
@@ -151,7 +164,12 @@ defmodule MiwayCreditCoreWeb.CustomerKycAuditTest do
 
     assert redirected_to(conn) == ~p"/admin/customers/#{customer.id}"
 
-    document = MiwayCreditCore.Customers.list_kyc_documents_for_customer(%Scope{organisation_id: customer.organisation_id}, customer.id) |> hd()
+    document =
+      MiwayCreditCore.Customers.list_kyc_documents_for_customer(
+        %Scope{organisation_id: customer.organisation_id},
+        customer.id
+      )
+      |> hd()
 
     conn =
       build_conn()

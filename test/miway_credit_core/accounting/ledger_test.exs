@@ -16,7 +16,9 @@ defmodule MiwayCreditCore.Accounting.LedgerTest do
       entries = Accounting.list_entries_for_account(scope, account.id)
       assert length(entries) == 3
       assert Enum.map(entries, & &1.entry_type) == ["disbursement", "repayment", "repayment"]
-      assert entries |> Enum.map(& &1.inserted_at) == Enum.sort(Enum.map(entries, & &1.inserted_at), NaiveDateTime)
+
+      assert entries |> Enum.map(& &1.inserted_at) ==
+               Enum.sort(Enum.map(entries, & &1.inserted_at), NaiveDateTime)
     end
 
     test "only returns entries for the given account" do
@@ -35,11 +37,19 @@ defmodule MiwayCreditCore.Accounting.LedgerTest do
       application = approved_application_fixture()
       scope = %Scope{organisation_id: application.organisation_id}
       account = application.loan_account
-      assert Decimal.equal?(Accounting.rebuild_outstanding_balance(scope, account.id), account.outstanding_balance)
+
+      assert Decimal.equal?(
+               Accounting.rebuild_outstanding_balance(scope, account.id),
+               account.outstanding_balance
+             )
 
       payment_fixture(account, %{"amount" => "50.00"})
       reloaded = Lending.get_account!(scope, account.id)
-      assert Decimal.equal?(Accounting.rebuild_outstanding_balance(scope, account.id), reloaded.outstanding_balance)
+
+      assert Decimal.equal?(
+               Accounting.rebuild_outstanding_balance(scope, account.id),
+               reloaded.outstanding_balance
+             )
     end
   end
 end

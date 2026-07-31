@@ -33,7 +33,8 @@ defmodule MiwayCreditCoreWeb.Plugs.AuthPlug do
   """
   def call(conn, _opts) do
     with user_id when not is_nil(user_id) <- get_session(conn, :user_id),
-         authenticated_at when not is_nil(authenticated_at) <- get_session(conn, :authenticated_at),
+         authenticated_at when not is_nil(authenticated_at) <-
+           get_session(conn, :authenticated_at),
          %Accounts.User{} = user <- Accounts.get_user!(user_id),
          :ok <- check_status(user),
          :ok <- check_session_not_invalidated(user, authenticated_at),
@@ -75,13 +76,17 @@ defmodule MiwayCreditCoreWeb.Plugs.AuthPlug do
             {:error, "Your account isn't linked to an organisation. Contact your administrator."}
 
           membership ->
-            {:ok, staff_member, nil, Scope.for_staff_member(user, staff_member, membership.organisation_id)}
+            {:ok, staff_member, nil,
+             Scope.for_staff_member(user, staff_member, membership.organisation_id)}
         end
 
       nil ->
         case Accounts.get_customer_user(user.id) do
-          nil -> {:ok, nil, nil, nil}
-          customer_user -> {:ok, nil, customer_user.customer, Scope.for_customer(user, customer_user.customer)}
+          nil ->
+            {:ok, nil, nil, nil}
+
+          customer_user ->
+            {:ok, nil, customer_user.customer, Scope.for_customer(user, customer_user.customer)}
         end
     end
   end
@@ -89,9 +94,16 @@ defmodule MiwayCreditCoreWeb.Plugs.AuthPlug do
   defp check_status(%Accounts.User{status: "active"}), do: :ok
   defp check_status(%Accounts.User{}), do: {:error, "Your account has been suspended."}
 
-  defp check_session_not_invalidated(%Accounts.User{sessions_invalidated_at: nil}, _authenticated_at), do: :ok
+  defp check_session_not_invalidated(
+         %Accounts.User{sessions_invalidated_at: nil},
+         _authenticated_at
+       ),
+       do: :ok
 
-  defp check_session_not_invalidated(%Accounts.User{sessions_invalidated_at: invalidated_at}, authenticated_at) do
+  defp check_session_not_invalidated(
+         %Accounts.User{sessions_invalidated_at: invalidated_at},
+         authenticated_at
+       ) do
     if NaiveDateTime.compare(authenticated_at, invalidated_at) == :lt do
       {:error, "Your session has expired. Please log in again."}
     else

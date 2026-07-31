@@ -16,7 +16,10 @@ defmodule MiwayCreditCore.ApplicationsTest do
       scope = %Scope{organisation_id: customer.organisation_id}
 
       assert {:ok, %LoanApplication{} = application} =
-               Applications.create_application(scope, valid_application_attrs(%{"customer_id" => customer.id}))
+               Applications.create_application(
+                 scope,
+                 valid_application_attrs(%{"customer_id" => customer.id})
+               )
 
       assert application.status == "pending"
       assert application.organisation_id == customer.organisation_id
@@ -30,7 +33,12 @@ defmodule MiwayCreditCore.ApplicationsTest do
     test "recalculates the customer's total_loans; current_balance stays zero (no account yet)" do
       customer = customer_fixture()
       scope = %Scope{organisation_id: customer.organisation_id}
-      {:ok, _application} = Applications.create_application(scope, valid_application_attrs(%{"customer_id" => customer.id}))
+
+      {:ok, _application} =
+        Applications.create_application(
+          scope,
+          valid_application_attrs(%{"customer_id" => customer.id})
+        )
 
       reloaded = Customers.get_customer!(scope, customer.id)
       assert reloaded.total_loans == 1
@@ -40,10 +48,18 @@ defmodule MiwayCreditCore.ApplicationsTest do
     test "blocks a second application while one is still pending" do
       customer = customer_fixture()
       scope = %Scope{organisation_id: customer.organisation_id}
-      {:ok, _first} = Applications.create_application(scope, valid_application_attrs(%{"customer_id" => customer.id}))
+
+      {:ok, _first} =
+        Applications.create_application(
+          scope,
+          valid_application_attrs(%{"customer_id" => customer.id})
+        )
 
       assert {:error, :pending_application_exists} =
-               Applications.create_application(scope, valid_application_attrs(%{"customer_id" => customer.id}))
+               Applications.create_application(
+                 scope,
+                 valid_application_attrs(%{"customer_id" => customer.id})
+               )
     end
 
     test "blocks a new application within 30 days of a rejection" do
@@ -53,10 +69,15 @@ defmodule MiwayCreditCore.ApplicationsTest do
       admin = admin_fixture()
       admin_scope = %Scope{user: admin, organisation_id: :all}
       {:ok, assessed} = Applications.assess_application(application, admin_scope)
-      {:ok, _rejected} = Applications.reject_application(assessed, admin_scope, "Insufficient income")
+
+      {:ok, _rejected} =
+        Applications.reject_application(assessed, admin_scope, "Insufficient income")
 
       assert {:error, :rejection_cooldown} =
-               Applications.create_application(scope, valid_application_attrs(%{"customer_id" => customer.id}))
+               Applications.create_application(
+                 scope,
+                 valid_application_attrs(%{"customer_id" => customer.id})
+               )
     end
 
     test "rejects invalid attrs with a changeset error" do
@@ -66,7 +87,10 @@ defmodule MiwayCreditCore.ApplicationsTest do
       assert {:error, %Ecto.Changeset{}} =
                Applications.create_application(
                  scope,
-                 valid_application_attrs(%{"customer_id" => customer.id, "purpose" => String.duplicate("x", 501)})
+                 valid_application_attrs(%{
+                   "customer_id" => customer.id,
+                   "purpose" => String.duplicate("x", 501)
+                 })
                )
     end
 
@@ -77,7 +101,10 @@ defmodule MiwayCreditCore.ApplicationsTest do
       assert {:error, :amount_below_minimum} =
                Applications.create_application(
                  scope,
-                 valid_application_attrs(%{"customer_id" => customer.id, "requested_amount" => "-5"})
+                 valid_application_attrs(%{
+                   "customer_id" => customer.id,
+                   "requested_amount" => "-5"
+                 })
                )
     end
 
@@ -110,7 +137,11 @@ defmodule MiwayCreditCore.ApplicationsTest do
       admin = admin_fixture()
 
       assert {:ok, assessed} =
-               Applications.assess_application(application, %Scope{user: admin, organisation_id: :all}, "Docs check out")
+               Applications.assess_application(
+                 application,
+                 %Scope{user: admin, organisation_id: :all},
+                 "Docs check out"
+               )
 
       assert assessed.status == "under_review"
       assert assessed.assessed_at
@@ -122,7 +153,12 @@ defmodule MiwayCreditCore.ApplicationsTest do
       application = application_fixture()
       admin = admin_fixture()
 
-      assert {:ok, assessed} = Applications.assess_application(application, %Scope{user: admin, organisation_id: :all})
+      assert {:ok, assessed} =
+               Applications.assess_application(application, %Scope{
+                 user: admin,
+                 organisation_id: :all
+               })
+
       assert assessed.assessment_notes == nil
     end
 
@@ -141,7 +177,12 @@ defmodule MiwayCreditCore.ApplicationsTest do
       application = application_fixture()
       admin = admin_fixture()
 
-      assert {:error, :invalid_status} = Applications.approve_application(application, %Scope{user: admin, organisation_id: :all}, true)
+      assert {:error, :invalid_status} =
+               Applications.approve_application(
+                 application,
+                 %Scope{user: admin, organisation_id: :all},
+                 true
+               )
     end
 
     test "flips under_review to approved, stamps decided_at/decided_by_id, and does not open a LoanAccount yet" do
@@ -154,7 +195,9 @@ defmodule MiwayCreditCore.ApplicationsTest do
       assert approved.status == "approved"
       assert approved.decided_at
       assert approved.decided_by_id == admin.id
-      assert Applications.get_application!(%Scope{organisation_id: :all}, approved.id).loan_account == nil
+
+      assert Applications.get_application!(%Scope{organisation_id: :all}, approved.id).loan_account ==
+               nil
     end
   end
 
@@ -163,7 +206,11 @@ defmodule MiwayCreditCore.ApplicationsTest do
       application = application_fixture()
       admin = admin_fixture()
 
-      assert {:error, :invalid_status} = Applications.disburse_application(application, %Scope{user: admin, organisation_id: :all})
+      assert {:error, :invalid_status} =
+               Applications.disburse_application(application, %Scope{
+                 user: admin,
+                 organisation_id: :all
+               })
     end
 
     test "flips approved to disbursed, stamps disbursed_at/disbursed_by_id, and opens a LoanAccount" do
@@ -208,7 +255,10 @@ defmodule MiwayCreditCore.ApplicationsTest do
       {:ok, approved} = Applications.approve_application(assessed, admin_scope, true)
 
       {:ok, _disbursed, account} =
-        Applications.disburse_application(approved, admin_scope, %{"method" => "mobile_money", "reference" => "MM-998877"})
+        Applications.disburse_application(approved, admin_scope, %{
+          "method" => "mobile_money",
+          "reference" => "MM-998877"
+        })
 
       assert account.disbursement_method == "mobile_money"
       assert account.disbursement_reference == "MM-998877"
@@ -239,7 +289,10 @@ defmodule MiwayCreditCore.ApplicationsTest do
       {:ok, approved} = Applications.approve_application(assessed, admin_scope, true)
       {:ok, _disbursed, account} = Applications.disburse_application(approved, admin_scope)
 
-      assert Decimal.equal?(Accounting.rebuild_outstanding_balance(scope, account.id), account.outstanding_balance)
+      assert Decimal.equal?(
+               Accounting.rebuild_outstanding_balance(scope, account.id),
+               account.outstanding_balance
+             )
 
       [entry] = Accounting.list_entries_for_account(scope, account.id)
       assert entry.entry_type == "disbursement"
@@ -279,7 +332,9 @@ defmodule MiwayCreditCore.ApplicationsTest do
       assert Enum.at(due_dates, 1) == Timex.shift(opened_date, months: 2)
       assert Enum.at(due_dates, 2) == Timex.shift(opened_date, months: 3)
 
-      total_scheduled = installments |> Enum.map(& &1.scheduled_amount) |> Enum.reduce(&Decimal.add/2)
+      total_scheduled =
+        installments |> Enum.map(& &1.scheduled_amount) |> Enum.reduce(&Decimal.add/2)
+
       assert Decimal.equal?(total_scheduled, account.outstanding_balance)
     end
   end
@@ -290,7 +345,11 @@ defmodule MiwayCreditCore.ApplicationsTest do
       admin = admin_fixture()
 
       assert {:error, :invalid_status} =
-               Applications.reject_application(application, %Scope{user: admin, organisation_id: :all}, "Not eligible")
+               Applications.reject_application(
+                 application,
+                 %Scope{user: admin, organisation_id: :all},
+                 "Not eligible"
+               )
     end
 
     test "sets status, decision fields, and rejection_reason" do
@@ -299,7 +358,9 @@ defmodule MiwayCreditCore.ApplicationsTest do
       admin_scope = %Scope{user: admin, organisation_id: :all}
       {:ok, assessed} = Applications.assess_application(application, admin_scope)
 
-      assert {:ok, rejected} = Applications.reject_application(assessed, admin_scope, "Debt-to-income too high")
+      assert {:ok, rejected} =
+               Applications.reject_application(assessed, admin_scope, "Debt-to-income too high")
+
       assert rejected.status == "rejected"
       assert rejected.decided_at
       assert rejected.decided_by_id == admin.id
@@ -323,7 +384,12 @@ defmodule MiwayCreditCore.ApplicationsTest do
       application = application_fixture()
       admin = admin_fixture()
 
-      assert {:ok, withdrawn} = Applications.withdraw_application(application, %Scope{user: admin, organisation_id: :all})
+      assert {:ok, withdrawn} =
+               Applications.withdraw_application(application, %Scope{
+                 user: admin,
+                 organisation_id: :all
+               })
+
       assert withdrawn.status == "withdrawn"
     end
 
@@ -372,7 +438,10 @@ defmodule MiwayCreditCore.ApplicationsTest do
   describe "update_application/2 and delete_application/1" do
     test "update_application/2 updates permitted fields" do
       application = application_fixture()
-      assert {:ok, updated} = Applications.update_application(application, %{"purpose" => "School fees"})
+
+      assert {:ok, updated} =
+               Applications.update_application(application, %{"purpose" => "School fees"})
+
       assert updated.purpose == "School fees"
     end
 
@@ -380,7 +449,10 @@ defmodule MiwayCreditCore.ApplicationsTest do
       application = application_fixture()
       scope = %Scope{organisation_id: application.organisation_id}
       assert {:ok, _} = Applications.delete_application(application)
-      assert_raise Ecto.NoResultsError, fn -> Applications.get_application!(scope, application.id) end
+
+      assert_raise Ecto.NoResultsError, fn ->
+        Applications.get_application!(scope, application.id)
+      end
 
       reloaded_customer = Customers.get_customer!(scope, application.customer_id)
       assert reloaded_customer.total_loans == 0
@@ -416,18 +488,26 @@ defmodule MiwayCreditCore.ApplicationsTest do
     test "blocked with :income_data_missing when the product requires it and the customer has no income on file" do
       organisation = organisation_fixture()
       customer = customer_fixture_in_organisation(organisation)
-      {:ok, product} = Products.create_product(%Scope{organisation_id: organisation.id}, valid_product_attrs(%{"requires_affordability_check" => true}))
+
+      {:ok, product} =
+        Products.create_product(
+          %Scope{organisation_id: organisation.id},
+          valid_product_attrs(%{"requires_affordability_check" => true})
+        )
 
       admin = admin_fixture()
       admin_scope = %Scope{user: admin, organisation_id: :all}
+
       {:ok, application} =
         Applications.create_application(
           %Scope{organisation_id: organisation.id},
           valid_application_attrs(%{"customer_id" => customer.id, "loan_product_id" => product.id})
         )
+
       {:ok, assessed} = Applications.assess_application(application, admin_scope)
 
-      assert {:error, :income_data_missing} = Applications.approve_application(assessed, admin_scope, true)
+      assert {:error, :income_data_missing} =
+               Applications.approve_application(assessed, admin_scope, true)
     end
 
     test "blocked with :affordability_exceeded when the ratio is too high; passes once income covers it" do
@@ -442,6 +522,7 @@ defmodule MiwayCreditCore.ApplicationsTest do
 
       admin = admin_fixture()
       admin_scope = %Scope{user: admin, organisation_id: :all}
+
       {:ok, application} =
         Applications.create_application(
           %Scope{organisation_id: organisation.id},
@@ -452,9 +533,11 @@ defmodule MiwayCreditCore.ApplicationsTest do
             "requested_term_months" => "12"
           })
         )
+
       {:ok, assessed} = Applications.assess_application(application, admin_scope)
 
-      assert {:error, :affordability_exceeded} = Applications.approve_application(assessed, admin_scope, true)
+      assert {:error, :affordability_exceeded} =
+               Applications.approve_application(assessed, admin_scope, true)
     end
   end
 
@@ -462,82 +545,129 @@ defmodule MiwayCreditCore.ApplicationsTest do
     test "blocked with :crb_check_required when the product requires it and no report is on file" do
       organisation = organisation_fixture()
       customer = customer_fixture_in_organisation(organisation)
-      {:ok, product} = Products.create_product(%Scope{organisation_id: organisation.id}, valid_product_attrs(%{"requires_crb_check" => true}))
+
+      {:ok, product} =
+        Products.create_product(
+          %Scope{organisation_id: organisation.id},
+          valid_product_attrs(%{"requires_crb_check" => true})
+        )
 
       admin = admin_fixture()
       admin_scope = %Scope{user: admin, organisation_id: :all}
+
       {:ok, application} =
         Applications.create_application(
           %Scope{organisation_id: organisation.id},
           valid_application_attrs(%{"customer_id" => customer.id, "loan_product_id" => product.id})
         )
+
       {:ok, assessed} = Applications.assess_application(application, admin_scope)
 
-      assert {:error, :crb_check_required} = Applications.approve_application(assessed, admin_scope, true)
+      assert {:error, :crb_check_required} =
+               Applications.approve_application(assessed, admin_scope, true)
     end
 
     test "blocked with :adverse_crb_report when the latest report is adverse" do
       organisation = organisation_fixture()
       customer = customer_fixture_in_organisation(organisation)
-      {:ok, product} = Products.create_product(%Scope{organisation_id: organisation.id}, valid_product_attrs(%{"requires_crb_check" => true}))
+
+      {:ok, product} =
+        Products.create_product(
+          %Scope{organisation_id: organisation.id},
+          valid_product_attrs(%{"requires_crb_check" => true})
+        )
 
       admin = admin_fixture()
       admin_scope = %Scope{user: admin, organisation_id: :all}
       grant_credit_check_consent(customer, admin.id)
+
       {:ok, _report} =
-        ManualAdapter.record_report(admin_scope, customer, %{"outcome" => "adverse", "checked_at" => Date.utc_today()}, admin.id)
+        ManualAdapter.record_report(
+          admin_scope,
+          customer,
+          %{"outcome" => "adverse", "checked_at" => Date.utc_today()},
+          admin.id
+        )
 
       {:ok, application} =
         Applications.create_application(
           %Scope{organisation_id: organisation.id},
           valid_application_attrs(%{"customer_id" => customer.id, "loan_product_id" => product.id})
         )
+
       {:ok, assessed} = Applications.assess_application(application, admin_scope)
 
-      assert {:error, :adverse_crb_report} = Applications.approve_application(assessed, admin_scope, true)
+      assert {:error, :adverse_crb_report} =
+               Applications.approve_application(assessed, admin_scope, true)
     end
 
     test "blocked with :crb_check_expired when the latest clear report is more than 90 days old" do
       organisation = organisation_fixture()
       customer = customer_fixture_in_organisation(organisation)
-      {:ok, product} = Products.create_product(%Scope{organisation_id: organisation.id}, valid_product_attrs(%{"requires_crb_check" => true}))
+
+      {:ok, product} =
+        Products.create_product(
+          %Scope{organisation_id: organisation.id},
+          valid_product_attrs(%{"requires_crb_check" => true})
+        )
 
       admin = admin_fixture()
       admin_scope = %Scope{user: admin, organisation_id: :all}
       grant_credit_check_consent(customer, admin.id)
       stale_date = Date.add(Date.utc_today(), -91)
+
       {:ok, _report} =
-        ManualAdapter.record_report(admin_scope, customer, %{"outcome" => "clear", "checked_at" => stale_date}, admin.id)
+        ManualAdapter.record_report(
+          admin_scope,
+          customer,
+          %{"outcome" => "clear", "checked_at" => stale_date},
+          admin.id
+        )
 
       {:ok, application} =
         Applications.create_application(
           %Scope{organisation_id: organisation.id},
           valid_application_attrs(%{"customer_id" => customer.id, "loan_product_id" => product.id})
         )
+
       {:ok, assessed} = Applications.assess_application(application, admin_scope)
 
-      assert {:error, :crb_check_expired} = Applications.approve_application(assessed, admin_scope, true)
+      assert {:error, :crb_check_expired} =
+               Applications.approve_application(assessed, admin_scope, true)
     end
 
     test "succeeds once a recent clear report is on file" do
       organisation = organisation_fixture()
       customer = customer_fixture_in_organisation(organisation)
-      {:ok, product} = Products.create_product(%Scope{organisation_id: organisation.id}, valid_product_attrs(%{"requires_crb_check" => true}))
+
+      {:ok, product} =
+        Products.create_product(
+          %Scope{organisation_id: organisation.id},
+          valid_product_attrs(%{"requires_crb_check" => true})
+        )
 
       admin = admin_fixture()
       admin_scope = %Scope{user: admin, organisation_id: :all}
       grant_credit_check_consent(customer, admin.id)
+
       {:ok, _report} =
-        ManualAdapter.record_report(admin_scope, customer, %{"outcome" => "clear", "checked_at" => Date.utc_today()}, admin.id)
+        ManualAdapter.record_report(
+          admin_scope,
+          customer,
+          %{"outcome" => "clear", "checked_at" => Date.utc_today()},
+          admin.id
+        )
 
       {:ok, application} =
         Applications.create_application(
           %Scope{organisation_id: organisation.id},
           valid_application_attrs(%{"customer_id" => customer.id, "loan_product_id" => product.id})
         )
+
       {:ok, assessed} = Applications.assess_application(application, admin_scope)
 
-      assert {:ok, %LoanApplication{status: "approved"}} = Applications.approve_application(assessed, admin_scope, true)
+      assert {:ok, %LoanApplication{status: "approved"}} =
+               Applications.approve_application(assessed, admin_scope, true)
     end
   end
 
@@ -559,16 +689,29 @@ defmodule MiwayCreditCore.ApplicationsTest do
       customer = customer_fixture_in_organisation(organisation)
 
       {:ok, product} =
-        Products.create_product(%Scope{organisation_id: organisation.id}, valid_product_attrs(%{"requires_separation_of_duties" => false}))
+        Products.create_product(
+          %Scope{organisation_id: organisation.id},
+          valid_product_attrs(%{"requires_separation_of_duties" => false})
+        )
 
       maker = staff_member_in_organisation_fixture(organisation, "organisation_administrator")
-      maker_scope = %Scope{user: maker, staff_member: Accounts.get_staff_member(maker.id), organisation_id: organisation.id}
+
+      maker_scope = %Scope{
+        user: maker,
+        staff_member: Accounts.get_staff_member(maker.id),
+        organisation_id: organisation.id
+      }
 
       {:ok, application} =
-        Applications.create_application(maker_scope, valid_application_attrs(%{"customer_id" => customer.id, "loan_product_id" => product.id}))
+        Applications.create_application(
+          maker_scope,
+          valid_application_attrs(%{"customer_id" => customer.id, "loan_product_id" => product.id})
+        )
+
       {:ok, assessed} = Applications.assess_application(application, maker_scope)
 
-      assert {:ok, %LoanApplication{status: "approved"}} = Applications.approve_application(assessed, maker_scope, true)
+      assert {:ok, %LoanApplication{status: "approved"}} =
+               Applications.approve_application(assessed, maker_scope, true)
     end
   end
 
@@ -580,9 +723,16 @@ defmodule MiwayCreditCore.ApplicationsTest do
       {:ok, assessed} = Applications.assess_application(application, admin_scope)
 
       assert {:ok, rejected} =
-               Applications.reject_application(assessed, admin_scope, "Too much existing debt", "poor_credit_history")
+               Applications.reject_application(
+                 assessed,
+                 admin_scope,
+                 "Too much existing debt",
+                 "poor_credit_history"
+               )
 
-      [decision] = Repo.all(ApprovalDecision) |> Enum.filter(&(&1.loan_application_id == rejected.id))
+      [decision] =
+        Repo.all(ApprovalDecision) |> Enum.filter(&(&1.loan_application_id == rejected.id))
+
       assert decision.decision == "rejected"
       assert decision.decline_reason_category == "poor_credit_history"
       assert decision.notes == "Too much existing debt"
@@ -596,7 +746,9 @@ defmodule MiwayCreditCore.ApplicationsTest do
 
       {:ok, rejected} = Applications.reject_application(assessed, admin_scope, "Not eligible")
 
-      [decision] = Repo.all(ApprovalDecision) |> Enum.filter(&(&1.loan_application_id == rejected.id))
+      [decision] =
+        Repo.all(ApprovalDecision) |> Enum.filter(&(&1.loan_application_id == rejected.id))
+
       assert decision.decline_reason_category == "other"
     end
   end
@@ -605,7 +757,9 @@ defmodule MiwayCreditCore.ApplicationsTest do
     test "level 1 alone leaves the application under_review when a second level is required" do
       {application, _level1_scope, level1_scope, _level2_scope} = two_level_setup()
 
-      assert {:ok, still_under_review} = Applications.approve_application(application, level1_scope, true)
+      assert {:ok, still_under_review} =
+               Applications.approve_application(application, level1_scope, true)
+
       assert still_under_review.status == "under_review"
     end
 
@@ -613,24 +767,32 @@ defmodule MiwayCreditCore.ApplicationsTest do
       {application, _org, level1_scope, level2_scope} = two_level_setup()
 
       {:ok, after_level1} = Applications.approve_application(application, level1_scope, true)
-      assert {:ok, %LoanApplication{status: "approved"}} = Applications.approve_application(after_level1, level2_scope, true)
+
+      assert {:ok, %LoanApplication{status: "approved"}} =
+               Applications.approve_application(after_level1, level2_scope, true)
     end
 
     test "the same person cannot decide both levels" do
       {application, _org, level1_scope, _level2_scope} = two_level_setup()
 
       {:ok, after_level1} = Applications.approve_application(application, level1_scope, true)
-      assert {:error, :already_decided} = Applications.approve_application(after_level1, level1_scope, true)
+
+      assert {:error, :already_decided} =
+               Applications.approve_application(after_level1, level1_scope, true)
     end
 
     test "disburse_application/2 only succeeds once both levels have concurred" do
       {application, _org, level1_scope, level2_scope} = two_level_setup()
 
       {:ok, after_level1} = Applications.approve_application(application, level1_scope, true)
-      assert {:error, :invalid_status} = Applications.disburse_application(after_level1, level2_scope)
+
+      assert {:error, :invalid_status} =
+               Applications.disburse_application(after_level1, level2_scope)
 
       {:ok, fully_approved} = Applications.approve_application(after_level1, level2_scope, true)
-      assert {:ok, %LoanApplication{status: "disbursed"}, _account} = Applications.disburse_application(fully_approved, level2_scope)
+
+      assert {:ok, %LoanApplication{status: "disbursed"}, _account} =
+               Applications.disburse_application(fully_approved, level2_scope)
     end
   end
 
@@ -638,7 +800,9 @@ defmodule MiwayCreditCore.ApplicationsTest do
     test "quorum not yet reached leaves the application under_review" do
       {application, voter1_scope, _voter2_scope, _voter3_scope} = committee_setup()
 
-      assert {:ok, still_under_review} = Applications.approve_application(application, voter1_scope, true)
+      assert {:ok, still_under_review} =
+               Applications.approve_application(application, voter1_scope, true)
+
       assert still_under_review.status == "under_review"
     end
 
@@ -646,7 +810,9 @@ defmodule MiwayCreditCore.ApplicationsTest do
       {application, voter1_scope, voter2_scope, _voter3_scope} = committee_setup()
 
       {:ok, after_voter1} = Applications.approve_application(application, voter1_scope, true)
-      assert {:ok, %LoanApplication{status: "approved"}} = Applications.approve_application(after_voter1, voter2_scope, true)
+
+      assert {:ok, %LoanApplication{status: "approved"}} =
+               Applications.approve_application(after_voter1, voter2_scope, true)
     end
 
     test "a third vote isn't needed once quorum already concluded the level" do
@@ -655,7 +821,8 @@ defmodule MiwayCreditCore.ApplicationsTest do
       {:ok, after_voter1} = Applications.approve_application(application, voter1_scope, true)
       {:ok, approved} = Applications.approve_application(after_voter1, voter2_scope, true)
 
-      assert {:error, :invalid_status} = Applications.approve_application(approved, voter3_scope, true)
+      assert {:error, :invalid_status} =
+               Applications.approve_application(approved, voter3_scope, true)
     end
   end
 
@@ -667,7 +834,12 @@ defmodule MiwayCreditCore.ApplicationsTest do
       {:ok, assessed} = Applications.assess_application(application, admin_scope)
 
       assert {:ok, conditional} =
-               Applications.conditionally_approve_application(assessed, admin_scope, "Provide updated payslip", true)
+               Applications.conditionally_approve_application(
+                 assessed,
+                 admin_scope,
+                 "Provide updated payslip",
+                 true
+               )
 
       assert conditional.status == "approved"
       assert conditional.conditions == "Provide updated payslip"
@@ -679,17 +851,29 @@ defmodule MiwayCreditCore.ApplicationsTest do
       admin = admin_fixture()
       admin_scope = %Scope{user: admin, organisation_id: :all}
       {:ok, assessed} = Applications.assess_application(application, admin_scope)
-      {:ok, conditional} = Applications.conditionally_approve_application(assessed, admin_scope, "Provide updated payslip", true)
 
-      assert {:error, :conditions_not_cleared} = Applications.disburse_application(conditional, admin_scope)
+      {:ok, conditional} =
+        Applications.conditionally_approve_application(
+          assessed,
+          admin_scope,
+          "Provide updated payslip",
+          true
+        )
+
+      assert {:error, :conditions_not_cleared} =
+               Applications.disburse_application(conditional, admin_scope)
 
       assert {:ok, cleared} = Applications.clear_conditions(conditional, admin_scope)
-      assert {:ok, %LoanApplication{status: "disbursed"}, _account} = Applications.disburse_application(cleared, admin_scope)
+
+      assert {:ok, %LoanApplication{status: "disbursed"}, _account} =
+               Applications.disburse_application(cleared, admin_scope)
     end
 
     test "clear_conditions/2 refuses when there are no conditions to clear" do
       application = approved_application_fixture()
-      assert {:error, :no_conditions_to_clear} = Applications.clear_conditions(application, %Scope{organisation_id: :all})
+
+      assert {:error, :no_conditions_to_clear} =
+               Applications.clear_conditions(application, %Scope{organisation_id: :all})
     end
   end
 
@@ -700,7 +884,9 @@ defmodule MiwayCreditCore.ApplicationsTest do
       admin_scope = %Scope{user: admin, organisation_id: :all}
       {:ok, assessed} = Applications.assess_application(application, admin_scope)
 
-      assert {:ok, referred} = Applications.refer_application(assessed, admin_scope, "Need proof of income")
+      assert {:ok, referred} =
+               Applications.refer_application(assessed, admin_scope, "Need proof of income")
+
       assert referred.status == "referred"
     end
 
@@ -709,12 +895,17 @@ defmodule MiwayCreditCore.ApplicationsTest do
       admin = admin_fixture()
       admin_scope = %Scope{user: admin, organisation_id: :all}
       {:ok, assessed} = Applications.assess_application(application, admin_scope)
-      {:ok, referred} = Applications.refer_application(assessed, admin_scope, "Need proof of income")
 
-      assert {:ok, reassessed} = Applications.assess_application(referred, admin_scope, "Payslip received")
+      {:ok, referred} =
+        Applications.refer_application(assessed, admin_scope, "Need proof of income")
+
+      assert {:ok, reassessed} =
+               Applications.assess_application(referred, admin_scope, "Payslip received")
+
       assert reassessed.status == "under_review"
 
-      assert {:ok, %LoanApplication{status: "approved"}} = Applications.approve_application(reassessed, admin_scope, true)
+      assert {:ok, %LoanApplication{status: "approved"}} =
+               Applications.approve_application(reassessed, admin_scope, true)
     end
 
     test "rejects referring a pending (not yet assessed) application" do
@@ -722,7 +913,11 @@ defmodule MiwayCreditCore.ApplicationsTest do
       admin = admin_fixture()
 
       assert {:error, :invalid_status} =
-               Applications.refer_application(application, %Scope{user: admin, organisation_id: :all}, "Need more info")
+               Applications.refer_application(
+                 application,
+                 %Scope{user: admin, organisation_id: :all},
+                 "Need more info"
+               )
     end
   end
 
@@ -744,10 +939,20 @@ defmodule MiwayCreditCore.ApplicationsTest do
       )
 
     level1 = staff_member_in_organisation_fixture(organisation, "organisation_administrator")
-    level1_scope = %Scope{user: level1, staff_member: Accounts.get_staff_member(level1.id), organisation_id: organisation.id}
+
+    level1_scope = %Scope{
+      user: level1,
+      staff_member: Accounts.get_staff_member(level1.id),
+      organisation_id: organisation.id
+    }
 
     level2 = staff_member_in_organisation_fixture(organisation, "organisation_administrator")
-    level2_scope = %Scope{user: level2, staff_member: Accounts.get_staff_member(level2.id), organisation_id: organisation.id}
+
+    level2_scope = %Scope{
+      user: level2,
+      staff_member: Accounts.get_staff_member(level2.id),
+      organisation_id: organisation.id
+    }
 
     {:ok, application} =
       Applications.create_application(
@@ -778,13 +983,28 @@ defmodule MiwayCreditCore.ApplicationsTest do
       )
 
     voter1 = staff_member_in_organisation_fixture(organisation, "loan_officer")
-    voter1_scope = %Scope{user: voter1, staff_member: Accounts.get_staff_member(voter1.id), organisation_id: organisation.id}
+
+    voter1_scope = %Scope{
+      user: voter1,
+      staff_member: Accounts.get_staff_member(voter1.id),
+      organisation_id: organisation.id
+    }
 
     voter2 = staff_member_in_organisation_fixture(organisation, "loan_officer")
-    voter2_scope = %Scope{user: voter2, staff_member: Accounts.get_staff_member(voter2.id), organisation_id: organisation.id}
+
+    voter2_scope = %Scope{
+      user: voter2,
+      staff_member: Accounts.get_staff_member(voter2.id),
+      organisation_id: organisation.id
+    }
 
     voter3 = staff_member_in_organisation_fixture(organisation, "loan_officer")
-    voter3_scope = %Scope{user: voter3, staff_member: Accounts.get_staff_member(voter3.id), organisation_id: organisation.id}
+
+    voter3_scope = %Scope{
+      user: voter3,
+      staff_member: Accounts.get_staff_member(voter3.id),
+      organisation_id: organisation.id
+    }
 
     {:ok, application} =
       Applications.create_application(
@@ -801,7 +1021,11 @@ defmodule MiwayCreditCore.ApplicationsTest do
     {:ok, _consent} =
       Customers.create_consent(
         customer,
-        %{"consent_type" => "credit_check", "method" => "signed_form", "granted_at" => DateTime.utc_now()},
+        %{
+          "consent_type" => "credit_check",
+          "method" => "signed_form",
+          "granted_at" => DateTime.utc_now()
+        },
         recorded_by_id
       )
   end

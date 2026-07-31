@@ -50,7 +50,10 @@ defmodule MiwayCreditCore.Accounting.GeneralLedger do
 
   @doc "The cash-side account code for a payment/disbursement method — cash, bank-like, mobile money, or an honest Suspense bucket for anything uncategorized."
   def cash_account_code("cash"), do: "1000"
-  def cash_account_code(method) when method in ["bank_transfer", "cheque", "payroll_deduction"], do: "1010"
+
+  def cash_account_code(method) when method in ["bank_transfer", "cheque", "payroll_deduction"],
+    do: "1010"
+
   def cash_account_code("mobile_money"), do: "1020"
   def cash_account_code(_other), do: "1030"
 
@@ -81,14 +84,17 @@ defmodule MiwayCreditCore.Accounting.GeneralLedger do
 
       true ->
         multi
-        |> Ecto.Multi.insert(key, JournalEntry.changeset(%JournalEntry{}, %{
-          organisation_id: attrs.organisation_id,
-          description: attrs.description,
-          source_type: attrs.source_type,
-          source_id: Map.get(attrs, :source_id),
-          occurred_at: attrs.occurred_at,
-          recorded_by_id: Map.get(attrs, :recorded_by_id)
-        }))
+        |> Ecto.Multi.insert(
+          key,
+          JournalEntry.changeset(%JournalEntry{}, %{
+            organisation_id: attrs.organisation_id,
+            description: attrs.description,
+            source_type: attrs.source_type,
+            source_id: Map.get(attrs, :source_id),
+            occurred_at: attrs.occurred_at,
+            recorded_by_id: Map.get(attrs, :recorded_by_id)
+          })
+        )
         |> Ecto.Multi.run(lines_key(key), fn repo, changes ->
           entry = Map.fetch!(changes, key)
           account_ids = account_ids_by_code(repo, attrs.organisation_id)
@@ -164,7 +170,11 @@ defmodule MiwayCreditCore.Accounting.GeneralLedger do
       |> select([jl], coalesce(sum(jl.credit_amount), ^Decimal.new("0.00")))
       |> Repo.one()
 
-    %{total_debits: total_debits, total_credits: total_credits, balanced?: Decimal.equal?(total_debits, total_credits)}
+    %{
+      total_debits: total_debits,
+      total_credits: total_credits,
+      balanced?: Decimal.equal?(total_debits, total_credits)
+    }
   end
 
   @doc "Net balance (debit - credit) per cash-type account (Cash/Bank/Mobile Money/Suspense) — the reconciliation baseline staff check against a real bank/mobile-money statement."
@@ -213,7 +223,8 @@ defmodule MiwayCreditCore.Accounting.GeneralLedger do
 
   defp net_lines_for_source(repo, organisation_id, source_type, source_id) do
     from(jl in JournalLine,
-      join: je in JournalEntry, on: je.id == jl.journal_entry_id,
+      join: je in JournalEntry,
+      on: je.id == jl.journal_entry_id,
       where:
         je.organisation_id == ^organisation_id and je.source_type == ^source_type and
           je.source_id == ^source_id,
@@ -239,6 +250,7 @@ defmodule MiwayCreditCore.Accounting.GeneralLedger do
   end
 
   defp scope_organisation(query, %Scope{organisation_id: :all}), do: query
+
   defp scope_organisation(query, %Scope{organisation_id: organisation_id}) do
     where(query, organisation_id: ^organisation_id)
   end

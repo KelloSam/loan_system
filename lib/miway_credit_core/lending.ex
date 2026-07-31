@@ -28,7 +28,11 @@ defmodule MiwayCreditCore.Lending do
   defdelegate total_outstanding_balance(scope), to: Servicing
 
   @doc "Compound interest details for an account. See `InterestCalculator.calculate/1`."
-  def compound_interest_details(%{principal_amount: amount, interest_rate: rate, term_months: term}) do
+  def compound_interest_details(%{
+        principal_amount: amount,
+        interest_rate: rate,
+        term_months: term
+      }) do
     InterestCalculator.calculate(%{amount: amount, interest_rate: rate, term_months: term})
   end
 

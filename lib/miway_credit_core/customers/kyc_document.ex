@@ -43,14 +43,28 @@ defmodule MiwayCreditCore.Customers.KycDocument do
   def changeset(kyc_document, attrs) do
     kyc_document
     |> cast(attrs, [
-      :organisation_id, :customer_id, :document_type, :stored_filename,
-      :original_filename, :content_type, :size_bytes, :status,
-      :uploaded_by_id, :uploaded_at
+      :organisation_id,
+      :customer_id,
+      :document_type,
+      :stored_filename,
+      :original_filename,
+      :content_type,
+      :size_bytes,
+      :status,
+      :uploaded_by_id,
+      :uploaded_at
     ])
     |> validate_required([
-      :organisation_id, :customer_id, :document_type, :stored_filename,
-      :original_filename, :content_type, :size_bytes, :status,
-      :uploaded_by_id, :uploaded_at
+      :organisation_id,
+      :customer_id,
+      :document_type,
+      :stored_filename,
+      :original_filename,
+      :content_type,
+      :size_bytes,
+      :status,
+      :uploaded_by_id,
+      :uploaded_at
     ])
     |> validate_inclusion(:document_type, @document_types)
     |> validate_inclusion(:status, @statuses)
@@ -64,7 +78,10 @@ defmodule MiwayCreditCore.Customers.KycDocument do
   end
 
   def void_changeset(kyc_document) do
-    change(kyc_document, status: "removed", removed_at: DateTime.utc_now() |> DateTime.truncate(:second))
+    change(kyc_document,
+      status: "removed",
+      removed_at: DateTime.utc_now() |> DateTime.truncate(:second)
+    )
   end
 
   @doc "The retention window has elapsed — the bytes are gone from disk, but this row (and stored_filename, as a historical pointer) stays, matching this schema's own tombstone philosophy."

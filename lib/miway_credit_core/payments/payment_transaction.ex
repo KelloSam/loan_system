@@ -47,10 +47,28 @@ defmodule MiwayCreditCore.Payments.PaymentTransaction do
 
   def changeset(payment_transaction, attrs) do
     payment_transaction
-    |> cast(attrs, [:organisation_id, :loan_account_id, :amount, :payable_amount, :overpayment_amount,
-                   :received_at, :method, :reference, :recorded_by_id, :notes, :idempotency_key])
-    |> validate_required([:organisation_id, :loan_account_id, :amount, :payable_amount, :received_at, :method,
-                          :recorded_by_id])
+    |> cast(attrs, [
+      :organisation_id,
+      :loan_account_id,
+      :amount,
+      :payable_amount,
+      :overpayment_amount,
+      :received_at,
+      :method,
+      :reference,
+      :recorded_by_id,
+      :notes,
+      :idempotency_key
+    ])
+    |> validate_required([
+      :organisation_id,
+      :loan_account_id,
+      :amount,
+      :payable_amount,
+      :received_at,
+      :method,
+      :recorded_by_id
+    ])
     |> validate_inclusion(:method, @methods)
     |> validate_number(:amount, greater_than: 0)
     |> validate_number(:payable_amount, greater_than_or_equal_to: 0)
@@ -58,18 +76,36 @@ defmodule MiwayCreditCore.Payments.PaymentTransaction do
     |> foreign_key_constraint(:organisation_id)
     |> foreign_key_constraint(:loan_account_id)
     |> foreign_key_constraint(:recorded_by_id)
-    |> unique_constraint(:idempotency_key, name: :payment_transactions_loan_account_id_idempotency_key_index)
+    |> unique_constraint(:idempotency_key,
+      name: :payment_transactions_loan_account_id_idempotency_key_index
+    )
   end
 
   @doc "Records a payment attempt that never reconciled — no allocation or balance effect."
   def failed_attempt_changeset(payment_transaction, attrs) do
     payment_transaction
-    |> cast(attrs, [:organisation_id, :loan_account_id, :amount, :received_at, :method, :reference,
-                   :recorded_by_id, :notes, :fail_reason])
+    |> cast(attrs, [
+      :organisation_id,
+      :loan_account_id,
+      :amount,
+      :received_at,
+      :method,
+      :reference,
+      :recorded_by_id,
+      :notes,
+      :fail_reason
+    ])
     |> put_change(:status, "failed")
     |> put_change(:payable_amount, Decimal.new("0.00"))
-    |> validate_required([:organisation_id, :loan_account_id, :amount, :received_at, :method, :recorded_by_id,
-                          :fail_reason])
+    |> validate_required([
+      :organisation_id,
+      :loan_account_id,
+      :amount,
+      :received_at,
+      :method,
+      :recorded_by_id,
+      :fail_reason
+    ])
     |> validate_inclusion(:method, @methods)
     |> validate_number(:amount, greater_than: 0)
     |> foreign_key_constraint(:organisation_id)

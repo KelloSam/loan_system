@@ -68,7 +68,11 @@ defmodule MiwayCreditCore.Reports do
 
     RepaymentScheduleInstallment
     |> scope_organisation(scope)
-    |> where([i], i.status in ["upcoming", "partially_paid"] and i.due_date >= ^today and i.due_date <= ^cutoff)
+    |> where(
+      [i],
+      i.status in ["upcoming", "partially_paid"] and i.due_date >= ^today and
+        i.due_date <= ^cutoff
+    )
     |> order_by([i], asc: i.due_date)
     |> preload(loan_account: [:customer, :loan_application])
     |> Repo.all()
@@ -82,7 +86,8 @@ defmodule MiwayCreditCore.Reports do
   rather than pulling in a CSV dependency for one export.
   """
   def loans_csv(%Scope{} = scope) do
-    header = ~w(application_id customer_name status risk_level requested_amount granted_amount outstanding_balance decided_at)
+    header =
+      ~w(application_id customer_name status risk_level requested_amount granted_amount outstanding_balance decided_at)
 
     rows =
       LoanApplication
@@ -97,9 +102,12 @@ defmodule MiwayCreditCore.Reports do
           application.status,
           application.risk_level,
           Decimal.to_string(application.requested_amount),
-          (application.loan_account && Decimal.to_string(application.loan_account.principal_amount)) || "",
-          (application.loan_account && Decimal.to_string(application.loan_account.outstanding_balance)) || "",
-          (application.decided_at && DateTime.to_date(application.decided_at) |> Date.to_iso8601()) || ""
+          (application.loan_account &&
+             Decimal.to_string(application.loan_account.principal_amount)) || "",
+          (application.loan_account &&
+             Decimal.to_string(application.loan_account.outstanding_balance)) || "",
+          (application.decided_at && DateTime.to_date(application.decided_at) |> Date.to_iso8601()) ||
+            ""
         ]
       end)
 
@@ -109,6 +117,7 @@ defmodule MiwayCreditCore.Reports do
   end
 
   defp scope_organisation(query, %Scope{organisation_id: :all}), do: query
+
   defp scope_organisation(query, %Scope{organisation_id: organisation_id}) do
     where(query, organisation_id: ^organisation_id)
   end

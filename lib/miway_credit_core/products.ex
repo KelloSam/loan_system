@@ -41,7 +41,8 @@ defmodule MiwayCreditCore.Products do
   end
 
   @doc "Creates a product under the caller's organisation. organisation_id always comes from scope, never from attrs."
-  def create_product(%Scope{organisation_id: organisation_id}, _attrs) when organisation_id == :all do
+  def create_product(%Scope{organisation_id: organisation_id}, _attrs)
+      when organisation_id == :all do
     raise ArgumentError, "create_product/2 requires a concrete organisation scope, not :all"
   end
 
@@ -77,6 +78,7 @@ defmodule MiwayCreditCore.Products do
   defp stringify_keys(attrs), do: Map.new(attrs, fn {k, v} -> {to_string(k), v} end)
 
   defp scope_organisation(query, %Scope{organisation_id: :all}), do: query
+
   defp scope_organisation(query, %Scope{organisation_id: organisation_id}) do
     where(query, organisation_id: ^organisation_id)
   end

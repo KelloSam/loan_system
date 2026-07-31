@@ -1,7 +1,17 @@
 defmodule MiwayCreditCore.Customers do
   import Ecto.Query
   alias MiwayCreditCore.Repo
-  alias MiwayCreditCore.Customers.{Customer, NextOfKin, Guarantor, KycDocument, Consent, DocumentStorage, MalwareScanner}
+
+  alias MiwayCreditCore.Customers.{
+    Customer,
+    NextOfKin,
+    Guarantor,
+    KycDocument,
+    Consent,
+    DocumentStorage,
+    MalwareScanner
+  }
+
   alias MiwayCreditCore.Accounts.Scope
 
   @doc """
@@ -9,9 +19,9 @@ defmodule MiwayCreditCore.Customers do
   caller's organisation. Accepts `page:` and `per_page:` opts (defaults: 1, 50).
   """
   def list_customers(%Scope{} = scope, opts \\ []) do
-    page     = Keyword.get(opts, :page, 1)
+    page = Keyword.get(opts, :page, 1)
     per_page = Keyword.get(opts, :per_page, 50)
-    offset   = (page - 1) * per_page
+    offset = (page - 1) * per_page
 
     Customer
     |> scope_organisation(scope)
@@ -29,7 +39,8 @@ defmodule MiwayCreditCore.Customers do
   end
 
   @doc "Creates a customer under the caller's organisation. organisation_id always comes from scope, never from attrs, so it can't be spoofed via form tampering."
-  def create_customer(%Scope{organisation_id: organisation_id}, _attrs) when organisation_id == :all do
+  def create_customer(%Scope{organisation_id: organisation_id}, _attrs)
+      when organisation_id == :all do
     raise ArgumentError, "create_customer/2 requires a concrete organisation scope, not :all"
   end
 
@@ -252,7 +263,12 @@ defmodule MiwayCreditCore.Customers do
   it; a blocked upload never touches disk, so there's nothing to clean
   up. Otherwise stores the file first, then its metadata.
   """
-  def create_kyc_document(%Customer{} = customer, %Plug.Upload{} = upload, document_type, uploaded_by_id) do
+  def create_kyc_document(
+        %Customer{} = customer,
+        %Plug.Upload{} = upload,
+        document_type,
+        uploaded_by_id
+      ) do
     case MalwareScanner.scan(upload.path) do
       :clean -> do_create_kyc_document(customer, upload, document_type, uploaded_by_id)
       {:infected, reason} -> {:error, {:blocked, reason}}
@@ -260,8 +276,14 @@ defmodule MiwayCreditCore.Customers do
     end
   end
 
-  defp do_create_kyc_document(%Customer{} = customer, %Plug.Upload{} = upload, document_type, uploaded_by_id) do
-    {stored_filename, size_bytes} = DocumentStorage.store(upload, customer.organisation_id, customer.id)
+  defp do_create_kyc_document(
+         %Customer{} = customer,
+         %Plug.Upload{} = upload,
+         document_type,
+         uploaded_by_id
+       ) do
+    {stored_filename, size_bytes} =
+      DocumentStorage.store(upload, customer.organisation_id, customer.id)
 
     attrs = %{
       "organisation_id" => customer.organisation_id,
@@ -287,7 +309,11 @@ defmodule MiwayCreditCore.Customers do
 
   @doc "The on-disk path — for existence/cleanup checks only, never for reading content directly (bytes are encrypted at rest). Callers must check scope/permission before calling this."
   def kyc_document_path(%KycDocument{} = document) do
-    DocumentStorage.read_path(document.organisation_id, document.customer_id, document.stored_filename)
+    DocumentStorage.read_path(
+      document.organisation_id,
+      document.customer_id,
+      document.stored_filename
+    )
   end
 
   @doc "The decrypted file bytes to stream for download — callers must check scope/permission before calling this."
@@ -322,7 +348,12 @@ defmodule MiwayCreditCore.Customers do
     |> where([d], d.status == "removed" and d.removed_at < ^cutoff)
     |> Repo.all()
     |> Enum.map(fn document ->
-      DocumentStorage.delete(document.organisation_id, document.customer_id, document.stored_filename)
+      DocumentStorage.delete(
+        document.organisation_id,
+        document.customer_id,
+        document.stored_filename
+      )
+
       {:ok, purged} = document |> KycDocument.purge_changeset() |> Repo.update()
       purged
     end)
@@ -375,13 +406,17 @@ defmodule MiwayCreditCore.Customers do
   def has_active_consent?(%Scope{} = scope, customer_id, consent_type) do
     Consent
     |> scope_organisation(scope)
-    |> where([c], c.customer_id == ^customer_id and c.consent_type == ^consent_type and is_nil(c.revoked_at))
+    |> where(
+      [c],
+      c.customer_id == ^customer_id and c.consent_type == ^consent_type and is_nil(c.revoked_at)
+    )
     |> Repo.exists?()
   end
 
   defp stringify_keys(attrs), do: Map.new(attrs, fn {k, v} -> {to_string(k), v} end)
 
   defp scope_organisation(query, %Scope{organisation_id: :all}), do: query
+
   defp scope_organisation(query, %Scope{organisation_id: organisation_id}) do
     where(query, organisation_id: ^organisation_id)
   end

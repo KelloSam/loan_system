@@ -138,8 +138,10 @@ defmodule MiwayCreditCore.Authorization do
   """
   def enroll_staff_member(staff_member, organisation_id) do
     Repo.transaction(fn ->
-      with {:ok, membership} <- Organisations.add_staff_to_organisation(staff_member.id, organisation_id),
-           %Role{} = role <- get_role_by_name(organisation_id, staff_member.role) || {:error, :role_not_seeded},
+      with {:ok, membership} <-
+             Organisations.add_staff_to_organisation(staff_member.id, organisation_id),
+           %Role{} = role <-
+             get_role_by_name(organisation_id, staff_member.role) || {:error, :role_not_seeded},
            {:ok, _assignment} <- assign_role(membership.id, role.id) do
         membership
       else
@@ -189,7 +191,12 @@ defmodule MiwayCreditCore.Authorization do
   @doc "Grants a Role to an OrganisationMembership — the permanent \"home role\" shape (no branch, no expiry)."
   def assign_role(organisation_membership_id, role_id, attrs \\ %{}) do
     %RoleAssignment{}
-    |> RoleAssignment.changeset(Map.merge(%{organisation_membership_id: organisation_membership_id, role_id: role_id}, attrs))
+    |> RoleAssignment.changeset(
+      Map.merge(
+        %{organisation_membership_id: organisation_membership_id, role_id: role_id},
+        attrs
+      )
+    )
     |> Repo.insert()
   end
 
@@ -212,8 +219,15 @@ defmodule MiwayCreditCore.Authorization do
   def authorized?(%Scope{organisation_id: :all}, _permission_key), do: true
   def authorized?(%Scope{staff_member: nil}, _permission_key), do: false
 
-  def authorized?(%Scope{staff_member: staff_member, organisation_id: organisation_id}, permission_key) do
-    membership = Repo.get_by(OrganisationMembership, staff_member_id: staff_member.id, organisation_id: organisation_id)
+  def authorized?(
+        %Scope{staff_member: staff_member, organisation_id: organisation_id},
+        permission_key
+      ) do
+    membership =
+      Repo.get_by(OrganisationMembership,
+        staff_member_id: staff_member.id,
+        organisation_id: organisation_id
+      )
 
     case membership do
       nil -> false
@@ -226,7 +240,9 @@ defmodule MiwayCreditCore.Authorization do
     |> where([ra], ra.organisation_membership_id == ^organisation_membership_id)
     |> Repo.all()
     |> Enum.filter(&RoleAssignment.active?/1)
-    |> Enum.flat_map(fn assignment -> permissions_for_role(assignment.role_id) |> MapSet.to_list() end)
+    |> Enum.flat_map(fn assignment ->
+      permissions_for_role(assignment.role_id) |> MapSet.to_list()
+    end)
     |> MapSet.new()
   end
 
@@ -238,8 +254,15 @@ defmodule MiwayCreditCore.Authorization do
   def approval_limit(%Scope{organisation_id: :all}, _permission_key), do: nil
   def approval_limit(%Scope{staff_member: nil}, _permission_key), do: nil
 
-  def approval_limit(%Scope{staff_member: staff_member, organisation_id: organisation_id}, permission_key) do
-    membership = Repo.get_by(OrganisationMembership, staff_member_id: staff_member.id, organisation_id: organisation_id)
+  def approval_limit(
+        %Scope{staff_member: staff_member, organisation_id: organisation_id},
+        permission_key
+      ) do
+    membership =
+      Repo.get_by(OrganisationMembership,
+        staff_member_id: staff_member.id,
+        organisation_id: organisation_id
+      )
 
     case membership do
       nil ->
@@ -276,8 +299,15 @@ defmodule MiwayCreditCore.Authorization do
   def role_meets_minimum?(%Scope{organisation_id: :all}, _minimum_role), do: true
   def role_meets_minimum?(%Scope{staff_member: nil}, _minimum_role), do: false
 
-  def role_meets_minimum?(%Scope{staff_member: staff_member, organisation_id: organisation_id}, minimum_role) do
-    membership = Repo.get_by(OrganisationMembership, staff_member_id: staff_member.id, organisation_id: organisation_id)
+  def role_meets_minimum?(
+        %Scope{staff_member: staff_member, organisation_id: organisation_id},
+        minimum_role
+      ) do
+    membership =
+      Repo.get_by(OrganisationMembership,
+        staff_member_id: staff_member.id,
+        organisation_id: organisation_id
+      )
 
     case membership do
       nil ->
@@ -303,7 +333,11 @@ defmodule MiwayCreditCore.Authorization do
 
   def set_approval_limit(role_id, permission_key, max_amount) do
     %ApprovalLimit{}
-    |> ApprovalLimit.changeset(%{role_id: role_id, permission_key: permission_key, max_amount: max_amount})
+    |> ApprovalLimit.changeset(%{
+      role_id: role_id,
+      permission_key: permission_key,
+      max_amount: max_amount
+    })
     |> Repo.insert()
   end
 end

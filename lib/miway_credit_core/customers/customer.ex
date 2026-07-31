@@ -4,10 +4,10 @@ defmodule MiwayCreditCore.Customers.Customer do
 
   @moduledoc """
   This module handles customer-related functionality.
-  
+
   A customer represents a person who can request loans in the system.
   This module provides functions to create, validate, and manage customers.
-  
+
   ## Examples
       
       iex> alias MiwayCreditCore.Customers.Customer
@@ -63,6 +63,7 @@ defmodule MiwayCreditCore.Customers.Customer do
 
     timestamps()
   end
+
   # Use Decimal for precise financial operations
   # --------------------------------------------------------------
   # TYPE SPECIFICATIONS
@@ -70,46 +71,48 @@ defmodule MiwayCreditCore.Customers.Customer do
   # Type specs help document what types of data your functions accept
   # and return. They're used by tools like Dialyzer for static analysis.
   # --------------------------------------------------------------
-  
+
   # Define a type for our customer struct
   @type t() :: %__MODULE__{
-    id: binary(),
-    organisation_id: binary(),
-    name: String.t(),
-    phone: String.t(),
-    id_number: String.t(),
-    email: String.t() | nil,
-    inserted_at: DateTime.t() | nil,
-    updated_at: DateTime.t() | nil,
-    active: boolean(),
-    total_loans: non_neg_integer(),
-    current_balance: Decimal.t() | nil,
-    customer_type: String.t(),
-    id_type: String.t(),
-    address_line: String.t() | nil,
-    kyc_status: String.t(),
-    loan_applications: [MiwayCreditCore.Applications.LoanApplication.t()] | Ecto.Association.NotLoaded.t(),
-    loan_accounts: [MiwayCreditCore.Lending.LoanAccount.t()] | Ecto.Association.NotLoaded.t()
-  }
+          id: binary(),
+          organisation_id: binary(),
+          name: String.t(),
+          phone: String.t(),
+          id_number: String.t(),
+          email: String.t() | nil,
+          inserted_at: DateTime.t() | nil,
+          updated_at: DateTime.t() | nil,
+          active: boolean(),
+          total_loans: non_neg_integer(),
+          current_balance: Decimal.t() | nil,
+          customer_type: String.t(),
+          id_type: String.t(),
+          address_line: String.t() | nil,
+          kyc_status: String.t(),
+          loan_applications:
+            [MiwayCreditCore.Applications.LoanApplication.t()] | Ecto.Association.NotLoaded.t(),
+          loan_accounts:
+            [MiwayCreditCore.Lending.LoanAccount.t()] | Ecto.Association.NotLoaded.t()
+        }
   # Define a type for customer creation params
   @type customer_params() :: %{
-    required(:name) => String.t(),
-    required(:phone) => String.t(),
-    required(:id_number) => String.t(),
-    optional(:email) => String.t(),
-    optional(:address) => String.t()
-  }
-  
+          required(:name) => String.t(),
+          required(:phone) => String.t(),
+          required(:id_number) => String.t(),
+          optional(:email) => String.t(),
+          optional(:address) => String.t()
+        }
+
   # Define a type for validation result
   @type validation_result() :: {:ok, t()} | {:error, keyword()}
-  
+
   # --------------------------------------------------------------
   # PUBLIC FUNCTIONS
   # --------------------------------------------------------------
-  
+
   @doc """
   Creates a new customer from the provided parameters.
-  
+
   ## Parameters
     * `params` - A map containing customer information
     
@@ -132,13 +135,15 @@ defmodule MiwayCreditCore.Customers.Customer do
     |> case do
       %{valid?: true} = changeset ->
         {:ok, Ecto.Changeset.apply_changes(changeset)}
+
       changeset ->
         {:error, changeset}
     end
   end
+
   @doc """
   Creates a changeset for customer.
-  
+
   ## Parameters
     * `customer` - Existing customer struct or %Customer{}
     * `attrs` - Map of attributes to change
@@ -182,7 +187,9 @@ defmodule MiwayCreditCore.Customers.Customer do
     ])
     |> validate_required([:organisation_id, :name, :phone, :id_number, :customer_type, :id_type])
     |> validate_phone_format()
-    |> validate_format(:email, ~r/^[^@\s]+@[^@\s]+\.[^@\s]+$/, message: "must have a valid format")
+    |> validate_format(:email, ~r/^[^@\s]+@[^@\s]+\.[^@\s]+$/,
+      message: "must have a valid format"
+    )
     |> validate_inclusion(:customer_type, @customer_types)
     |> validate_inclusion(:id_type, @id_types)
     |> validate_id_type_matches_customer_type()
@@ -221,13 +228,14 @@ defmodule MiwayCreditCore.Customers.Customer do
       _ -> add_error(changeset, :id_type, "does not match customer_type")
     end
   end
-  
+
   # Custom validator for phone format
   defp validate_phone_format(changeset) do
     validate_change(changeset, :phone, fn :phone, phone ->
       if valid_phone?(phone), do: [], else: [phone: "invalid format"]
     end)
   end
+
   # --------------------------------------------------------------
   # PRIVATE FUNCTIONS
   # --------------------------------------------------------------
@@ -239,5 +247,6 @@ defmodule MiwayCreditCore.Customers.Customer do
     # The outer anchors ensure the entire string is digits only
     Regex.match?(~r/^(26|260)\d{7,}$/, phone)
   end
+
   defp valid_phone?(_), do: false
 end

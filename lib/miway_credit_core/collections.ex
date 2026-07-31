@@ -18,7 +18,15 @@ defmodule MiwayCreditCore.Collections do
 
   import Ecto.Query
   alias MiwayCreditCore.Repo
-  alias MiwayCreditCore.Collections.{CollectionCase, CollectionActivity, PromiseToPay, RestructuringRequest, WriteOffRequest}
+
+  alias MiwayCreditCore.Collections.{
+    CollectionCase,
+    CollectionActivity,
+    PromiseToPay,
+    RestructuringRequest,
+    WriteOffRequest
+  }
+
   alias MiwayCreditCore.Lending
   alias MiwayCreditCore.Lending.{LoanAccount, RepaymentScheduleInstallment, InterestCalculator}
   alias MiwayCreditCore.Payments.PaymentTransaction
@@ -129,7 +137,10 @@ defmodule MiwayCreditCore.Collections do
   """
   def set_recovery_status(%CollectionCase{} = collection_case, recovery_status, _admin_id) do
     Ecto.Multi.new()
-    |> Ecto.Multi.update(:case, CollectionCase.changeset(collection_case, %{recovery_status: recovery_status}))
+    |> Ecto.Multi.update(
+      :case,
+      CollectionCase.changeset(collection_case, %{recovery_status: recovery_status})
+    )
     |> Ecto.Multi.run(:account, fn repo, _changes ->
       if recovery_status == "legal_action" do
         account = repo.get!(LoanAccount, collection_case.loan_account_id)
@@ -213,7 +224,10 @@ defmodule MiwayCreditCore.Collections do
         |> Repo.exists?()
 
       promise
-      |> PromiseToPay.evaluation_changeset(%{status: if(kept?, do: "kept", else: "broken"), evaluated_at: now})
+      |> PromiseToPay.evaluation_changeset(%{
+        status: if(kept?, do: "kept", else: "broken"),
+        evaluated_at: now
+      })
       |> Repo.update!()
     end)
 
@@ -258,7 +272,8 @@ defmodule MiwayCreditCore.Collections do
     |> Repo.update()
   end
 
-  def reject_restructuring(%RestructuringRequest{}, _approver_id, _notes), do: {:error, :invalid_status}
+  def reject_restructuring(%RestructuringRequest{}, _approver_id, _notes),
+    do: {:error, :invalid_status}
 
   @doc """
   Approves a term-extension request: marks every remaining unpaid
@@ -281,7 +296,11 @@ defmodule MiwayCreditCore.Collections do
 
       remaining =
         RepaymentScheduleInstallment
-        |> where([i], i.loan_account_id == ^account.id and i.status in ["upcoming", "overdue", "partially_paid"])
+        |> where(
+          [i],
+          i.loan_account_id == ^account.id and
+            i.status in ["upcoming", "overdue", "partially_paid"]
+        )
         |> order_by([i], asc: i.due_date)
         |> Repo.all()
 
@@ -299,25 +318,59 @@ defmodule MiwayCreditCore.Collections do
         end)
 
       new_term_months = length(remaining) + request.additional_term_months
-      next_installment_number = (Repo.aggregate(from(i in RepaymentScheduleInstallment, where: i.loan_account_id == ^account.id), :max, :installment_number) || 0) + 1
+
+      next_installment_number =
+        (Repo.aggregate(
+           from(i in RepaymentScheduleInstallment, where: i.loan_account_id == ^account.id),
+           :max,
+           :installment_number
+         ) || 0) + 1
 
       %{monthly_payment: monthly_payment} =
-        InterestCalculator.calculate(%{amount: remaining_principal, interest_rate: account.interest_rate, term_months: new_term_months})
+        InterestCalculator.calculate(%{
+          amount: remaining_principal,
+          interest_rate: account.interest_rate,
+          term_months: new_term_months
+        })
 
-      new_installments = build_restructured_schedule(account, remaining_principal, monthly_payment, new_term_months, next_installment_number, now)
-      new_remaining_total = Enum.reduce(new_installments, Decimal.new("0.00"), &Decimal.add(&2, &1.scheduled_amount))
+      new_installments =
+        build_restructured_schedule(
+          account,
+          remaining_principal,
+          monthly_payment,
+          new_term_months,
+          next_installment_number,
+          now
+        )
+
+      new_remaining_total =
+        Enum.reduce(new_installments, Decimal.new("0.00"), &Decimal.add(&2, &1.scheduled_amount))
+
       delta = Decimal.sub(new_remaining_total, old_remaining_total)
 
       Ecto.Multi.new()
-      |> Ecto.Multi.update(:request, RestructuringRequest.decision_changeset(request, %{
-        status: "approved", decided_by_id: approver_id, decided_at: now
-      }))
+      |> Ecto.Multi.update(
+        :request,
+        RestructuringRequest.decision_changeset(request, %{
+          status: "approved",
+          decided_by_id: approver_id,
+          decided_at: now
+        })
+      )
       |> Ecto.Multi.run(:restructure_old, fn repo, _changes ->
-        Enum.each(remaining, fn i -> i |> RepaymentScheduleInstallment.changeset(%{status: "restructured"}) |> repo.update!() end)
+        Enum.each(remaining, fn i ->
+          i |> RepaymentScheduleInstallment.changeset(%{status: "restructured"}) |> repo.update!()
+        end)
+
         {:ok, :restructured}
       end)
       |> Ecto.Multi.insert_all(:new_schedule, RepaymentScheduleInstallment, new_installments)
-      |> Ecto.Multi.update(:account, LoanAccount.changeset(account, %{outstanding_balance: Decimal.add(account.outstanding_balance, delta)}))
+      |> Ecto.Multi.update(
+        :account,
+        LoanAccount.changeset(account, %{
+          outstanding_balance: Decimal.add(account.outstanding_balance, delta)
+        })
+      )
       |> maybe_post_restructure_entry(delta, account, now)
       |> Repo.transaction()
       |> case do
@@ -329,7 +382,14 @@ defmodule MiwayCreditCore.Collections do
 
   def approve_restructuring(%RestructuringRequest{}, _approver_id), do: {:error, :invalid_status}
 
-  defp build_restructured_schedule(account, remaining_principal, monthly_payment, term_months, start_number, now) do
+  defp build_restructured_schedule(
+         account,
+         remaining_principal,
+         monthly_payment,
+         term_months,
+         start_number,
+         now
+       ) do
     base_date = Date.utc_today()
     monthly_rate = Decimal.div(account.interest_rate, Decimal.new("1200"))
 
@@ -369,17 +429,20 @@ defmodule MiwayCreditCore.Collections do
   defp maybe_post_restructure_entry(multi, delta, account, now) do
     if Decimal.compare(delta, Decimal.new("0")) == :gt do
       multi
-      |> Ecto.Multi.insert(:restructure_entry, AccountingEntry.changeset(%AccountingEntry{}, %{
-        organisation_id: account.organisation_id,
-        loan_account_id: account.id,
-        entry_type: "fee",
-        amount: delta,
-        running_balance: Decimal.add(account.outstanding_balance, delta),
-        source_type: "loan_account",
-        source_id: account.id,
-        description: "Interest recognized on loan restructuring",
-        occurred_at: now
-      }))
+      |> Ecto.Multi.insert(
+        :restructure_entry,
+        AccountingEntry.changeset(%AccountingEntry{}, %{
+          organisation_id: account.organisation_id,
+          loan_account_id: account.id,
+          entry_type: "fee",
+          amount: delta,
+          running_balance: Decimal.add(account.outstanding_balance, delta),
+          source_type: "loan_account",
+          source_id: account.id,
+          description: "Interest recognized on loan restructuring",
+          occurred_at: now
+        })
+      )
       |> MiwayCreditCore.Accounting.GeneralLedger.post_journal_entry(:restructure_gl, %{
         organisation_id: account.organisation_id,
         description: "Interest recognized on loan restructuring",
@@ -441,10 +504,17 @@ defmodule MiwayCreditCore.Collections do
       now = DateTime.utc_now() |> DateTime.truncate(:second)
 
       Ecto.Multi.new()
-      |> Ecto.Multi.update(:request, WriteOffRequest.decision_changeset(request, %{
-        status: "approved", decided_by_id: approver_id, decided_at: now
-      }))
-      |> Ecto.Multi.run(:write_off, fn _repo, _changes -> Lending.write_off_account(account, approver_id) end)
+      |> Ecto.Multi.update(
+        :request,
+        WriteOffRequest.decision_changeset(request, %{
+          status: "approved",
+          decided_by_id: approver_id,
+          decided_at: now
+        })
+      )
+      |> Ecto.Multi.run(:write_off, fn _repo, _changes ->
+        Lending.write_off_account(account, approver_id)
+      end)
       |> Repo.transaction()
       |> case do
         {:ok, %{request: request}} -> {:ok, request}
@@ -466,6 +536,7 @@ defmodule MiwayCreditCore.Collections do
   end
 
   defp scope_organisation(query, %Scope{organisation_id: :all}), do: query
+
   defp scope_organisation(query, %Scope{organisation_id: organisation_id}) do
     where(query, organisation_id: ^organisation_id)
   end

@@ -29,12 +29,20 @@ defmodule MiwayCreditCore.Customers.Consent do
   def changeset(consent, attrs) do
     consent
     |> cast(attrs, [
-      :organisation_id, :customer_id, :consent_type, :method,
-      :granted_at, :recorded_by_id
+      :organisation_id,
+      :customer_id,
+      :consent_type,
+      :method,
+      :granted_at,
+      :recorded_by_id
     ])
     |> validate_required([
-      :organisation_id, :customer_id, :consent_type, :method,
-      :granted_at, :recorded_by_id
+      :organisation_id,
+      :customer_id,
+      :consent_type,
+      :method,
+      :granted_at,
+      :recorded_by_id
     ])
     |> validate_inclusion(:consent_type, @consent_types)
     |> validate_inclusion(:method, @methods)

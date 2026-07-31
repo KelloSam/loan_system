@@ -39,9 +39,9 @@ defmodule MiwayCreditCore.Applications do
 
   @doc "Paginated applications, newest first, customer + loan_account preloaded (the admin list view shows the account's status/rate once approved). Accepts page:/per_page:."
   def list_applications(%Scope{} = scope, opts \\ []) do
-    page     = Keyword.get(opts, :page, 1)
+    page = Keyword.get(opts, :page, 1)
     per_page = Keyword.get(opts, :per_page, 50)
-    offset   = (page - 1) * per_page
+    offset = (page - 1) * per_page
 
     LoanApplication
     |> scope_organisation(scope)
@@ -124,9 +124,9 @@ defmodule MiwayCreditCore.Applications do
       end)
       |> Repo.transaction()
       |> case do
-        {:ok, %{application: application}}    -> {:ok, application}
-        {:error, :application, changeset, _}  -> {:error, changeset}
-        {:error, _, reason, _}                -> {:error, reason}
+        {:ok, %{application: application}} -> {:ok, application}
+        {:error, :application, changeset, _} -> {:error, changeset}
+        {:error, _, reason, _} -> {:error, reason}
       end
     end
   end
@@ -158,9 +158,9 @@ defmodule MiwayCreditCore.Applications do
     end)
     |> Repo.transaction()
     |> case do
-      {:ok, %{application: deleted}}       -> {:ok, deleted}
+      {:ok, %{application: deleted}} -> {:ok, deleted}
       {:error, :application, changeset, _} -> {:error, changeset}
-      {:error, _, reason, _}               -> {:error, reason}
+      {:error, _, reason, _} -> {:error, reason}
     end
   end
 
@@ -224,7 +224,11 @@ defmodule MiwayCreditCore.Applications do
   `LoanApplication.status` actually flip to `"approved"` — until then
   it stays `under_review`, now just mid-workflow.
   """
-  def approve_application(%LoanApplication{status: "under_review"} = application, %Scope{} = scope, attests_no_conflict_of_interest) do
+  def approve_application(
+        %LoanApplication{status: "under_review"} = application,
+        %Scope{} = scope,
+        attests_no_conflict_of_interest
+      ) do
     product = Products.get_product!(scope, application.loan_product_id)
     level = current_level(Repo, application, product)
 
@@ -240,7 +244,8 @@ defmodule MiwayCreditCore.Applications do
     end
   end
 
-  def approve_application(%LoanApplication{}, %Scope{}, _attestation), do: {:error, :invalid_status}
+  def approve_application(%LoanApplication{}, %Scope{}, _attestation),
+    do: {:error, :invalid_status}
 
   @doc """
   Conditionally approves an assessed application — same guard chain as
@@ -252,7 +257,12 @@ defmodule MiwayCreditCore.Applications do
   `disburse_application/2` refuses until `clear_conditions/2` confirms
   they were met.
   """
-  def conditionally_approve_application(%LoanApplication{status: "under_review"} = application, %Scope{} = scope, conditions, attests_no_conflict_of_interest)
+  def conditionally_approve_application(
+        %LoanApplication{status: "under_review"} = application,
+        %Scope{} = scope,
+        conditions,
+        attests_no_conflict_of_interest
+      )
       when is_binary(conditions) and conditions != "" do
     product = Products.get_product!(scope, application.loan_product_id)
     level = current_level(Repo, application, product)
@@ -268,30 +278,37 @@ defmodule MiwayCreditCore.Applications do
       now = DateTime.utc_now() |> DateTime.truncate(:second)
 
       Ecto.Multi.new()
-      |> Ecto.Multi.insert(:decision, ApprovalDecision.changeset(%ApprovalDecision{}, %{
-        organisation_id: application.organisation_id,
-        loan_application_id: application.id,
-        decided_by_id: scope.user.id,
-        level: level,
-        decision: "conditional",
-        conditions: conditions,
-        decided_at: now
-      }))
-      |> Ecto.Multi.update(:application, LoanApplication.decision_changeset(application, %{
-        status: "approved",
-        decided_at: now,
-        decided_by_id: scope.user.id,
-        conditions: conditions
-      }))
+      |> Ecto.Multi.insert(
+        :decision,
+        ApprovalDecision.changeset(%ApprovalDecision{}, %{
+          organisation_id: application.organisation_id,
+          loan_application_id: application.id,
+          decided_by_id: scope.user.id,
+          level: level,
+          decision: "conditional",
+          conditions: conditions,
+          decided_at: now
+        })
+      )
+      |> Ecto.Multi.update(
+        :application,
+        LoanApplication.decision_changeset(application, %{
+          status: "approved",
+          decided_at: now,
+          decided_by_id: scope.user.id,
+          conditions: conditions
+        })
+      )
       |> Repo.transaction()
       |> case do
         {:ok, %{application: updated}} -> {:ok, updated}
-        {:error, _, reason, _}         -> {:error, reason}
+        {:error, _, reason, _} -> {:error, reason}
       end
     end
   end
 
-  def conditionally_approve_application(%LoanApplication{}, %Scope{}, _conditions, _attestation), do: {:error, :invalid_status}
+  def conditionally_approve_application(%LoanApplication{}, %Scope{}, _conditions, _attestation),
+    do: {:error, :invalid_status}
 
   @doc """
   Confirms a conditionally-approved application's conditions were
@@ -299,7 +316,10 @@ defmodule MiwayCreditCore.Applications do
   separate staff action — disbursement never infers a condition was
   satisfied on its own.
   """
-  def clear_conditions(%LoanApplication{conditions: conditions, conditions_cleared_at: nil} = application, %Scope{})
+  def clear_conditions(
+        %LoanApplication{conditions: conditions, conditions_cleared_at: nil} = application,
+        %Scope{}
+      )
       when not is_nil(conditions) do
     application
     |> LoanApplication.decision_changeset(%{
@@ -321,27 +341,37 @@ defmodule MiwayCreditCore.Applications do
   re-assessing once the missing information arrives is exactly what
   that already means.
   """
-  def refer_application(%LoanApplication{status: "under_review"} = application, %Scope{} = scope, reason)
+  def refer_application(
+        %LoanApplication{status: "under_review"} = application,
+        %Scope{} = scope,
+        reason
+      )
       when is_binary(reason) and reason != "" do
     product = Products.get_product!(scope, application.loan_product_id)
     level = current_level(Repo, application, product)
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
     Ecto.Multi.new()
-    |> Ecto.Multi.insert(:decision, ApprovalDecision.changeset(%ApprovalDecision{}, %{
-      organisation_id: application.organisation_id,
-      loan_application_id: application.id,
-      decided_by_id: scope.user.id,
-      level: level,
-      decision: "referred",
-      notes: reason,
-      decided_at: now
-    }))
-    |> Ecto.Multi.update(:application, LoanApplication.decision_changeset(application, %{status: "referred"}))
+    |> Ecto.Multi.insert(
+      :decision,
+      ApprovalDecision.changeset(%ApprovalDecision{}, %{
+        organisation_id: application.organisation_id,
+        loan_application_id: application.id,
+        decided_by_id: scope.user.id,
+        level: level,
+        decision: "referred",
+        notes: reason,
+        decided_at: now
+      })
+    )
+    |> Ecto.Multi.update(
+      :application,
+      LoanApplication.decision_changeset(application, %{status: "referred"})
+    )
     |> Repo.transaction()
     |> case do
       {:ok, %{application: updated}} -> {:ok, updated}
-      {:error, _, reason, _}         -> {:error, reason}
+      {:error, _, reason, _} -> {:error, reason}
     end
   end
 
@@ -355,17 +385,31 @@ defmodule MiwayCreditCore.Applications do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
     Ecto.Multi.new()
-    |> Ecto.Multi.insert(:decision, ApprovalDecision.changeset(%ApprovalDecision{}, Map.merge(%{
-      organisation_id: application.organisation_id,
-      loan_application_id: application.id,
-      decided_by_id: scope.user.id,
-      level: level,
-      decided_at: now
-    }, decision_attrs)))
+    |> Ecto.Multi.insert(
+      :decision,
+      ApprovalDecision.changeset(
+        %ApprovalDecision{},
+        Map.merge(
+          %{
+            organisation_id: application.organisation_id,
+            loan_application_id: application.id,
+            decided_by_id: scope.user.id,
+            level: level,
+            decided_at: now
+          },
+          decision_attrs
+        )
+      )
+    )
     |> Ecto.Multi.run(:application, fn repo, _changes ->
-      if final_level?(product, level) and level_requirement_met?(repo, application.id, level, product) do
+      if final_level?(product, level) and
+           level_requirement_met?(repo, application.id, level, product) do
         application
-        |> LoanApplication.decision_changeset(%{status: "approved", decided_at: now, decided_by_id: scope.user.id})
+        |> LoanApplication.decision_changeset(%{
+          status: "approved",
+          decided_at: now,
+          decided_by_id: scope.user.id
+        })
         |> repo.update()
       else
         {:ok, application}
@@ -374,17 +418,27 @@ defmodule MiwayCreditCore.Applications do
     |> Repo.transaction()
     |> case do
       {:ok, %{application: updated}} -> {:ok, updated}
-      {:error, _, reason, _}         -> {:error, reason}
+      {:error, _, reason, _} -> {:error, reason}
     end
   end
 
   defp check_conflict_of_interest_attestation(true), do: :ok
-  defp check_conflict_of_interest_attestation(_), do: {:error, :conflict_of_interest_attestation_required}
 
-  defp check_separation_of_duties(_application, _scope, %LoanProduct{requires_separation_of_duties: false}), do: :ok
+  defp check_conflict_of_interest_attestation(_),
+    do: {:error, :conflict_of_interest_attestation_required}
+
+  defp check_separation_of_duties(_application, _scope, %LoanProduct{
+         requires_separation_of_duties: false
+       }),
+       do: :ok
+
   defp check_separation_of_duties(%LoanApplication{created_by_id: nil}, _scope, _product), do: :ok
 
-  defp check_separation_of_duties(%LoanApplication{created_by_id: created_by_id}, %Scope{user: %{id: user_id}}, _product) do
+  defp check_separation_of_duties(
+         %LoanApplication{created_by_id: created_by_id},
+         %Scope{user: %{id: user_id}},
+         _product
+       ) do
     if created_by_id == user_id, do: {:error, :maker_checker_violation}, else: :ok
   end
 
@@ -399,7 +453,11 @@ defmodule MiwayCreditCore.Applications do
   defp check_not_already_decided(application, %Scope{user: %{id: user_id}}) do
     already_decided =
       ApprovalDecision
-      |> where([d], d.loan_application_id == ^application.id and d.decided_by_id == ^user_id and d.decision != "referred")
+      |> where(
+        [d],
+        d.loan_application_id == ^application.id and d.decided_by_id == ^user_id and
+          d.decision != "referred"
+      )
       |> Repo.exists?()
 
     if already_decided, do: {:error, :already_decided}, else: :ok
@@ -407,25 +465,38 @@ defmodule MiwayCreditCore.Applications do
 
   defp check_approval_limit(%LoanApplication{requested_amount: amount}, scope) do
     case Authorization.approval_limit(scope, "applications.approve") do
-      nil -> :ok
-      limit -> if Decimal.compare(amount, limit) == :gt, do: {:error, :exceeds_approval_limit}, else: :ok
+      nil ->
+        :ok
+
+      limit ->
+        if Decimal.compare(amount, limit) == :gt, do: {:error, :exceeds_approval_limit}, else: :ok
     end
   end
 
-  defp check_guarantor_requirement(_application, %LoanProduct{requires_guarantor: false}, _scope), do: :ok
+  defp check_guarantor_requirement(_application, %LoanProduct{requires_guarantor: false}, _scope),
+    do: :ok
 
-  defp check_guarantor_requirement(application, %LoanProduct{requires_guarantor: true} = product, scope) do
+  defp check_guarantor_requirement(
+         application,
+         %LoanProduct{requires_guarantor: true} = product,
+         scope
+       ) do
     count = scope |> Customers.list_guarantors_for_customer(application.customer_id) |> length()
     if count >= product.minimum_guarantors, do: :ok, else: {:error, :guarantor_required}
   end
 
   defp check_level_minimum_role(product, scope, level) do
     role = level_minimum_role(product, level)
-    if Authorization.role_meets_minimum?(scope, role), do: :ok, else: {:error, :insufficient_approval_role}
+
+    if Authorization.role_meets_minimum?(scope, role),
+      do: :ok,
+      else: {:error, :insufficient_approval_role}
   end
 
   defp level_minimum_role(product, 1), do: product.minimum_approval_role
-  defp level_minimum_role(product, 2), do: product.second_level_minimum_role || product.minimum_approval_role
+
+  defp level_minimum_role(product, 2),
+    do: product.second_level_minimum_role || product.minimum_approval_role
 
   # 1, or 2 when the product requires a second level.
   defp total_levels(%LoanProduct{requires_second_level_approval: true}), do: 2
@@ -447,7 +518,11 @@ defmodule MiwayCreditCore.Applications do
   defp level_requirement_met?(repo, application_id, level, product) do
     approved_count =
       ApprovalDecision
-      |> where([d], d.loan_application_id == ^application_id and d.level == ^level and d.decision == "approved")
+      |> where(
+        [d],
+        d.loan_application_id == ^application_id and d.level == ^level and
+          d.decision == "approved"
+      )
       |> repo.aggregate(:count)
 
     approved_count >= required_votes_for_level(product, level)
@@ -465,15 +540,25 @@ defmodule MiwayCreditCore.Applications do
     end)
   end
 
-  defp check_affordability(_application, %LoanProduct{requires_affordability_check: false}, _scope), do: :ok
+  defp check_affordability(
+         _application,
+         %LoanProduct{requires_affordability_check: false},
+         _scope
+       ),
+       do: :ok
 
-  defp check_affordability(application, %LoanProduct{requires_affordability_check: true} = product, scope) do
+  defp check_affordability(
+         application,
+         %LoanProduct{requires_affordability_check: true} = product,
+         scope
+       ) do
     Risk.assess_affordability(scope, application, product)
   end
 
   @crb_report_validity_days 90
 
-  defp check_crb_requirement(_application, %LoanProduct{requires_crb_check: false}, _scope), do: :ok
+  defp check_crb_requirement(_application, %LoanProduct{requires_crb_check: false}, _scope),
+    do: :ok
 
   defp check_crb_requirement(application, %LoanProduct{requires_crb_check: true}, scope) do
     case CreditReporting.get_latest_report_for_customer(scope, application.customer_id) do
@@ -514,26 +599,49 @@ defmodule MiwayCreditCore.Applications do
   otherwise), "reference" optional (the channel's own confirmation
   number, e.g. a mobile money transaction id).
   """
-  def disburse_application(application, scope, disbursement_details \\ %{"method" => "bank_transfer"})
+  def disburse_application(
+        application,
+        scope,
+        disbursement_details \\ %{"method" => "bank_transfer"}
+      )
 
-  def disburse_application(%LoanApplication{status: "approved"} = application, %Scope{} = scope, disbursement_details) do
+  def disburse_application(
+        %LoanApplication{status: "approved"} = application,
+        %Scope{} = scope,
+        disbursement_details
+      ) do
     case check_conditions_cleared(application) do
       :ok ->
         product = Products.get_product!(scope, application.loan_product_id)
-        do_disburse_application(application, scope.user.id, product, stringify_keys(disbursement_details))
+
+        do_disburse_application(
+          application,
+          scope.user.id,
+          product,
+          stringify_keys(disbursement_details)
+        )
 
       error ->
         error
     end
   end
 
-  def disburse_application(%LoanApplication{}, %Scope{}, _disbursement_details), do: {:error, :invalid_status}
+  def disburse_application(%LoanApplication{}, %Scope{}, _disbursement_details),
+    do: {:error, :invalid_status}
 
   defp check_conditions_cleared(%LoanApplication{conditions: nil}), do: :ok
-  defp check_conditions_cleared(%LoanApplication{conditions_cleared_at: nil}), do: {:error, :conditions_not_cleared}
+
+  defp check_conditions_cleared(%LoanApplication{conditions_cleared_at: nil}),
+    do: {:error, :conditions_not_cleared}
+
   defp check_conditions_cleared(%LoanApplication{}), do: :ok
 
-  defp do_disburse_application(%LoanApplication{} = application, admin_id, %LoanProduct{} = product, disbursement_details) do
+  defp do_disburse_application(
+         %LoanApplication{} = application,
+         admin_id,
+         %LoanProduct{} = product,
+         disbursement_details
+       ) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
     account_id = Ecto.UUID.generate()
 
@@ -554,11 +662,14 @@ defmodule MiwayCreditCore.Applications do
     interest_amount = Decimal.sub(total_repayment, application.requested_amount)
 
     Ecto.Multi.new()
-    |> Ecto.Multi.update(:application, LoanApplication.decision_changeset(application, %{
-      status: "disbursed",
-      disbursed_at: now,
-      disbursed_by_id: admin_id
-    }))
+    |> Ecto.Multi.update(
+      :application,
+      LoanApplication.decision_changeset(application, %{
+        status: "disbursed",
+        disbursed_at: now,
+        disbursed_by_id: admin_id
+      })
+    )
     |> Ecto.Multi.insert(:account, fn %{application: application} ->
       LoanAccount.changeset(%LoanAccount{id: account_id}, %{
         organisation_id: application.organisation_id,
@@ -617,8 +728,8 @@ defmodule MiwayCreditCore.Applications do
     |> Repo.transaction()
     |> case do
       {:ok, %{application: application, account: account}} -> {:ok, application, account}
-      {:error, :application, changeset, _}                 -> {:error, changeset}
-      {:error, _, reason, _}                                -> {:error, reason}
+      {:error, :application, changeset, _} -> {:error, changeset}
+      {:error, _, reason, _} -> {:error, reason}
     end
   end
 
@@ -671,7 +782,12 @@ defmodule MiwayCreditCore.Applications do
   """
   def reject_application(application, scope, reason, decline_reason_category \\ "other")
 
-  def reject_application(%LoanApplication{status: "under_review"} = application, %Scope{} = scope, reason, decline_reason_category) do
+  def reject_application(
+        %LoanApplication{status: "under_review"} = application,
+        %Scope{} = scope,
+        reason,
+        decline_reason_category
+      ) do
     product = Products.get_product!(scope, application.loan_product_id)
     level = current_level(Repo, application, product)
 
@@ -680,34 +796,41 @@ defmodule MiwayCreditCore.Applications do
       now = DateTime.utc_now() |> DateTime.truncate(:second)
 
       Ecto.Multi.new()
-      |> Ecto.Multi.insert(:decision, ApprovalDecision.changeset(%ApprovalDecision{}, %{
-        organisation_id: application.organisation_id,
-        loan_application_id: application.id,
-        decided_by_id: scope.user.id,
-        level: level,
-        decision: "rejected",
-        decline_reason_category: decline_reason_category,
-        notes: reason,
-        decided_at: now
-      }))
-      |> Ecto.Multi.update(:application, LoanApplication.decision_changeset(application, %{
-        status: "rejected",
-        decided_at: now,
-        decided_by_id: scope.user.id,
-        rejection_reason: reason
-      }))
+      |> Ecto.Multi.insert(
+        :decision,
+        ApprovalDecision.changeset(%ApprovalDecision{}, %{
+          organisation_id: application.organisation_id,
+          loan_application_id: application.id,
+          decided_by_id: scope.user.id,
+          level: level,
+          decision: "rejected",
+          decline_reason_category: decline_reason_category,
+          notes: reason,
+          decided_at: now
+        })
+      )
+      |> Ecto.Multi.update(
+        :application,
+        LoanApplication.decision_changeset(application, %{
+          status: "rejected",
+          decided_at: now,
+          decided_by_id: scope.user.id,
+          rejection_reason: reason
+        })
+      )
       |> Ecto.Multi.run(:update_customer_stats, fn repo, %{application: updated} ->
         CustomerStats.recalculate(repo, updated.customer_id)
       end)
       |> Repo.transaction()
       |> case do
         {:ok, %{application: updated}} -> {:ok, updated}
-        {:error, _, reason, _}         -> {:error, reason}
+        {:error, _, reason, _} -> {:error, reason}
       end
     end
   end
 
-  def reject_application(%LoanApplication{}, %Scope{}, _reason, _decline_reason_category), do: {:error, :invalid_status}
+  def reject_application(%LoanApplication{}, %Scope{}, _reason, _decline_reason_category),
+    do: {:error, :invalid_status}
 
   @doc """
   Withdraws an application still in flight — pending or under_review.
@@ -722,7 +845,11 @@ defmodule MiwayCreditCore.Applications do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
     application
-    |> LoanApplication.decision_changeset(%{status: "withdrawn", decided_at: now, decided_by_id: scope.user.id})
+    |> LoanApplication.decision_changeset(%{
+      status: "withdrawn",
+      decided_at: now,
+      decided_by_id: scope.user.id
+    })
     |> Repo.update()
   end
 
@@ -774,6 +901,7 @@ defmodule MiwayCreditCore.Applications do
   # ---------------------------------------------------------------------------
 
   defp scope_organisation(query, %Scope{organisation_id: :all}), do: query
+
   defp scope_organisation(query, %Scope{organisation_id: organisation_id}) do
     where(query, organisation_id: ^organisation_id)
   end
@@ -800,8 +928,10 @@ defmodule MiwayCreditCore.Applications do
     base_date = Timex.shift(DateTime.to_date(account.opened_at), days: grace_period_days || 0)
 
     {installments, _} =
-      Enum.map_reduce(1..account.term_months, account.principal_amount, fn n, remaining_principal ->
+      Enum.map_reduce(1..account.term_months, account.principal_amount, fn n,
+                                                                           remaining_principal ->
         interest_due = remaining_principal |> Decimal.mult(monthly_rate) |> Decimal.round(2)
+
         principal_due =
           if n == account.term_months do
             remaining_principal

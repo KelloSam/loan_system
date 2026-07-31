@@ -1,7 +1,14 @@
 defmodule MiwayCreditCore.Accounts do
   import Ecto.Query
   alias MiwayCreditCore.Repo
-  alias MiwayCreditCore.Accounts.{User, StaffMember, CustomerUser, PasswordResetToken, PasswordResetNotifier}
+
+  alias MiwayCreditCore.Accounts.{
+    User,
+    StaffMember,
+    CustomerUser,
+    PasswordResetToken,
+    PasswordResetNotifier
+  }
 
   def create_user(attrs \\ %{}) do
     %User{}
@@ -215,7 +222,8 @@ defmodule MiwayCreditCore.Accounts do
         :ok
 
       user ->
-        raw_token = :crypto.strong_rand_bytes(@reset_token_bytes) |> Base.url_encode64(padding: false)
+        raw_token =
+          :crypto.strong_rand_bytes(@reset_token_bytes) |> Base.url_encode64(padding: false)
 
         expires_at =
           DateTime.utc_now()
@@ -230,8 +238,11 @@ defmodule MiwayCreditCore.Accounts do
         })
         |> Repo.insert()
         |> case do
-          {:ok, _token} -> PasswordResetNotifier.deliver_reset_link(user, reset_url_fun.(raw_token))
-          {:error, _changeset} -> :ok
+          {:ok, _token} ->
+            PasswordResetNotifier.deliver_reset_link(user, reset_url_fun.(raw_token))
+
+          {:error, _changeset} ->
+            :ok
         end
 
         :ok

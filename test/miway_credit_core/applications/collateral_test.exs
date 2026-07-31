@@ -11,7 +11,11 @@ defmodule MiwayCreditCore.Applications.CollateralTest do
       application = approved_application_fixture()
       account = application.loan_account
 
-      attrs = %{"type" => "vehicle", "description" => "Toyota Hilux 2018", "estimated_value" => "45000.00"}
+      attrs = %{
+        "type" => "vehicle",
+        "description" => "Toyota Hilux 2018",
+        "estimated_value" => "45000.00"
+      }
 
       assert {:ok, %Collateral{} = collateral} = Applications.create_collateral(account, attrs)
       assert collateral.type == "vehicle"
@@ -51,20 +55,44 @@ defmodule MiwayCreditCore.Applications.CollateralTest do
       account = application.loan_account
       scope = %Scope{organisation_id: account.organisation_id}
 
-      {:ok, _} = Applications.create_collateral(account, %{"type" => "vehicle", "description" => "Car", "estimated_value" => "20000.00"})
-      {:ok, _} = Applications.create_collateral(account, %{"type" => "land", "description" => "Plot", "estimated_value" => "30000.00"})
-      {:ok, _} = Applications.create_collateral(other_application.loan_account, %{"type" => "electronics", "description" => "Laptop", "estimated_value" => "5000.00"})
+      {:ok, _} =
+        Applications.create_collateral(account, %{
+          "type" => "vehicle",
+          "description" => "Car",
+          "estimated_value" => "20000.00"
+        })
+
+      {:ok, _} =
+        Applications.create_collateral(account, %{
+          "type" => "land",
+          "description" => "Plot",
+          "estimated_value" => "30000.00"
+        })
+
+      {:ok, _} =
+        Applications.create_collateral(other_application.loan_account, %{
+          "type" => "electronics",
+          "description" => "Laptop",
+          "estimated_value" => "5000.00"
+        })
 
       results = Applications.list_collaterals_for_account(scope, account.id)
       assert length(results) == 2
 
-      assert Decimal.equal?(Applications.total_collateral_value(scope, account.id), Decimal.new("50000.00"))
+      assert Decimal.equal?(
+               Applications.total_collateral_value(scope, account.id),
+               Decimal.new("50000.00")
+             )
     end
 
     test "total_collateral_value/2 is zero when no collateral is recorded" do
       application = approved_application_fixture()
       scope = %Scope{organisation_id: application.organisation_id}
-      assert Decimal.equal?(Applications.total_collateral_value(scope, application.loan_account.id), Decimal.new("0.00"))
+
+      assert Decimal.equal?(
+               Applications.total_collateral_value(scope, application.loan_account.id),
+               Decimal.new("0.00")
+             )
     end
   end
 
@@ -72,11 +100,20 @@ defmodule MiwayCreditCore.Applications.CollateralTest do
     test "fetches and deletes a collateral record" do
       application = approved_application_fixture()
       scope = %Scope{organisation_id: application.organisation_id}
-      {:ok, collateral} = Applications.create_collateral(application.loan_account, %{"type" => "other", "description" => "Jewelry", "estimated_value" => "1500.00"})
+
+      {:ok, collateral} =
+        Applications.create_collateral(application.loan_account, %{
+          "type" => "other",
+          "description" => "Jewelry",
+          "estimated_value" => "1500.00"
+        })
 
       assert Applications.get_collateral!(scope, collateral.id).id == collateral.id
       assert {:ok, _} = Applications.delete_collateral(collateral)
-      assert_raise Ecto.NoResultsError, fn -> Applications.get_collateral!(scope, collateral.id) end
+
+      assert_raise Ecto.NoResultsError, fn ->
+        Applications.get_collateral!(scope, collateral.id)
+      end
     end
   end
 end

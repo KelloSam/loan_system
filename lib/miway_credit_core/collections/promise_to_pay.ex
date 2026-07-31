@@ -30,8 +30,20 @@ defmodule MiwayCreditCore.Collections.PromiseToPay do
 
   def changeset(promise, attrs) do
     promise
-    |> cast(attrs, [:organisation_id, :collection_case_id, :promised_amount, :promised_date, :recorded_by_id])
-    |> validate_required([:organisation_id, :collection_case_id, :promised_amount, :promised_date, :recorded_by_id])
+    |> cast(attrs, [
+      :organisation_id,
+      :collection_case_id,
+      :promised_amount,
+      :promised_date,
+      :recorded_by_id
+    ])
+    |> validate_required([
+      :organisation_id,
+      :collection_case_id,
+      :promised_amount,
+      :promised_date,
+      :recorded_by_id
+    ])
     |> validate_number(:promised_amount, greater_than: 0)
     |> foreign_key_constraint(:organisation_id)
     |> foreign_key_constraint(:collection_case_id)

@@ -23,7 +23,7 @@ defmodule MiwayCreditCore.Risk.FraudDetector do
   alias MiwayCreditCore.Customers.Customer
 
   @medium_threshold 26
-  @high_threshold   56
+  @high_threshold 56
 
   @doc """
   Evaluates a loan application and returns {risk_level, score, signal_texts}.
@@ -44,8 +44,8 @@ defmodule MiwayCreditCore.Risk.FraudDetector do
       ]
       |> Enum.reject(&is_nil/1)
 
-    score     = signals |> Enum.map(&elem(&1, 0)) |> Enum.sum()
-    texts     = signals |> Enum.map(&elem(&1, 1))
+    score = signals |> Enum.map(&elem(&1, 0)) |> Enum.sum()
+    texts = signals |> Enum.map(&elem(&1, 1))
     risk_level = classify(score)
 
     {risk_level, score, texts}
@@ -56,8 +56,8 @@ defmodule MiwayCreditCore.Risk.FraudDetector do
   # ---------------------------------------------------------------------------
 
   defp classify(score) when score < @medium_threshold, do: "low"
-  defp classify(score) when score < @high_threshold,   do: "medium"
-  defp classify(_score),                               do: "high"
+  defp classify(score) when score < @high_threshold, do: "medium"
+  defp classify(_score), do: "high"
 
   # ---------------------------------------------------------------------------
   # Individual signals — each returns {points, text} or nil
@@ -65,6 +65,7 @@ defmodule MiwayCreditCore.Risk.FraudDetector do
 
   # +20 — account created less than 7 days ago
   defp signal_new_customer(nil), do: nil
+
   defp signal_new_customer(customer_id) do
     cutoff = NaiveDateTime.utc_now() |> NaiveDateTime.add(-7 * 24 * 60 * 60, :second)
 
@@ -81,6 +82,7 @@ defmodule MiwayCreditCore.Risk.FraudDetector do
 
   # +15 — no disbursed loans on record
   defp signal_no_repayment_history(nil, _exclude), do: nil
+
   defp signal_no_repayment_history(customer_id, exclude_id) do
     if prior_successful_count(customer_id, exclude_id) == 0 do
       {15, "No repayment history on record"}
@@ -91,6 +93,7 @@ defmodule MiwayCreditCore.Risk.FraudDetector do
 
   # +25 — first loan AND amount exceeds 5 000 ZMW
   defp signal_large_first_loan(nil, _amount, _exclude), do: nil
+
   defp signal_large_first_loan(customer_id, amount, exclude_id) do
     first? = prior_successful_count(customer_id, exclude_id) == 0
     large? = Decimal.compare(amount, Decimal.new("5000")) == :gt
@@ -104,9 +107,12 @@ defmodule MiwayCreditCore.Risk.FraudDetector do
 
   # +20 — amount is more than 3× customer's historical average
   defp signal_amount_vs_average(nil, _amount, _exclude), do: nil
+
   defp signal_amount_vs_average(customer_id, amount, exclude_id) do
     case avg_prior_loans(customer_id, exclude_id) do
-      nil -> nil
+      nil ->
+        nil
+
       prior_avg ->
         threshold = Decimal.mult(prior_avg, Decimal.new("3"))
 
@@ -122,6 +128,7 @@ defmodule MiwayCreditCore.Risk.FraudDetector do
   # +25 — a rejection within the last 90 days (Phase 1 blocks < 30 days;
   # this catches the 30–90 day window after that hard block lifts)
   defp signal_recent_rejection(nil), do: nil
+
   defp signal_recent_rejection(customer_id) do
     cutoff =
       NaiveDateTime.utc_now()

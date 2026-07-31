@@ -18,7 +18,9 @@ defmodule MiwayCreditCore.LoansFixtures do
   def valid_application_attrs(attrs \\ %{}) do
     customer_id = attrs[:customer_id] || attrs["customer_id"] || customer_fixture().id
     organisation_id = Repo.get!(Customer, customer_id).organisation_id
-    product_id = attrs[:loan_product_id] || attrs["loan_product_id"] || default_product_id(organisation_id)
+
+    product_id =
+      attrs[:loan_product_id] || attrs["loan_product_id"] || default_product_id(organisation_id)
 
     Enum.into(stringify_keys(attrs), %{
       "customer_id" => customer_id,
@@ -71,8 +73,13 @@ defmodule MiwayCreditCore.LoansFixtures do
     admin_scope = %Scope{user: admin, organisation_id: :all}
 
     {:ok, assessed} = MiwayCreditCore.Applications.assess_application(application, admin_scope)
-    {:ok, approved} = MiwayCreditCore.Applications.approve_application(assessed, admin_scope, true)
-    {:ok, disbursed, account} = MiwayCreditCore.Applications.disburse_application(approved, admin_scope)
+
+    {:ok, approved} =
+      MiwayCreditCore.Applications.approve_application(assessed, admin_scope, true)
+
+    {:ok, disbursed, account} =
+      MiwayCreditCore.Applications.disburse_application(approved, admin_scope)
+
     %{disbursed | loan_account: account}
   end
 

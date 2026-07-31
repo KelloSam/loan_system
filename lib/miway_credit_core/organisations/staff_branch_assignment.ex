@@ -8,6 +8,7 @@ defmodule MiwayCreditCore.Organisations.StaffBranchAssignment do
   schema "staff_branch_assignments" do
     belongs_to :organisation_membership, MiwayCreditCore.Organisations.OrganisationMembership,
       type: :binary_id
+
     belongs_to :branch, MiwayCreditCore.Organisations.Branch, type: :binary_id
 
     timestamps()

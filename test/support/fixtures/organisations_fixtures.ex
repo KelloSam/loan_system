@@ -10,7 +10,9 @@ defmodule MiwayCreditCore.OrganisationsFixtures do
 
   @doc "Creates an Organisation with its default Roles already seeded (via Authorization.provision_organisation/1)."
   def organisation_fixture(attrs \\ %{}) do
-    {:ok, organisation} = attrs |> valid_organisation_attrs() |> Authorization.provision_organisation()
+    {:ok, organisation} =
+      attrs |> valid_organisation_attrs() |> Authorization.provision_organisation()
+
     organisation
   end
 
@@ -36,7 +38,10 @@ defmodule MiwayCreditCore.OrganisationsFixtures do
   throwaway organisation, leaving two memberships and an
   indeterminate "active" one.
   """
-  def staff_member_in_organisation_fixture(%Organisations.Organisation{} = organisation, role \\ "loan_officer") do
+  def staff_member_in_organisation_fixture(
+        %Organisations.Organisation{} = organisation,
+        role \\ "loan_officer"
+      ) do
     {:ok, user, staff_member} =
       MiwayCreditCore.AccountsFixtures.valid_user_attrs()
       |> MiwayCreditCore.Accounts.register_staff_member(role)

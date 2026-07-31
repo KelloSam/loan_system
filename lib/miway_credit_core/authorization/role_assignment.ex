@@ -24,10 +24,15 @@ defmodule MiwayCreditCore.Authorization.RoleAssignment do
   schema "role_assignments" do
     field :expires_at, :utc_datetime
 
-    belongs_to :organisation_membership, MiwayCreditCore.Organisations.OrganisationMembership, type: :binary_id
+    belongs_to :organisation_membership, MiwayCreditCore.Organisations.OrganisationMembership,
+      type: :binary_id
+
     belongs_to :role, MiwayCreditCore.Authorization.Role, type: :binary_id
     belongs_to :branch, MiwayCreditCore.Organisations.Branch, type: :binary_id
-    belongs_to :delegated_from_membership, MiwayCreditCore.Organisations.OrganisationMembership, type: :binary_id
+
+    belongs_to :delegated_from_membership, MiwayCreditCore.Organisations.OrganisationMembership,
+      type: :binary_id
+
     belongs_to :granted_by, MiwayCreditCore.Accounts.User
 
     timestamps()
@@ -53,5 +58,7 @@ defmodule MiwayCreditCore.Authorization.RoleAssignment do
 
   @doc "True when this assignment currently grants its role — either permanent or an unexpired delegation."
   def active?(%__MODULE__{expires_at: nil}), do: true
-  def active?(%__MODULE__{expires_at: expires_at}), do: DateTime.compare(DateTime.utc_now(), expires_at) == :lt
+
+  def active?(%__MODULE__{expires_at: expires_at}),
+    do: DateTime.compare(DateTime.utc_now(), expires_at) == :lt
 end

@@ -10,17 +10,18 @@ defmodule MiwayCreditCoreWeb.Router do
     plug :fetch_live_flash
     plug :put_root_layout, html: {MiwayCreditCoreWeb.Layouts, :root}
     plug :protect_from_forgery
+
     plug :put_secure_browser_headers, %{
       "content-security-policy" =>
         "default-src 'self'; " <>
-        "script-src 'self'; " <>
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " <>
-        "font-src 'self' https://fonts.gstatic.com; " <>
-        "img-src 'self' data:; " <>
-        "connect-src 'self' ws: wss:; " <>
-        "frame-ancestors 'self'; " <>
-        "base-uri 'self'; " <>
-        "form-action 'self';"
+          "script-src 'self'; " <>
+          "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " <>
+          "font-src 'self' https://fonts.gstatic.com; " <>
+          "img-src 'self' data:; " <>
+          "connect-src 'self' ws: wss:; " <>
+          "frame-ancestors 'self'; " <>
+          "base-uri 'self'; " <>
+          "form-action 'self';"
     }
   end
 
@@ -97,7 +98,11 @@ defmodule MiwayCreditCoreWeb.Router do
     delete "/customers/:id/guarantors/:guarantor_id", CustomerController, :delete_guarantor
     post "/customers/:id/credit_reports", CustomerController, :create_credit_report
     post "/customers/:id/kyc_documents", CustomerController, :create_kyc_document
-    get "/customers/:id/kyc_documents/:document_id/download", CustomerController, :download_kyc_document
+
+    get "/customers/:id/kyc_documents/:document_id/download",
+        CustomerController,
+        :download_kyc_document
+
     delete "/customers/:id/kyc_documents/:document_id", CustomerController, :remove_kyc_document
     post "/customers/:id/consents", CustomerController, :create_consent
     delete "/customers/:id/consents/:consent_id", CustomerController, :revoke_consent
@@ -132,11 +137,24 @@ defmodule MiwayCreditCoreWeb.Router do
     patch "/loans/:id/collections/close", CollectionController, :close_case
     patch "/loans/:id/collections/recovery_status", CollectionController, :set_recovery_status
     post "/loans/:id/restructuring_requests", CollectionController, :create_restructuring_request
-    patch "/loans/:id/restructuring_requests/:request_id/approve", CollectionController, :approve_restructuring
-    patch "/loans/:id/restructuring_requests/:request_id/reject", CollectionController, :reject_restructuring
+
+    patch "/loans/:id/restructuring_requests/:request_id/approve",
+          CollectionController,
+          :approve_restructuring
+
+    patch "/loans/:id/restructuring_requests/:request_id/reject",
+          CollectionController,
+          :reject_restructuring
+
     post "/loans/:id/write_off_requests", CollectionController, :create_write_off_request
-    patch "/loans/:id/write_off_requests/:request_id/approve", CollectionController, :approve_write_off
-    patch "/loans/:id/write_off_requests/:request_id/reject", CollectionController, :reject_write_off
+
+    patch "/loans/:id/write_off_requests/:request_id/approve",
+          CollectionController,
+          :approve_write_off
+
+    patch "/loans/:id/write_off_requests/:request_id/reject",
+          CollectionController,
+          :reject_write_off
   end
 
   if Application.compile_env(:miway_credit_core, :dev_routes) do

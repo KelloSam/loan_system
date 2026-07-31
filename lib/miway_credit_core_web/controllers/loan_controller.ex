@@ -1,7 +1,18 @@
 defmodule MiwayCreditCoreWeb.LoanController do
   use MiwayCreditCoreWeb, :controller
 
-  alias MiwayCreditCore.{Applications, Lending, Payments, Customers, Products, AuditLogs, Organisations, Repo, Collections}
+  alias MiwayCreditCore.{
+    Applications,
+    Lending,
+    Payments,
+    Customers,
+    Products,
+    AuditLogs,
+    Organisations,
+    Repo,
+    Collections
+  }
+
   alias MiwayCreditCore.Applications.{LoanApplication, Collateral}
   alias MiwayCreditCore.Payments.PaymentTransaction
   alias MiwayCreditCoreWeb.Plugs.RequirePermissionPlug
@@ -10,13 +21,21 @@ defmodule MiwayCreditCoreWeb.LoanController do
   plug RequirePermissionPlug, "applications.create" when action in [:new, :create]
   plug RequirePermissionPlug, "applications.edit" when action in [:edit, :update, :delete]
   plug RequirePermissionPlug, "applications.assess" when action == :assess
-  plug RequirePermissionPlug, "applications.approve" when action in [:approve, :conditionally_approve, :clear_conditions]
+
+  plug RequirePermissionPlug,
+       "applications.approve" when action in [:approve, :conditionally_approve, :clear_conditions]
+
   plug RequirePermissionPlug, "applications.reject" when action in [:reject, :refer]
   plug RequirePermissionPlug, "loans.disburse" when action in [:disburse, :reverse_disbursement]
   plug RequirePermissionPlug, "applications.withdraw" when action == :withdraw
-  plug RequirePermissionPlug, "payments.receive" when action in [:create_payment, :record_failed_payment]
+
+  plug RequirePermissionPlug,
+       "payments.receive" when action in [:create_payment, :record_failed_payment]
+
   plug RequirePermissionPlug, "payments.reverse" when action in [:void_payment, :fail_payment]
-  plug RequirePermissionPlug, "collateral.manage" when action in [:create_collateral, :delete_collateral]
+
+  plug RequirePermissionPlug,
+       "collateral.manage" when action in [:create_collateral, :delete_collateral]
 
   def index(conn, _params) do
     applications = Applications.list_applications(conn.assigns.current_scope)
@@ -27,8 +46,13 @@ defmodule MiwayCreditCoreWeb.LoanController do
     scope = conn.assigns.current_scope
     application = Applications.get_application!(scope, id)
     fraud_signals = Applications.fraud_signals(application)
-    payment_changeset = PaymentTransaction.changeset(%PaymentTransaction{}, %{idempotency_key: Ecto.UUID.generate()})
-    failed_payment_changeset = PaymentTransaction.failed_attempt_changeset(%PaymentTransaction{}, %{})
+
+    payment_changeset =
+      PaymentTransaction.changeset(%PaymentTransaction{}, %{idempotency_key: Ecto.UUID.generate()})
+
+    failed_payment_changeset =
+      PaymentTransaction.failed_attempt_changeset(%PaymentTransaction{}, %{})
+
     collateral_changeset = Collateral.changeset(%Collateral{}, %{})
 
     {account, interest, installments, transactions, collaterals, days_past_due} =
@@ -47,7 +71,9 @@ defmodule MiwayCreditCoreWeb.LoanController do
           }
       end
 
-    render(conn, :show,
+    render(
+      conn,
+      :show,
       [
         application: application,
         account: account,
@@ -81,7 +107,10 @@ defmodule MiwayCreditCoreWeb.LoanController do
           target_id: application.id,
           ip_address: get_ip(conn),
           organisation_id: application.organisation_id,
-          metadata: %{requested_amount: application.requested_amount, customer_id: application.customer_id}
+          metadata: %{
+            requested_amount: application.requested_amount,
+            customer_id: application.customer_id
+          }
         )
 
         conn
@@ -90,12 +119,18 @@ defmodule MiwayCreditCoreWeb.LoanController do
 
       {:error, :pending_application_exists} ->
         conn
-        |> put_flash(:error, "Blocked: this customer already has a pending application. Resolve the existing application before creating a new one.")
+        |> put_flash(
+          :error,
+          "Blocked: this customer already has a pending application. Resolve the existing application before creating a new one."
+        )
         |> redirect(to: ~p"/admin/loans/new")
 
       {:error, :rejection_cooldown} ->
         conn
-        |> put_flash(:error, "Blocked: this customer was rejected within the last 30 days. New applications are frozen during the cooling-off period.")
+        |> put_flash(
+          :error,
+          "Blocked: this customer was rejected within the last 30 days. New applications are frozen during the cooling-off period."
+        )
         |> redirect(to: ~p"/admin/loans/new")
 
       {:error, :product_required} ->
@@ -216,7 +251,11 @@ defmodule MiwayCreditCoreWeb.LoanController do
           target_id: application.id,
           ip_address: get_ip(conn),
           organisation_id: application.organisation_id,
-          metadata: %{requested_amount: application.requested_amount, customer_id: application.customer_id, level_status: application.status}
+          metadata: %{
+            requested_amount: application.requested_amount,
+            customer_id: application.customer_id,
+            level_status: application.status
+          }
         )
 
         message =
@@ -240,7 +279,12 @@ defmodule MiwayCreditCoreWeb.LoanController do
     reason = Map.get(params, "reason", "Not specified")
     decline_reason_category = Map.get(params, "decline_reason_category", "other")
 
-    case Applications.reject_application(application, conn.assigns.current_scope, reason, decline_reason_category) do
+    case Applications.reject_application(
+           application,
+           conn.assigns.current_scope,
+           reason,
+           decline_reason_category
+         ) do
       {:ok, application} ->
         AuditLogs.log("loan_application_rejected",
           actor_id: conn.assigns.current_user.id,
@@ -249,7 +293,11 @@ defmodule MiwayCreditCoreWeb.LoanController do
           target_id: application.id,
           ip_address: get_ip(conn),
           organisation_id: application.organisation_id,
-          metadata: %{requested_amount: application.requested_amount, customer_id: application.customer_id, decline_reason_category: decline_reason_category}
+          metadata: %{
+            requested_amount: application.requested_amount,
+            customer_id: application.customer_id,
+            decline_reason_category: decline_reason_category
+          }
         )
 
         conn
@@ -268,7 +316,12 @@ defmodule MiwayCreditCoreWeb.LoanController do
     conditions = Map.get(params, "conditions", "")
     attestation = attests_no_conflict_of_interest?(params)
 
-    case Applications.conditionally_approve_application(application, conn.assigns.current_scope, conditions, attestation) do
+    case Applications.conditionally_approve_application(
+           application,
+           conn.assigns.current_scope,
+           conditions,
+           attestation
+         ) do
       {:ok, application} ->
         AuditLogs.log("loan_application_conditionally_approved",
           actor_id: conn.assigns.current_user.id,
@@ -281,7 +334,10 @@ defmodule MiwayCreditCoreWeb.LoanController do
         )
 
         conn
-        |> put_flash(:info, "Application conditionally approved — conditions must be cleared before disbursement.")
+        |> put_flash(
+          :info,
+          "Application conditionally approved — conditions must be cleared before disbursement."
+        )
         |> redirect(to: ~p"/admin/loans/#{application}")
 
       {:error, reason} ->
@@ -348,21 +404,53 @@ defmodule MiwayCreditCoreWeb.LoanController do
     Map.get(params, "conflict_of_interest_confirmed") in ["true", "on", true]
   end
 
-  defp approval_error_message(:invalid_status), do: "This application isn't in a status that allows this action."
-  defp approval_error_message(:maker_checker_violation), do: "You submitted this application — someone else must decide it."
-  defp approval_error_message(:already_decided), do: "You've already recorded a decision on this application — a different person must act next."
-  defp approval_error_message(:conflict_of_interest_attestation_required), do: "You must confirm you have no conflict of interest with this applicant."
-  defp approval_error_message(:exceeds_approval_limit), do: "This amount exceeds your approval limit."
-  defp approval_error_message(:guarantor_required), do: "This product requires a guarantor on record before it can be approved."
-  defp approval_error_message(:insufficient_approval_role), do: "This product requires a more senior role to approve."
-  defp approval_error_message(:income_data_missing), do: "This product requires an affordability check, but the customer has no income data on file."
-  defp approval_error_message(:affordability_exceeded), do: "This loan would exceed the product's maximum debt-to-income ratio for this customer."
-  defp approval_error_message(:crb_check_required), do: "This product requires a CRB report on record before it can be approved."
-  defp approval_error_message(:adverse_crb_report), do: "This customer's most recent CRB report is adverse."
-  defp approval_error_message(:crb_check_expired), do: "This customer's CRB report is more than 90 days old — a fresh check is required."
-  defp approval_error_message(:conditions_not_cleared), do: "This application's conditions must be cleared before it can be disbursed."
-  defp approval_error_message(:no_conditions_to_clear), do: "This application has no outstanding conditions to clear."
-  defp approval_error_message(%Ecto.Changeset{} = changeset), do: "Could not complete this action: #{changeset_error_summary(changeset)}"
+  defp approval_error_message(:invalid_status),
+    do: "This application isn't in a status that allows this action."
+
+  defp approval_error_message(:maker_checker_violation),
+    do: "You submitted this application — someone else must decide it."
+
+  defp approval_error_message(:already_decided),
+    do:
+      "You've already recorded a decision on this application — a different person must act next."
+
+  defp approval_error_message(:conflict_of_interest_attestation_required),
+    do: "You must confirm you have no conflict of interest with this applicant."
+
+  defp approval_error_message(:exceeds_approval_limit),
+    do: "This amount exceeds your approval limit."
+
+  defp approval_error_message(:guarantor_required),
+    do: "This product requires a guarantor on record before it can be approved."
+
+  defp approval_error_message(:insufficient_approval_role),
+    do: "This product requires a more senior role to approve."
+
+  defp approval_error_message(:income_data_missing),
+    do:
+      "This product requires an affordability check, but the customer has no income data on file."
+
+  defp approval_error_message(:affordability_exceeded),
+    do: "This loan would exceed the product's maximum debt-to-income ratio for this customer."
+
+  defp approval_error_message(:crb_check_required),
+    do: "This product requires a CRB report on record before it can be approved."
+
+  defp approval_error_message(:adverse_crb_report),
+    do: "This customer's most recent CRB report is adverse."
+
+  defp approval_error_message(:crb_check_expired),
+    do: "This customer's CRB report is more than 90 days old — a fresh check is required."
+
+  defp approval_error_message(:conditions_not_cleared),
+    do: "This application's conditions must be cleared before it can be disbursed."
+
+  defp approval_error_message(:no_conditions_to_clear),
+    do: "This application has no outstanding conditions to clear."
+
+  defp approval_error_message(%Ecto.Changeset{} = changeset),
+    do: "Could not complete this action: #{changeset_error_summary(changeset)}"
+
   defp approval_error_message(_), do: "Could not complete this action."
 
   defp changeset_error_summary(changeset) do
@@ -373,9 +461,15 @@ defmodule MiwayCreditCoreWeb.LoanController do
 
   def disburse(conn, %{"id" => id} = params) do
     application = Applications.get_application!(conn.assigns.current_scope, id)
-    disbursement_details = params |> Map.take(["method", "reference"]) |> Map.put_new("method", "bank_transfer")
 
-    case Applications.disburse_application(application, conn.assigns.current_scope, disbursement_details) do
+    disbursement_details =
+      params |> Map.take(["method", "reference"]) |> Map.put_new("method", "bank_transfer")
+
+    case Applications.disburse_application(
+           application,
+           conn.assigns.current_scope,
+           disbursement_details
+         ) do
       {:ok, application, account} ->
         AuditLogs.log("loan_application_disbursed",
           actor_id: conn.assigns.current_user.id,
@@ -393,7 +487,10 @@ defmodule MiwayCreditCoreWeb.LoanController do
         )
 
         conn
-        |> put_flash(:info, "Application disbursed — account #{account.contract_reference} opened.")
+        |> put_flash(
+          :info,
+          "Application disbursed — account #{account.contract_reference} opened."
+        )
         |> redirect(to: ~p"/admin/loans/#{application}")
 
       {:error, :invalid_status} ->
@@ -403,12 +500,18 @@ defmodule MiwayCreditCoreWeb.LoanController do
 
       {:error, :conditions_not_cleared} ->
         conn
-        |> put_flash(:error, "This application's conditions must be cleared before it can be disbursed.")
+        |> put_flash(
+          :error,
+          "This application's conditions must be cleared before it can be disbursed."
+        )
         |> redirect(to: ~p"/admin/loans/#{id}")
 
       {:error, %Ecto.Changeset{} = changeset} ->
         conn
-        |> put_flash(:error, "Could not disburse application: #{changeset_error_summary(changeset)}")
+        |> put_flash(
+          :error,
+          "Could not disburse application: #{changeset_error_summary(changeset)}"
+        )
         |> redirect(to: ~p"/admin/loans/#{id}")
 
       {:error, _} ->
@@ -442,12 +545,18 @@ defmodule MiwayCreditCoreWeb.LoanController do
 
       {:error, :invalid_status} ->
         conn
-        |> put_flash(:error, "This loan account isn't active — its disbursement can't be reversed.")
+        |> put_flash(
+          :error,
+          "This loan account isn't active — its disbursement can't be reversed."
+        )
         |> redirect(to: ~p"/admin/loans/#{id}")
 
       {:error, :payments_already_received} ->
         conn
-        |> put_flash(:error, "This loan already has payments recorded against it — its disbursement can no longer be reversed.")
+        |> put_flash(
+          :error,
+          "This loan already has payments recorded against it — its disbursement can no longer be reversed."
+        )
         |> redirect(to: ~p"/admin/loans/#{id}")
 
       {:error, _} ->
@@ -559,7 +668,11 @@ defmodule MiwayCreditCoreWeb.LoanController do
             target_id: transaction.id,
             ip_address: get_ip(conn),
             organisation_id: transaction.organisation_id,
-            metadata: %{amount: transaction.amount, loan_account_id: account.id, fail_reason: transaction.fail_reason}
+            metadata: %{
+              amount: transaction.amount,
+              loan_account_id: account.id,
+              fail_reason: transaction.fail_reason
+            }
           )
 
           conn
@@ -658,7 +771,11 @@ defmodule MiwayCreditCoreWeb.LoanController do
 
     conn
     |> put_layout(html: false)
-    |> render(:receipt, application: application, transaction: transaction, organisation: organisation)
+    |> render(:receipt,
+      application: application,
+      transaction: transaction,
+      organisation: organisation
+    )
   end
 
   def create_collateral(conn, %{"id" => id, "collateral" => collateral_params}) do
@@ -674,7 +791,11 @@ defmodule MiwayCreditCoreWeb.LoanController do
           target_id: collateral.id,
           ip_address: get_ip(conn),
           organisation_id: collateral.organisation_id,
-          metadata: %{type: collateral.type, estimated_value: collateral.estimated_value, loan_account_id: account.id}
+          metadata: %{
+            type: collateral.type,
+            estimated_value: collateral.estimated_value,
+            loan_account_id: account.id
+          }
         )
 
         conn
@@ -719,7 +840,9 @@ defmodule MiwayCreditCoreWeb.LoanController do
 
     {account, interest, installments, transactions, collaterals, days_past_due} =
       case application.loan_account do
-        nil -> {nil, nil, [], [], [], 0}
+        nil ->
+          {nil, nil, [], [], [], 0}
+
         account ->
           {account, Lending.compound_interest_details(account),
            Lending.list_installments_for_account(scope, account.id),
@@ -735,8 +858,12 @@ defmodule MiwayCreditCoreWeb.LoanController do
         interest: interest,
         installments: installments,
         transactions: transactions,
-        payment_changeset: PaymentTransaction.changeset(%PaymentTransaction{}, %{idempotency_key: Ecto.UUID.generate()}),
-        failed_payment_changeset: PaymentTransaction.failed_attempt_changeset(%PaymentTransaction{}, %{}),
+        payment_changeset:
+          PaymentTransaction.changeset(%PaymentTransaction{}, %{
+            idempotency_key: Ecto.UUID.generate()
+          }),
+        failed_payment_changeset:
+          PaymentTransaction.failed_attempt_changeset(%PaymentTransaction{}, %{}),
         collateral_changeset: Collateral.changeset(%Collateral{}, %{}),
         collaterals: collaterals,
         fraud_signals: fraud_signals,
@@ -753,7 +880,14 @@ defmodule MiwayCreditCoreWeb.LoanController do
   # and every restructuring/write-off request ever filed for this
   # account, regardless of loan_account presence.
   defp collections_assigns(_scope, nil) do
-    [collection_case: nil, collection_activities: [], promises_to_pay: [], restructuring_requests: [], write_off_requests: [], arrears_bucket: "current"]
+    [
+      collection_case: nil,
+      collection_activities: [],
+      promises_to_pay: [],
+      restructuring_requests: [],
+      write_off_requests: [],
+      arrears_bucket: "current"
+    ]
   end
 
   defp collections_assigns(scope, account) do
@@ -761,9 +895,12 @@ defmodule MiwayCreditCoreWeb.LoanController do
 
     [
       collection_case: collection_case,
-      collection_activities: collection_case && Collections.list_activities_for_case(scope, collection_case.id) || [],
-      promises_to_pay: collection_case && Collections.list_promises_for_case(scope, collection_case.id) || [],
-      restructuring_requests: Collections.list_restructuring_requests_for_account(scope, account.id),
+      collection_activities:
+        (collection_case && Collections.list_activities_for_case(scope, collection_case.id)) || [],
+      promises_to_pay:
+        (collection_case && Collections.list_promises_for_case(scope, collection_case.id)) || [],
+      restructuring_requests:
+        Collections.list_restructuring_requests_for_account(scope, account.id),
       write_off_requests: Collections.list_write_off_requests_for_account(scope, account.id),
       arrears_bucket: Collections.classify_arrears(Lending.days_past_due(account))
     ]

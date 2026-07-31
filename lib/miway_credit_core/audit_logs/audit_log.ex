@@ -24,8 +24,16 @@ defmodule MiwayCreditCore.AuditLogs.AuditLog do
 
   def changeset(log, attrs) do
     log
-    |> cast(attrs, [:event, :actor_id, :actor_email, :target_type, :target_id, :metadata, :ip_address,
-                   :organisation_id])
+    |> cast(attrs, [
+      :event,
+      :actor_id,
+      :actor_email,
+      :target_type,
+      :target_id,
+      :metadata,
+      :ip_address,
+      :organisation_id
+    ])
     |> validate_required([:event])
     |> foreign_key_constraint(:organisation_id)
   end

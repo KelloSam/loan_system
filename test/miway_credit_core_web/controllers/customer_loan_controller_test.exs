@@ -27,7 +27,8 @@ defmodule MiwayCreditCoreWeb.CustomerLoanControllerTest do
     assert html_response(conn, 200)
   end
 
-  test "show refuses an application belonging to a different customer in the same organisation", %{conn: conn} do
+  test "show refuses an application belonging to a different customer in the same organisation",
+       %{conn: conn} do
     organisation = organisation_fixture()
     customer = customer_fixture_in_organisation(organisation)
     other_customer = customer_fixture_in_organisation(organisation)

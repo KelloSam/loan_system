@@ -47,7 +47,9 @@ defmodule MiwayCreditCoreWeb.Plugs.AuthPlugTest do
     user = staff_member_fixture("loan_officer")
 
     stale_authenticated_at =
-      NaiveDateTime.utc_now() |> NaiveDateTime.add(-3600, :second) |> NaiveDateTime.truncate(:second)
+      NaiveDateTime.utc_now()
+      |> NaiveDateTime.add(-3600, :second)
+      |> NaiveDateTime.truncate(:second)
 
     {:ok, _} =
       user

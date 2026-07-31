@@ -28,7 +28,10 @@ defmodule MiwayCreditCore.CollectionsTest do
       account = application.loan_account
       [installment] = Lending.list_installments_for_account(scope, account.id)
 
-      installment |> Ecto.Changeset.change(due_date: Date.add(Date.utc_today(), -1)) |> Repo.update!()
+      installment
+      |> Ecto.Changeset.change(due_date: Date.add(Date.utc_today(), -1))
+      |> Repo.update!()
+
       Lending.mark_overdue_installments()
 
       cases = Collections.list_cases_for_account(scope, account.id)
@@ -107,7 +110,9 @@ defmodule MiwayCreditCore.CollectionsTest do
       admin = admin_fixture()
       {:ok, collection_case} = Collections.ensure_case_opened(account)
 
-      assert {:ok, updated} = Collections.set_recovery_status(collection_case, "legal_action", admin.id)
+      assert {:ok, updated} =
+               Collections.set_recovery_status(collection_case, "legal_action", admin.id)
+
       assert updated.recovery_status == "legal_action"
 
       reloaded_account = Lending.get_account!(scope, account.id)
@@ -237,7 +242,8 @@ defmodule MiwayCreditCore.CollectionsTest do
           "requested_by_id" => admin.id
         })
 
-      assert {:error, :maker_checker_violation} = Collections.approve_restructuring(request, admin.id)
+      assert {:error, :maker_checker_violation} =
+               Collections.approve_restructuring(request, admin.id)
     end
 
     test "approve_restructuring/2 marks remaining installments restructured, leaves paid ones untouched, and generates a schedule covering the true remaining principal" do
@@ -273,9 +279,16 @@ defmodule MiwayCreditCore.CollectionsTest do
       # 2 remaining installments + 2 additional months = 4 new installments
       assert length(new_installments) == 4
 
-      new_principal_total = new_installments |> Enum.map(& &1.scheduled_principal) |> Enum.reduce(&Decimal.add/2)
-      old_remaining_principal = Decimal.add(reloaded_second.scheduled_principal, reloaded_third.scheduled_principal)
-      assert Decimal.equal?(Decimal.round(new_principal_total, 2), Decimal.round(old_remaining_principal, 2))
+      new_principal_total =
+        new_installments |> Enum.map(& &1.scheduled_principal) |> Enum.reduce(&Decimal.add/2)
+
+      old_remaining_principal =
+        Decimal.add(reloaded_second.scheduled_principal, reloaded_third.scheduled_principal)
+
+      assert Decimal.equal?(
+               Decimal.round(new_principal_total, 2),
+               Decimal.round(old_remaining_principal, 2)
+             )
 
       assert Accounting.trial_balance(scope).balanced?
     end
@@ -287,7 +300,11 @@ defmodule MiwayCreditCore.CollectionsTest do
       account = application.loan_account
       admin = admin_fixture()
 
-      {:ok, request} = Collections.request_write_off(account, %{"reason" => "Uncollectable", "requested_by_id" => admin.id})
+      {:ok, request} =
+        Collections.request_write_off(account, %{
+          "reason" => "Uncollectable",
+          "requested_by_id" => admin.id
+        })
 
       assert {:error, :maker_checker_violation} = Collections.approve_write_off(request, admin.id)
     end
@@ -300,7 +317,12 @@ defmodule MiwayCreditCore.CollectionsTest do
       requester = admin_fixture()
       approver = staff_member_in_organisation_fixture(organisation, "organisation_administrator")
 
-      {:ok, request} = Collections.request_write_off(account, %{"reason" => "Uncollectable", "requested_by_id" => requester.id})
+      {:ok, request} =
+        Collections.request_write_off(account, %{
+          "reason" => "Uncollectable",
+          "requested_by_id" => requester.id
+        })
+
       assert Decimal.equal?(request.requested_amount, account.outstanding_balance)
 
       assert {:ok, approved} = Collections.approve_write_off(request, approver.id)
@@ -317,8 +339,15 @@ defmodule MiwayCreditCore.CollectionsTest do
       account = application.loan_account
       admin = admin_fixture()
 
-      {:ok, request} = Collections.request_write_off(account, %{"reason" => "Uncollectable", "requested_by_id" => admin.id})
-      assert {:ok, rejected} = Collections.reject_write_off(request, admin.id, "Customer is paying")
+      {:ok, request} =
+        Collections.request_write_off(account, %{
+          "reason" => "Uncollectable",
+          "requested_by_id" => admin.id
+        })
+
+      assert {:ok, rejected} =
+               Collections.reject_write_off(request, admin.id, "Customer is paying")
+
       assert rejected.status == "rejected"
 
       reloaded = Lending.get_account!(scope, account.id)

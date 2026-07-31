@@ -6,17 +6,28 @@ defmodule MiwayCreditCoreWeb.CustomerController do
   alias MiwayCreditCore.CreditReporting.CreditReport
   alias MiwayCreditCoreWeb.Plugs.RequirePermissionPlug
 
-  plug RequirePermissionPlug, "customers.view" when action in [:index, :show, :download_kyc_document]
+  plug RequirePermissionPlug,
+       "customers.view" when action in [:index, :show, :download_kyc_document]
 
   plug RequirePermissionPlug,
        "customers.manage"
        when action in [
-              :new, :create, :edit, :update, :delete,
-              :create_next_of_kin, :delete_next_of_kin,
-              :create_guarantor, :delete_guarantor,
-              :create_kyc_document, :remove_kyc_document,
-              :create_consent, :revoke_consent,
-              :submit_kyc_review, :verify_kyc, :reject_kyc,
+              :new,
+              :create,
+              :edit,
+              :update,
+              :delete,
+              :create_next_of_kin,
+              :delete_next_of_kin,
+              :create_guarantor,
+              :delete_guarantor,
+              :create_kyc_document,
+              :remove_kyc_document,
+              :create_consent,
+              :revoke_consent,
+              :submit_kyc_review,
+              :verify_kyc,
+              :reject_kyc,
               :create_credit_report
             ]
 
@@ -212,7 +223,12 @@ defmodule MiwayCreditCoreWeb.CustomerController do
     scope = conn.assigns.current_scope
     customer = Customers.get_customer!(scope, id)
 
-    case CreditReporting.ManualAdapter.record_report(scope, customer, attrs, conn.assigns.current_user.id) do
+    case CreditReporting.ManualAdapter.record_report(
+           scope,
+           customer,
+           attrs,
+           conn.assigns.current_user.id
+         ) do
       {:ok, credit_report} ->
         AuditLogs.log("credit_report_recorded",
           actor_id: conn.assigns.current_user.id,
@@ -230,7 +246,10 @@ defmodule MiwayCreditCoreWeb.CustomerController do
 
       {:error, :consent_required} ->
         conn
-        |> put_flash(:error, "This customer has no active credit-check consent on file — grant consent before recording a CRB report.")
+        |> put_flash(
+          :error,
+          "This customer has no active credit-check consent on file — grant consent before recording a CRB report."
+        )
         |> redirect(to: ~p"/admin/customers/#{customer}")
 
       {:error, changeset} ->
@@ -272,7 +291,12 @@ defmodule MiwayCreditCoreWeb.CustomerController do
       }) do
     customer = Customers.get_customer!(conn.assigns.current_scope, id)
 
-    case Customers.create_kyc_document(customer, upload, document_type, conn.assigns.current_user.id) do
+    case Customers.create_kyc_document(
+           customer,
+           upload,
+           document_type,
+           conn.assigns.current_user.id
+         ) do
       {:ok, document} ->
         AuditLogs.log("kyc_document_uploaded",
           actor_id: conn.assigns.current_user.id,
@@ -488,7 +512,8 @@ defmodule MiwayCreditCoreWeb.CustomerController do
         kyc_documents: Customers.list_kyc_documents_for_customer(scope, customer.id),
         consents: Customers.list_consents_for_customer(scope, customer.id),
         credit_reports: CreditReporting.list_reports_for_customer(scope, customer.id),
-        has_credit_check_consent: Customers.has_active_consent?(scope, customer.id, "credit_check"),
+        has_credit_check_consent:
+          Customers.has_active_consent?(scope, customer.id, "credit_check"),
         next_of_kin_changeset: NextOfKin.changeset(%NextOfKin{}, %{}),
         guarantor_changeset: Guarantor.changeset(%Guarantor{}, %{}),
         kyc_document_changeset: KycDocument.changeset(%KycDocument{}, %{}),

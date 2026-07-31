@@ -13,4 +13,3 @@ defmodule MiwayCreditCore.Repo do
     {:ok, config}
   end
 end
-

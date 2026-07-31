@@ -49,7 +49,11 @@ defmodule MiwayCreditCore.Lending.ServicingTest do
 
       entries = Accounting.list_entries_for_account(scope, account.id)
       assert Enum.any?(entries, &(&1.entry_type == "write_off"))
-      assert Decimal.equal?(Accounting.rebuild_outstanding_balance(scope, account.id), Decimal.new("0.00"))
+
+      assert Decimal.equal?(
+               Accounting.rebuild_outstanding_balance(scope, account.id),
+               Decimal.new("0.00")
+             )
 
       reloaded_customer = Customers.get_customer!(scope, application.customer_id)
       assert Decimal.equal?(reloaded_customer.current_balance, Decimal.new("0.00"))
@@ -64,7 +68,9 @@ defmodule MiwayCreditCore.Lending.ServicingTest do
       account = application.loan_account
       admin = admin_fixture()
 
-      assert {:ok, reversed} = Lending.reverse_disbursement(account, admin.id, "Disbursed to the wrong customer")
+      assert {:ok, reversed} =
+               Lending.reverse_disbursement(account, admin.id, "Disbursed to the wrong customer")
+
       assert reversed.status == "reversed"
       assert reversed.reversed_at
       assert reversed.reversal_reason == "Disbursed to the wrong customer"
@@ -72,7 +78,11 @@ defmodule MiwayCreditCore.Lending.ServicingTest do
 
       entries = Accounting.list_entries_for_account(scope, account.id)
       assert Enum.any?(entries, &(&1.entry_type == "reversal"))
-      assert Decimal.equal?(Accounting.rebuild_outstanding_balance(scope, account.id), Decimal.new("0.00"))
+
+      assert Decimal.equal?(
+               Accounting.rebuild_outstanding_balance(scope, account.id),
+               Decimal.new("0.00")
+             )
 
       reloaded_customer = Customers.get_customer!(scope, application.customer_id)
       assert Decimal.equal?(reloaded_customer.current_balance, Decimal.new("0.00"))
@@ -97,7 +107,8 @@ defmodule MiwayCreditCore.Lending.ServicingTest do
       admin = admin_fixture()
       _transaction = payment_fixture(account)
 
-      assert {:error, :payments_already_received} = Lending.reverse_disbursement(account, admin.id, "Too late now")
+      assert {:error, :payments_already_received} =
+               Lending.reverse_disbursement(account, admin.id, "Too late now")
     end
 
     test "refuses on an account that isn't active" do
@@ -106,7 +117,8 @@ defmodule MiwayCreditCore.Lending.ServicingTest do
       admin = admin_fixture()
       {:ok, closed} = Lending.close_account(account)
 
-      assert {:error, :invalid_status} = Lending.reverse_disbursement(closed, admin.id, "Too late")
+      assert {:error, :invalid_status} =
+               Lending.reverse_disbursement(closed, admin.id, "Too late")
     end
   end
 

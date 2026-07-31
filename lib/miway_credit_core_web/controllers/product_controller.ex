@@ -6,7 +6,9 @@ defmodule MiwayCreditCoreWeb.ProductController do
   alias MiwayCreditCoreWeb.Plugs.RequirePermissionPlug
 
   plug RequirePermissionPlug, "products.view" when action == :index
-  plug RequirePermissionPlug, "products.manage" when action in [:new, :create, :edit, :update, :retire, :activate]
+
+  plug RequirePermissionPlug,
+       "products.manage" when action in [:new, :create, :edit, :update, :retire, :activate]
 
   def index(conn, _params) do
     products = Products.list_products(conn.assigns.current_scope)

@@ -16,7 +16,12 @@ defmodule MiwayCreditCore.PaymentsTest do
       assert transaction.loan_account_id == account.id
 
       reloaded = Lending.get_account!(scope, account.id)
-      assert Decimal.equal?(reloaded.outstanding_balance, Decimal.sub(account.outstanding_balance, "234.56"))
+
+      assert Decimal.equal?(
+               reloaded.outstanding_balance,
+               Decimal.sub(account.outstanding_balance, "234.56")
+             )
+
       assert reloaded.status == "active"
       assert Accounting.trial_balance(scope).balanced?
     end
@@ -31,7 +36,9 @@ defmodule MiwayCreditCore.PaymentsTest do
       # on insert regardless, so comparing against an unrounded value
       # would spuriously fail.
       partial = first.scheduled_amount |> Decimal.div(Decimal.new("2")) |> Decimal.round(2)
-      {:ok, transaction} = Payments.record_payment(scope, valid_payment_attrs(account, %{"amount" => partial}))
+
+      {:ok, transaction} =
+        Payments.record_payment(scope, valid_payment_attrs(account, %{"amount" => partial}))
 
       first_reloaded = Lending.get_installment!(scope, first.id)
       assert first_reloaded.status == "partially_paid"
@@ -40,7 +47,10 @@ defmodule MiwayCreditCore.PaymentsTest do
       assert Lending.get_installment!(scope, second.id).status == "upcoming"
       assert Lending.get_installment!(scope, third.id).status == "upcoming"
 
-      [allocation] = Accounting.list_entries_for_account(scope, account.id) |> Enum.filter(&(&1.source_id == transaction.id))
+      [allocation] =
+        Accounting.list_entries_for_account(scope, account.id)
+        |> Enum.filter(&(&1.source_id == transaction.id))
+
       assert Decimal.equal?(allocation.amount, Decimal.negate(partial))
     end
 
@@ -52,7 +62,9 @@ defmodule MiwayCreditCore.PaymentsTest do
 
       half_second = second.scheduled_amount |> Decimal.div(Decimal.new("2")) |> Decimal.round(2)
       amount = Decimal.add(first.scheduled_amount, half_second)
-      {:ok, _transaction} = Payments.record_payment(scope, valid_payment_attrs(account, %{"amount" => amount}))
+
+      {:ok, _transaction} =
+        Payments.record_payment(scope, valid_payment_attrs(account, %{"amount" => amount}))
 
       assert Lending.get_installment!(scope, first.id).status == "paid"
       assert Lending.get_installment!(scope, second.id).status == "partially_paid"
@@ -83,7 +95,11 @@ defmodule MiwayCreditCore.PaymentsTest do
       reloaded = Lending.get_account!(scope, account.id)
       assert reloaded.status == "closed"
       assert Decimal.equal?(reloaded.outstanding_balance, Decimal.new("0.00"))
-      assert Decimal.equal?(Accounting.rebuild_outstanding_balance(scope, account.id), Decimal.new("0.00"))
+
+      assert Decimal.equal?(
+               Accounting.rebuild_outstanding_balance(scope, account.id),
+               Decimal.new("0.00")
+             )
     end
 
     test "payroll_deduction is a valid method" do
@@ -92,7 +108,10 @@ defmodule MiwayCreditCore.PaymentsTest do
       account = application.loan_account
 
       assert {:ok, transaction} =
-               Payments.record_payment(scope, valid_payment_attrs(account, %{"method" => "payroll_deduction"}))
+               Payments.record_payment(
+                 scope,
+                 valid_payment_attrs(account, %{"method" => "payroll_deduction"})
+               )
 
       assert transaction.method == "payroll_deduction"
     end
@@ -110,7 +129,9 @@ defmodule MiwayCreditCore.PaymentsTest do
       |> MiwayCreditCore.Repo.update!()
 
       partial = Decimal.new("10.00")
-      {:ok, transaction} = Payments.record_payment(scope, valid_payment_attrs(account, %{"amount" => partial}))
+
+      {:ok, transaction} =
+        Payments.record_payment(scope, valid_payment_attrs(account, %{"amount" => partial}))
 
       allocations =
         MiwayCreditCore.Repo.all(
@@ -137,11 +158,15 @@ defmodule MiwayCreditCore.PaymentsTest do
       settings = MiwayCreditCore.Organisations.get_settings(account.organisation_id)
 
       settings
-      |> MiwayCreditCore.Organisations.OrganisationSettings.changeset(%{allocation_order: ["principal", "interest"]})
+      |> MiwayCreditCore.Organisations.OrganisationSettings.changeset(%{
+        allocation_order: ["principal", "interest"]
+      })
       |> MiwayCreditCore.Repo.update!()
 
       small = Decimal.new("1.00")
-      {:ok, transaction} = Payments.record_payment(scope, valid_payment_attrs(account, %{"amount" => small}))
+
+      {:ok, transaction} =
+        Payments.record_payment(scope, valid_payment_attrs(account, %{"amount" => small}))
 
       allocations =
         MiwayCreditCore.Repo.all(
@@ -169,7 +194,11 @@ defmodule MiwayCreditCore.PaymentsTest do
 
       reloaded = Lending.get_account!(scope, account.id)
       assert Decimal.equal?(repayment.running_balance, reloaded.outstanding_balance)
-      assert Decimal.equal?(Accounting.rebuild_outstanding_balance(scope, account.id), reloaded.outstanding_balance)
+
+      assert Decimal.equal?(
+               Accounting.rebuild_outstanding_balance(scope, account.id),
+               reloaded.outstanding_balance
+             )
     end
 
     test "recalculates the customer's current_balance after a payment" do
@@ -194,7 +223,10 @@ defmodule MiwayCreditCore.PaymentsTest do
       assert Lending.get_account!(scope, account.id).status == "closed"
 
       assert {:ok, voided} =
-               Payments.void_payment(transaction, %{"voided_by_id" => admin.id, "void_reason" => "Entered in error"})
+               Payments.void_payment(transaction, %{
+                 "voided_by_id" => admin.id,
+                 "void_reason" => "Entered in error"
+               })
 
       assert voided.status == "voided"
 
@@ -206,7 +238,11 @@ defmodule MiwayCreditCore.PaymentsTest do
       assert Enum.all?(installments, &(&1.status != "paid"))
       assert Enum.all?(installments, &Decimal.equal?(&1.paid_amount, Decimal.new("0.00")))
 
-      assert Decimal.equal?(Accounting.rebuild_outstanding_balance(scope, account.id), reloaded_account.outstanding_balance)
+      assert Decimal.equal?(
+               Accounting.rebuild_outstanding_balance(scope, account.id),
+               reloaded_account.outstanding_balance
+             )
+
       assert Accounting.trial_balance(scope).balanced?
     end
 
@@ -217,7 +253,9 @@ defmodule MiwayCreditCore.PaymentsTest do
       {:ok, transaction} = payment_result(scope, account, "50.00")
       admin = admin_fixture()
 
-      {:ok, voided} = Payments.void_payment(transaction, %{"voided_by_id" => admin.id, "void_reason" => "test"})
+      {:ok, voided} =
+        Payments.void_payment(transaction, %{"voided_by_id" => admin.id, "void_reason" => "test"})
+
       assert voided.status == "voided"
 
       assert_raise FunctionClauseError, fn ->
@@ -234,7 +272,10 @@ defmodule MiwayCreditCore.PaymentsTest do
       admin = admin_fixture()
 
       assert {:ok, _voided} =
-               Payments.void_payment(transaction, %{"voided_by_id" => admin.id, "void_reason" => "test"})
+               Payments.void_payment(transaction, %{
+                 "voided_by_id" => admin.id,
+                 "void_reason" => "test"
+               })
 
       reloaded_account = Lending.get_account!(scope, account.id)
       assert Decimal.equal?(reloaded_account.outstanding_balance, account.outstanding_balance)
@@ -252,7 +293,10 @@ defmodule MiwayCreditCore.PaymentsTest do
       assert Lending.get_account!(scope, account.id).status == "closed"
 
       assert {:ok, failed} =
-               Payments.fail_payment(transaction, %{"failed_by_id" => admin.id, "fail_reason" => "Cheque bounced"})
+               Payments.fail_payment(transaction, %{
+                 "failed_by_id" => admin.id,
+                 "fail_reason" => "Cheque bounced"
+               })
 
       assert failed.status == "failed"
       assert failed.fail_reason == "Cheque bounced"
@@ -275,7 +319,8 @@ defmodule MiwayCreditCore.PaymentsTest do
                Payments.record_failed_payment(scope, %{
                  "loan_account_id" => account.id,
                  "amount" => "50.00",
-                 "received_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
+                 "received_at" =>
+                   DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
                  "method" => "mobile_money",
                  "recorded_by_id" => recorder.id,
                  "fail_reason" => "No matching funds received"
@@ -311,8 +356,17 @@ defmodule MiwayCreditCore.PaymentsTest do
       scope = %Scope{organisation_id: application.organisation_id}
       account = application.loan_account
 
-      assert {:ok, first} = Payments.record_payment(scope, valid_payment_attrs(account, %{"idempotency_key" => "key-a"}))
-      assert {:ok, second} = Payments.record_payment(scope, valid_payment_attrs(account, %{"idempotency_key" => "key-b"}))
+      assert {:ok, first} =
+               Payments.record_payment(
+                 scope,
+                 valid_payment_attrs(account, %{"idempotency_key" => "key-a"})
+               )
+
+      assert {:ok, second} =
+               Payments.record_payment(
+                 scope,
+                 valid_payment_attrs(account, %{"idempotency_key" => "key-b"})
+               )
 
       assert first.id != second.id
       assert Payments.list_transactions_for_account(scope, account.id) |> length() == 2

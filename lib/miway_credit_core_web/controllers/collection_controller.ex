@@ -6,12 +6,23 @@ defmodule MiwayCreditCoreWeb.CollectionController do
 
   plug RequirePermissionPlug,
        "collections.manage"
-       when action in [:create_activity, :create_promise, :escalate_case, :close_case, :set_recovery_status]
+       when action in [
+              :create_activity,
+              :create_promise,
+              :escalate_case,
+              :close_case,
+              :set_recovery_status
+            ]
 
   plug RequirePermissionPlug, "write_offs.request" when action == :create_write_off_request
-  plug RequirePermissionPlug, "write_offs.approve" when action in [:approve_write_off, :reject_write_off]
+
+  plug RequirePermissionPlug,
+       "write_offs.approve" when action in [:approve_write_off, :reject_write_off]
+
   plug RequirePermissionPlug, "restructuring.request" when action == :create_restructuring_request
-  plug RequirePermissionPlug, "restructuring.approve" when action in [:approve_restructuring, :reject_restructuring]
+
+  plug RequirePermissionPlug,
+       "restructuring.approve" when action in [:approve_restructuring, :reject_restructuring]
 
   def create_activity(conn, %{"id" => id, "activity" => activity_params}) do
     scope = conn.assigns.current_scope
@@ -35,10 +46,14 @@ defmodule MiwayCreditCoreWeb.CollectionController do
           metadata: %{activity_type: activity.activity_type, outcome: activity.outcome}
         )
 
-        conn |> put_flash(:info, "Activity logged.") |> redirect(to: ~p"/admin/loans/#{application}")
+        conn
+        |> put_flash(:info, "Activity logged.")
+        |> redirect(to: ~p"/admin/loans/#{application}")
 
       {:error, _changeset} ->
-        conn |> put_flash(:error, "Could not log activity — check the form and try again.") |> redirect(to: ~p"/admin/loans/#{application}")
+        conn
+        |> put_flash(:error, "Could not log activity — check the form and try again.")
+        |> redirect(to: ~p"/admin/loans/#{application}")
     end
   end
 
@@ -58,13 +73,20 @@ defmodule MiwayCreditCoreWeb.CollectionController do
           target_id: promise.id,
           ip_address: get_ip(conn),
           organisation_id: application.organisation_id,
-          metadata: %{promised_amount: promise.promised_amount, promised_date: promise.promised_date}
+          metadata: %{
+            promised_amount: promise.promised_amount,
+            promised_date: promise.promised_date
+          }
         )
 
-        conn |> put_flash(:info, "Promise to pay recorded.") |> redirect(to: ~p"/admin/loans/#{application}")
+        conn
+        |> put_flash(:info, "Promise to pay recorded.")
+        |> redirect(to: ~p"/admin/loans/#{application}")
 
       {:error, _changeset} ->
-        conn |> put_flash(:error, "Could not record the promise — check the amount and date.") |> redirect(to: ~p"/admin/loans/#{application}")
+        conn
+        |> put_flash(:error, "Could not record the promise — check the amount and date.")
+        |> redirect(to: ~p"/admin/loans/#{application}")
     end
   end
 
@@ -113,7 +135,11 @@ defmodule MiwayCreditCoreWeb.CollectionController do
     application = Applications.get_application!(scope, id)
     collection_case = Collections.get_open_case_for_account(scope, application.loan_account.id)
 
-    case Collections.set_recovery_status(collection_case, recovery_status, conn.assigns.current_user.id) do
+    case Collections.set_recovery_status(
+           collection_case,
+           recovery_status,
+           conn.assigns.current_user.id
+         ) do
       {:ok, _} ->
         AuditLogs.log("collection_recovery_status_set",
           actor_id: conn.assigns.current_user.id,
@@ -125,10 +151,14 @@ defmodule MiwayCreditCoreWeb.CollectionController do
           metadata: %{recovery_status: recovery_status}
         )
 
-        conn |> put_flash(:info, "Recovery status updated.") |> redirect(to: ~p"/admin/loans/#{application}")
+        conn
+        |> put_flash(:info, "Recovery status updated.")
+        |> redirect(to: ~p"/admin/loans/#{application}")
 
       {:error, _} ->
-        conn |> put_flash(:error, "Could not update recovery status.") |> redirect(to: ~p"/admin/loans/#{application}")
+        conn
+        |> put_flash(:error, "Could not update recovery status.")
+        |> redirect(to: ~p"/admin/loans/#{application}")
     end
   end
 
@@ -149,10 +179,14 @@ defmodule MiwayCreditCoreWeb.CollectionController do
           metadata: %{additional_term_months: request.additional_term_months}
         )
 
-        conn |> put_flash(:info, "Restructuring requested.") |> redirect(to: ~p"/admin/loans/#{application}")
+        conn
+        |> put_flash(:info, "Restructuring requested.")
+        |> redirect(to: ~p"/admin/loans/#{application}")
 
       {:error, _changeset} ->
-        conn |> put_flash(:error, "Could not submit the restructuring request.") |> redirect(to: ~p"/admin/loans/#{application}")
+        conn
+        |> put_flash(:error, "Could not submit the restructuring request.")
+        |> redirect(to: ~p"/admin/loans/#{application}")
     end
   end
 
@@ -172,13 +206,22 @@ defmodule MiwayCreditCoreWeb.CollectionController do
           organisation_id: application.organisation_id
         )
 
-        conn |> put_flash(:info, "Restructuring approved — a new schedule has been generated.") |> redirect(to: ~p"/admin/loans/#{application}")
+        conn
+        |> put_flash(:info, "Restructuring approved — a new schedule has been generated.")
+        |> redirect(to: ~p"/admin/loans/#{application}")
 
       {:error, :maker_checker_violation} ->
-        conn |> put_flash(:error, "You requested this restructuring — a different authorised staff member must approve it.") |> redirect(to: ~p"/admin/loans/#{application}")
+        conn
+        |> put_flash(
+          :error,
+          "You requested this restructuring — a different authorised staff member must approve it."
+        )
+        |> redirect(to: ~p"/admin/loans/#{application}")
 
       {:error, _} ->
-        conn |> put_flash(:error, "Could not approve the restructuring request.") |> redirect(to: ~p"/admin/loans/#{application}")
+        conn
+        |> put_flash(:error, "Could not approve the restructuring request.")
+        |> redirect(to: ~p"/admin/loans/#{application}")
     end
   end
 
@@ -200,7 +243,9 @@ defmodule MiwayCreditCoreWeb.CollectionController do
       metadata: %{notes: notes}
     )
 
-    conn |> put_flash(:info, "Restructuring request rejected.") |> redirect(to: ~p"/admin/loans/#{application}")
+    conn
+    |> put_flash(:info, "Restructuring request rejected.")
+    |> redirect(to: ~p"/admin/loans/#{application}")
   end
 
   def create_write_off_request(conn, %{"id" => id, "write_off_request" => params}) do
@@ -220,10 +265,14 @@ defmodule MiwayCreditCoreWeb.CollectionController do
           metadata: %{requested_amount: request.requested_amount}
         )
 
-        conn |> put_flash(:info, "Write-off requested.") |> redirect(to: ~p"/admin/loans/#{application}")
+        conn
+        |> put_flash(:info, "Write-off requested.")
+        |> redirect(to: ~p"/admin/loans/#{application}")
 
       {:error, _changeset} ->
-        conn |> put_flash(:error, "Could not submit the write-off request.") |> redirect(to: ~p"/admin/loans/#{application}")
+        conn
+        |> put_flash(:error, "Could not submit the write-off request.")
+        |> redirect(to: ~p"/admin/loans/#{application}")
     end
   end
 
@@ -243,13 +292,22 @@ defmodule MiwayCreditCoreWeb.CollectionController do
           organisation_id: application.organisation_id
         )
 
-        conn |> put_flash(:info, "Write-off approved — the balance has been zeroed.") |> redirect(to: ~p"/admin/loans/#{application}")
+        conn
+        |> put_flash(:info, "Write-off approved — the balance has been zeroed.")
+        |> redirect(to: ~p"/admin/loans/#{application}")
 
       {:error, :maker_checker_violation} ->
-        conn |> put_flash(:error, "You requested this write-off — a different authorised staff member must approve it.") |> redirect(to: ~p"/admin/loans/#{application}")
+        conn
+        |> put_flash(
+          :error,
+          "You requested this write-off — a different authorised staff member must approve it."
+        )
+        |> redirect(to: ~p"/admin/loans/#{application}")
 
       {:error, _} ->
-        conn |> put_flash(:error, "Could not approve the write-off request.") |> redirect(to: ~p"/admin/loans/#{application}")
+        conn
+        |> put_flash(:error, "Could not approve the write-off request.")
+        |> redirect(to: ~p"/admin/loans/#{application}")
     end
   end
 
@@ -271,7 +329,9 @@ defmodule MiwayCreditCoreWeb.CollectionController do
       metadata: %{notes: notes}
     )
 
-    conn |> put_flash(:info, "Write-off request rejected.") |> redirect(to: ~p"/admin/loans/#{application}")
+    conn
+    |> put_flash(:info, "Write-off request rejected.")
+    |> redirect(to: ~p"/admin/loans/#{application}")
   end
 
   defp get_ip(conn), do: conn.remote_ip |> :inet.ntoa() |> to_string()

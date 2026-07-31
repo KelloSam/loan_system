@@ -36,7 +36,8 @@ defmodule MiwayCreditCoreWeb.SessionController do
         end
 
       {:error, {:account_locked, locked_until}} ->
-        remaining = max(1, div(NaiveDateTime.diff(locked_until, NaiveDateTime.utc_now(), :second), 60))
+        remaining =
+          max(1, div(NaiveDateTime.diff(locked_until, NaiveDateTime.utc_now(), :second), 60))
 
         AuditLogs.log("login_blocked_lockout",
           actor_email: email,
@@ -46,7 +47,10 @@ defmodule MiwayCreditCoreWeb.SessionController do
 
         conn
         |> put_layout(html: false)
-        |> put_flash(:error, "Account locked after too many failed attempts. Try again in #{remaining} minute(s).")
+        |> put_flash(
+          :error,
+          "Account locked after too many failed attempts. Try again in #{remaining} minute(s)."
+        )
         |> render(:new)
 
       {:error, :invalid_credentials} ->

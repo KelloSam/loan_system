@@ -56,7 +56,9 @@ defmodule MiwayCreditCore.Risk.FraudDetectorTest do
       admin = admin_fixture()
       admin_scope = %Scope{user: admin, organisation_id: :all}
 
-      prior = application_fixture(%{"customer_id" => customer.id, "requested_amount" => "1000.50"})
+      prior =
+        application_fixture(%{"customer_id" => customer.id, "requested_amount" => "1000.50"})
+
       {:ok, assessed} = Applications.assess_application(prior, admin_scope)
       {:ok, approved} = Applications.approve_application(assessed, admin_scope, true)
       {:ok, _disbursed, _account} = Applications.disburse_application(approved, admin_scope)
@@ -91,7 +93,9 @@ defmodule MiwayCreditCore.Risk.FraudDetectorTest do
       refute Enum.any?(signals_included, &(&1 =~ "No repayment history"))
 
       # Excluding it: back to "no history", since that's the only application.
-      {_level, _score, signals_excluded} = FraudDetector.evaluate(customer.id, "1234.56", approved.id)
+      {_level, _score, signals_excluded} =
+        FraudDetector.evaluate(customer.id, "1234.56", approved.id)
+
       assert Enum.any?(signals_excluded, &(&1 =~ "No repayment history"))
     end
   end

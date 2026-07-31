@@ -37,7 +37,11 @@ defmodule MiwayCreditCoreWeb.PasswordResetControllerTest do
     user = user_fixture(%{password: "OriginalPassword1"})
     {raw_token, _url} = request_reset(user)
 
-    conn = put(conn, ~p"/password-reset/#{raw_token}", password_reset: %{password: "BrandNewPassword1"})
+    conn =
+      put(conn, ~p"/password-reset/#{raw_token}",
+        password_reset: %{password: "BrandNewPassword1"}
+      )
+
     assert redirected_to(conn) == ~p"/login"
 
     assert {:ok, _} = Accounts.authenticate_user(user.email, "BrandNewPassword1")
@@ -48,7 +52,9 @@ defmodule MiwayCreditCoreWeb.PasswordResetControllerTest do
     {raw_token, _url} = request_reset(user)
 
     put(conn, ~p"/password-reset/#{raw_token}", password_reset: %{password: "BrandNewPassword1"})
-    conn2 = put(conn, ~p"/password-reset/#{raw_token}", password_reset: %{password: "AnotherPassword1"})
+
+    conn2 =
+      put(conn, ~p"/password-reset/#{raw_token}", password_reset: %{password: "AnotherPassword1"})
 
     assert redirected_to(conn2) == ~p"/password-reset"
   end

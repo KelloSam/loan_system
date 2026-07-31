@@ -12,7 +12,12 @@ defmodule MiwayCreditCore.ProductsTest do
       other = organisation_fixture()
       scope = %Scope{organisation_id: organisation.id}
 
-      assert {:ok, product} = Products.create_product(scope, valid_product_attrs(%{"organisation_id" => other.id}))
+      assert {:ok, product} =
+               Products.create_product(
+                 scope,
+                 valid_product_attrs(%{"organisation_id" => other.id})
+               )
+
       assert product.organisation_id == organisation.id
     end
 
@@ -28,6 +33,7 @@ defmodule MiwayCreditCore.ProductsTest do
 
       attrs = valid_product_attrs(%{"minimum_principal" => "5000", "maximum_principal" => "1000"})
       assert {:error, changeset} = Products.create_product(scope, attrs)
+
       assert "must be greater than or equal to minimum_principal" in errors_on(changeset).maximum_principal
     end
 
@@ -37,6 +43,7 @@ defmodule MiwayCreditCore.ProductsTest do
 
       attrs = valid_product_attrs(%{"minimum_term_months" => "12", "maximum_term_months" => "6"})
       assert {:error, changeset} = Products.create_product(scope, attrs)
+
       assert "must be greater than or equal to minimum_term_months" in errors_on(changeset).maximum_term_months
     end
 
@@ -59,7 +66,9 @@ defmodule MiwayCreditCore.ProductsTest do
       scope = %Scope{organisation_id: organisation.id}
       {:ok, _} = Products.create_product(scope, valid_product_attrs(%{"name" => "Business Loan"}))
 
-      assert {:error, changeset} = Products.create_product(scope, valid_product_attrs(%{"name" => "Business Loan"}))
+      assert {:error, changeset} =
+               Products.create_product(scope, valid_product_attrs(%{"name" => "Business Loan"}))
+
       assert "has already been taken" in errors_on(changeset).organisation_id
     end
 
@@ -67,8 +76,17 @@ defmodule MiwayCreditCore.ProductsTest do
       organisation = organisation_fixture()
       other = organisation_fixture()
 
-      {:ok, _} = Products.create_product(%Scope{organisation_id: organisation.id}, valid_product_attrs(%{"name" => "Shared Name"}))
-      assert {:ok, _} = Products.create_product(%Scope{organisation_id: other.id}, valid_product_attrs(%{"name" => "Shared Name"}))
+      {:ok, _} =
+        Products.create_product(
+          %Scope{organisation_id: organisation.id},
+          valid_product_attrs(%{"name" => "Shared Name"})
+        )
+
+      assert {:ok, _} =
+               Products.create_product(
+                 %Scope{organisation_id: other.id},
+                 valid_product_attrs(%{"name" => "Shared Name"})
+               )
     end
   end
 
@@ -76,7 +94,10 @@ defmodule MiwayCreditCore.ProductsTest do
     test "list_products includes retired products; list_available_products excludes them" do
       organisation = organisation_fixture()
       scope = %Scope{organisation_id: organisation.id}
-      {:ok, product} = Products.create_product(scope, valid_product_attrs(%{"name" => "Retiring Soon"}))
+
+      {:ok, product} =
+        Products.create_product(scope, valid_product_attrs(%{"name" => "Retiring Soon"}))
+
       {:ok, product} = Products.retire_product(product)
 
       assert Enum.any?(Products.list_products(scope), &(&1.id == product.id))
@@ -88,7 +109,13 @@ defmodule MiwayCreditCore.ProductsTest do
       scope = %Scope{organisation_id: organisation.id}
 
       {:ok, future} =
-        Products.create_product(scope, valid_product_attrs(%{"name" => "Future", "effective_from" => Date.add(Date.utc_today(), 30)}))
+        Products.create_product(
+          scope,
+          valid_product_attrs(%{
+            "name" => "Future",
+            "effective_from" => Date.add(Date.utc_today(), 30)
+          })
+        )
 
       {:ok, expired} =
         Products.create_product(
@@ -108,7 +135,9 @@ defmodule MiwayCreditCore.ProductsTest do
     test "a product in another organisation never appears, even with the same scope's org filtered out" do
       organisation = organisation_fixture()
       other = organisation_fixture()
-      {:ok, other_product} = Products.create_product(%Scope{organisation_id: other.id}, valid_product_attrs())
+
+      {:ok, other_product} =
+        Products.create_product(%Scope{organisation_id: other.id}, valid_product_attrs())
 
       scope = %Scope{organisation_id: organisation.id}
       refute Enum.any?(Products.list_products(scope), &(&1.id == other_product.id))
@@ -117,8 +146,12 @@ defmodule MiwayCreditCore.ProductsTest do
     test "scope :all sees products across every organisation" do
       organisation = organisation_fixture()
       other = organisation_fixture()
-      {:ok, p1} = Products.create_product(%Scope{organisation_id: organisation.id}, valid_product_attrs())
-      {:ok, p2} = Products.create_product(%Scope{organisation_id: other.id}, valid_product_attrs())
+
+      {:ok, p1} =
+        Products.create_product(%Scope{organisation_id: organisation.id}, valid_product_attrs())
+
+      {:ok, p2} =
+        Products.create_product(%Scope{organisation_id: other.id}, valid_product_attrs())
 
       ids = %Scope{organisation_id: :all} |> Products.list_products() |> Enum.map(& &1.id)
       assert p1.id in ids
@@ -129,7 +162,9 @@ defmodule MiwayCreditCore.ProductsTest do
   test "get_product!/2 raises for a product outside the scope's organisation" do
     organisation = organisation_fixture()
     other = organisation_fixture()
-    {:ok, product} = Products.create_product(%Scope{organisation_id: other.id}, valid_product_attrs())
+
+    {:ok, product} =
+      Products.create_product(%Scope{organisation_id: other.id}, valid_product_attrs())
 
     assert_raise Ecto.NoResultsError, fn ->
       Products.get_product!(%Scope{organisation_id: organisation.id}, product.id)
@@ -139,7 +174,9 @@ defmodule MiwayCreditCore.ProductsTest do
   describe "update_product/2" do
     test "updates terms in place" do
       organisation = organisation_fixture()
-      {:ok, product} = Products.create_product(%Scope{organisation_id: organisation.id}, valid_product_attrs())
+
+      {:ok, product} =
+        Products.create_product(%Scope{organisation_id: organisation.id}, valid_product_attrs())
 
       assert {:ok, updated} = Products.update_product(product, %{"interest_rate" => "22.50"})
       assert Decimal.equal?(updated.interest_rate, Decimal.new("22.50"))
@@ -149,7 +186,9 @@ defmodule MiwayCreditCore.ProductsTest do
   describe "retire_product/1 and activate_product/1" do
     test "retire_product sets status to retired; activate_product reverses it" do
       organisation = organisation_fixture()
-      {:ok, product} = Products.create_product(%Scope{organisation_id: organisation.id}, valid_product_attrs())
+
+      {:ok, product} =
+        Products.create_product(%Scope{organisation_id: organisation.id}, valid_product_attrs())
 
       assert {:ok, retired} = Products.retire_product(product)
       assert retired.status == "retired"

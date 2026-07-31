@@ -77,7 +77,10 @@ defmodule MiwayCreditCore.ReportsTest do
 
   describe "par_percent/2" do
     test "is 0 when outstanding balance is 0" do
-      assert Decimal.equal?(Reports.par_percent(Decimal.new("0"), Decimal.new("0")), Decimal.new("0"))
+      assert Decimal.equal?(
+               Reports.par_percent(Decimal.new("0"), Decimal.new("0")),
+               Decimal.new("0")
+             )
     end
 
     test "computes overdue as a percentage of outstanding, rounded to 1 decimal" do
@@ -93,7 +96,10 @@ defmodule MiwayCreditCore.ReportsTest do
       account = application.loan_account
       [installment] = Lending.list_installments_for_account(scope, account.id)
 
-      installment |> Ecto.Changeset.change(due_date: Date.add(Date.utc_today(), -3)) |> Repo.update!()
+      installment
+      |> Ecto.Changeset.change(due_date: Date.add(Date.utc_today(), -3))
+      |> Repo.update!()
+
       Lending.mark_overdue_installments()
 
       summary = Reports.portfolio_summary(scope)

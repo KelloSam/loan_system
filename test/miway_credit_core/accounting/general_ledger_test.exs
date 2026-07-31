@@ -44,7 +44,10 @@ defmodule MiwayCreditCore.Accounting.GeneralLedgerTest do
           source_type: "loan_account",
           source_id: account.id,
           occurred_at: now,
-          lines: [%{account_code: "1100", debit: Decimal.new("0")}, %{account_code: "4100", credit: Decimal.new("0")}]
+          lines: [
+            %{account_code: "1100", debit: Decimal.new("0")},
+            %{account_code: "4100", credit: Decimal.new("0")}
+          ]
         })
 
       assert multi == Ecto.Multi.new()
@@ -66,22 +69,36 @@ defmodule MiwayCreditCore.Accounting.GeneralLedgerTest do
 
       assert Decimal.equal?(receivable.debit_amount, account.outstanding_balance)
       assert Decimal.equal?(cash.credit_amount, account.principal_amount)
-      assert Decimal.equal?(interest.credit_amount, Decimal.sub(account.outstanding_balance, account.principal_amount))
+
+      assert Decimal.equal?(
+               interest.credit_amount,
+               Decimal.sub(account.outstanding_balance, account.principal_amount)
+             )
+
       assert Accounting.trial_balance(scope).balanced?
     end
 
     test "with an origination fee — a second balanced entry adds Fee Income" do
       customer = MiwayCreditCore.CustomersFixtures.customer_fixture()
       scope = scope_for_customer_id(customer.id)
+
       {:ok, product} =
         Products.create_product(scope, %{
-          "name" => "Fee Product", "minimum_principal" => "0.01", "maximum_principal" => "999999.99",
-          "interest_method" => "reducing_balance", "interest_rate" => "18.00", "minimum_term_months" => "1",
-          "maximum_term_months" => "12", "repayment_frequency" => "monthly",
-          "origination_fee_percent" => "5.00", "effective_from" => Date.utc_today()
+          "name" => "Fee Product",
+          "minimum_principal" => "0.01",
+          "maximum_principal" => "999999.99",
+          "interest_method" => "reducing_balance",
+          "interest_rate" => "18.00",
+          "minimum_term_months" => "1",
+          "maximum_term_months" => "12",
+          "repayment_frequency" => "monthly",
+          "origination_fee_percent" => "5.00",
+          "effective_from" => Date.utc_today()
         })
 
-      application = application_fixture(%{"customer_id" => customer.id, "loan_product_id" => product.id})
+      application =
+        application_fixture(%{"customer_id" => customer.id, "loan_product_id" => product.id})
+
       admin = admin_fixture()
       admin_scope = %Scope{user: admin, organisation_id: :all}
       {:ok, assessed} = Applications.assess_application(application, admin_scope)
@@ -120,9 +137,11 @@ defmodule MiwayCreditCore.Accounting.GeneralLedgerTest do
       transaction = payment_fixture(account, %{"amount" => "50.00"})
       admin = admin_fixture()
 
-      {:ok, _voided} = MiwayCreditCore.Payments.void_payment(transaction, %{
-        "voided_by_id" => admin.id, "void_reason" => "test"
-      })
+      {:ok, _voided} =
+        MiwayCreditCore.Payments.void_payment(transaction, %{
+          "voided_by_id" => admin.id,
+          "void_reason" => "test"
+        })
 
       net_receivable = net_for_account_code(scope, "payment_transaction", transaction.id, "1100")
       assert Decimal.equal?(net_receivable, Decimal.new("0.00"))
@@ -141,7 +160,9 @@ defmodule MiwayCreditCore.Accounting.GeneralLedgerTest do
 
       for code <- ["1100", "1010", "4000"] do
         net = net_for_account_code(scope, "loan_account", account.id, code)
-        assert Decimal.equal?(net, Decimal.new("0.00")), "expected #{code} to net to zero, got #{net}"
+
+        assert Decimal.equal?(net, Decimal.new("0.00")),
+               "expected #{code} to net to zero, got #{net}"
       end
 
       assert Accounting.trial_balance(scope).balanced?
@@ -189,15 +210,22 @@ defmodule MiwayCreditCore.Accounting.GeneralLedgerTest do
   defp lines_for_source(%Scope{} = scope, source_type, source_id) do
     MiwayCreditCore.Accounting.JournalLine
     |> where([jl], jl.organisation_id == ^scope.organisation_id)
-    |> join(:inner, [jl], je in MiwayCreditCore.Accounting.JournalEntry, on: je.id == jl.journal_entry_id)
+    |> join(:inner, [jl], je in MiwayCreditCore.Accounting.JournalEntry,
+      on: je.id == jl.journal_entry_id
+    )
     |> join(:inner, [jl, je], a in MiwayCreditCore.Accounting.Account, on: a.id == jl.account_id)
     |> where([jl, je], je.source_type == ^source_type)
     |> maybe_filter_source_id(source_id)
-    |> select([jl, je, a], %{code: a.code, debit_amount: jl.debit_amount, credit_amount: jl.credit_amount})
+    |> select([jl, je, a], %{
+      code: a.code,
+      debit_amount: jl.debit_amount,
+      credit_amount: jl.credit_amount
+    })
     |> Repo.all()
   end
 
   defp maybe_filter_source_id(query, nil), do: query
+
   defp maybe_filter_source_id(query, source_id) do
     where(query, [jl, je], je.source_id == ^source_id)
   end

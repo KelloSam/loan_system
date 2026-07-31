@@ -137,6 +137,7 @@ defmodule MiwayCreditCore.AuditLogs do
   end
 
   defp scope_organisation(query, %Scope{organisation_id: :all}), do: query
+
   defp scope_organisation(query, %Scope{organisation_id: organisation_id}) do
     where(query, organisation_id: ^organisation_id)
   end
@@ -153,11 +154,13 @@ defmodule MiwayCreditCore.AuditLogs do
   defp filter_event(query, event), do: where(query, [l], l.event == ^event)
 
   defp filter_actor_email(query, actor_email) when actor_email in [nil, ""], do: query
+
   defp filter_actor_email(query, actor_email) do
     where(query, [l], ilike(l.actor_email, ^"%#{actor_email}%"))
   end
 
   defp filter_from(query, date) when date in [nil, ""], do: query
+
   defp filter_from(query, date) do
     case Date.from_iso8601(date) do
       {:ok, date} -> where(query, [l], l.inserted_at >= ^NaiveDateTime.new!(date, ~T[00:00:00]))
@@ -166,6 +169,7 @@ defmodule MiwayCreditCore.AuditLogs do
   end
 
   defp filter_to(query, date) when date in [nil, ""], do: query
+
   defp filter_to(query, date) do
     case Date.from_iso8601(date) do
       {:ok, date} -> where(query, [l], l.inserted_at <= ^NaiveDateTime.new!(date, ~T[23:59:59]))

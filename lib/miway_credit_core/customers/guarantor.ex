@@ -31,11 +31,23 @@ defmodule MiwayCreditCore.Customers.Guarantor do
   def changeset(guarantor, attrs) do
     guarantor
     |> cast(attrs, [
-      :organisation_id, :customer_id, :name, :relationship, :phone,
-      :id_type, :id_number, :address_line
+      :organisation_id,
+      :customer_id,
+      :name,
+      :relationship,
+      :phone,
+      :id_type,
+      :id_number,
+      :address_line
     ])
     |> validate_required([
-      :organisation_id, :customer_id, :name, :relationship, :phone, :id_type, :id_number
+      :organisation_id,
+      :customer_id,
+      :name,
+      :relationship,
+      :phone,
+      :id_type,
+      :id_number
     ])
     |> validate_inclusion(:id_type, @id_types)
     |> foreign_key_constraint(:organisation_id)

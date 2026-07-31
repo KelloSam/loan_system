@@ -120,11 +120,21 @@ defmodule MiwayCreditCore.AuditLogsTest do
       tomorrow = Date.utc_today() |> Date.add(1) |> Date.to_iso8601()
       yesterday = Date.utc_today() |> Date.add(-1) |> Date.to_iso8601()
 
-      assert Enum.any?(AuditLogs.list_filtered(scope, %{"from" => today, "to" => tomorrow}), &(&1.event == "in_range"))
-      refute Enum.any?(AuditLogs.list_filtered(scope, %{"from" => yesterday, "to" => yesterday}), &(&1.event == "in_range"))
+      assert Enum.any?(
+               AuditLogs.list_filtered(scope, %{"from" => today, "to" => tomorrow}),
+               &(&1.event == "in_range")
+             )
+
+      refute Enum.any?(
+               AuditLogs.list_filtered(scope, %{"from" => yesterday, "to" => yesterday}),
+               &(&1.event == "in_range")
+             )
     end
 
-    test "never returns another organisation's events even with a matching filter", %{organisation: organisation, scope: scope} do
+    test "never returns another organisation's events even with a matching filter", %{
+      organisation: organisation,
+      scope: scope
+    } do
       other_organisation = organisation_fixture()
       AuditLogs.log("shared_event_name", organisation_id: other_organisation.id)
 
@@ -138,7 +148,11 @@ defmodule MiwayCreditCore.AuditLogsTest do
       other_organisation = organisation_fixture()
       scope = %Scope{organisation_id: organisation.id}
 
-      AuditLogs.log("loan_application_created", actor_email: "staff@example.com", organisation_id: organisation.id)
+      AuditLogs.log("loan_application_created",
+        actor_email: "staff@example.com",
+        organisation_id: organisation.id
+      )
+
       AuditLogs.log("other_org_event", organisation_id: other_organisation.id)
 
       csv = AuditLogs.audit_csv(scope)

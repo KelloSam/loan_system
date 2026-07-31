@@ -65,22 +65,28 @@ defmodule MiwayCreditCore.Lending.Servicing do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
     Ecto.Multi.new()
-    |> Ecto.Multi.update(:account, LoanAccount.changeset(account, %{
-      status: "written_off",
-      outstanding_balance: Decimal.new("0.00"),
-      closed_at: now
-    }))
-    |> Ecto.Multi.insert(:entry, AccountingEntry.changeset(%AccountingEntry{}, %{
-      organisation_id: account.organisation_id,
-      loan_account_id: account.id,
-      entry_type: "write_off",
-      amount: Decimal.negate(account.outstanding_balance),
-      running_balance: Decimal.new("0.00"),
-      source_type: "manual_adjustment",
-      description: "Balance written off",
-      recorded_by_id: admin_id,
-      occurred_at: now
-    }))
+    |> Ecto.Multi.update(
+      :account,
+      LoanAccount.changeset(account, %{
+        status: "written_off",
+        outstanding_balance: Decimal.new("0.00"),
+        closed_at: now
+      })
+    )
+    |> Ecto.Multi.insert(
+      :entry,
+      AccountingEntry.changeset(%AccountingEntry{}, %{
+        organisation_id: account.organisation_id,
+        loan_account_id: account.id,
+        entry_type: "write_off",
+        amount: Decimal.negate(account.outstanding_balance),
+        running_balance: Decimal.new("0.00"),
+        source_type: "manual_adjustment",
+        description: "Balance written off",
+        recorded_by_id: admin_id,
+        occurred_at: now
+      })
+    )
     |> GeneralLedger.post_journal_entry(:write_off_gl, %{
       organisation_id: account.organisation_id,
       description: "Balance written off",
@@ -97,8 +103,8 @@ defmodule MiwayCreditCore.Lending.Servicing do
     end)
     |> Repo.transaction()
     |> case do
-      {:ok, %{account: account}}    -> {:ok, account}
-      {:error, _, reason, _}        -> {:error, reason}
+      {:ok, %{account: account}} -> {:ok, account}
+      {:error, _, reason, _} -> {:error, reason}
     end
   end
 
@@ -119,30 +125,40 @@ defmodule MiwayCreditCore.Lending.Servicing do
   any repayment, the realistic case).
   """
   def reverse_disbursement(%LoanAccount{status: "active"} = account, admin_id, reason) do
-    if Repo.exists?(from(t in PaymentTransaction, where: t.loan_account_id == ^account.id and t.status == "posted")) do
+    if Repo.exists?(
+         from(t in PaymentTransaction,
+           where: t.loan_account_id == ^account.id and t.status == "posted"
+         )
+       ) do
       {:error, :payments_already_received}
     else
       now = DateTime.utc_now() |> DateTime.truncate(:second)
 
       Ecto.Multi.new()
-      |> Ecto.Multi.update(:account, LoanAccount.changeset(account, %{
-        status: "reversed",
-        outstanding_balance: Decimal.new("0.00"),
-        reversed_at: now,
-        reversed_by_id: admin_id,
-        reversal_reason: reason
-      }))
-      |> Ecto.Multi.insert(:entry, AccountingEntry.changeset(%AccountingEntry{}, %{
-        organisation_id: account.organisation_id,
-        loan_account_id: account.id,
-        entry_type: "reversal",
-        amount: Decimal.negate(account.outstanding_balance),
-        running_balance: Decimal.new("0.00"),
-        source_type: "manual_adjustment",
-        description: "Disbursement reversed: #{reason}",
-        recorded_by_id: admin_id,
-        occurred_at: now
-      }))
+      |> Ecto.Multi.update(
+        :account,
+        LoanAccount.changeset(account, %{
+          status: "reversed",
+          outstanding_balance: Decimal.new("0.00"),
+          reversed_at: now,
+          reversed_by_id: admin_id,
+          reversal_reason: reason
+        })
+      )
+      |> Ecto.Multi.insert(
+        :entry,
+        AccountingEntry.changeset(%AccountingEntry{}, %{
+          organisation_id: account.organisation_id,
+          loan_account_id: account.id,
+          entry_type: "reversal",
+          amount: Decimal.negate(account.outstanding_balance),
+          running_balance: Decimal.new("0.00"),
+          source_type: "manual_adjustment",
+          description: "Disbursement reversed: #{reason}",
+          recorded_by_id: admin_id,
+          occurred_at: now
+        })
+      )
       |> GeneralLedger.post_reversal(:reversal_gl, %{
         organisation_id: account.organisation_id,
         description: "Disbursement reversed: #{reason}",
@@ -157,7 +173,7 @@ defmodule MiwayCreditCore.Lending.Servicing do
       |> Repo.transaction()
       |> case do
         {:ok, %{account: account}} -> {:ok, account}
-        {:error, _, reason, _}     -> {:error, reason}
+        {:error, _, reason, _} -> {:error, reason}
       end
     end
   end
@@ -165,6 +181,7 @@ defmodule MiwayCreditCore.Lending.Servicing do
   def reverse_disbursement(%LoanAccount{}, _admin_id, _reason), do: {:error, :invalid_status}
 
   defp scope_organisation(query, %Scope{organisation_id: :all}), do: query
+
   defp scope_organisation(query, %Scope{organisation_id: organisation_id}) do
     where(query, organisation_id: ^organisation_id)
   end

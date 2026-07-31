@@ -36,7 +36,10 @@ defmodule MiwayCreditCore.CustomersKycTest do
 
     test "individual + company_registration is rejected" do
       scope = %Scope{organisation_id: organisation_fixture().id}
-      attrs = valid_customer_attrs(%{customer_type: "individual", id_type: "company_registration"})
+
+      attrs =
+        valid_customer_attrs(%{customer_type: "individual", id_type: "company_registration"})
+
       assert {:error, changeset} = Customers.create_customer(scope, attrs)
       assert "does not match customer_type" in errors_on(changeset).id_type
     end
@@ -72,7 +75,8 @@ defmodule MiwayCreditCore.CustomersKycTest do
       existing = customer_fixture_in_organisation(org_a)
       scope_b = %Scope{organisation_id: org_b.id}
 
-      assert Customers.find_potential_duplicates(scope_b, %{"id_number" => existing.id_number}) == []
+      assert Customers.find_potential_duplicates(scope_b, %{"id_number" => existing.id_number}) ==
+               []
     end
 
     test "the same NRC can belong to customers in two different organisations" do
@@ -81,10 +85,16 @@ defmodule MiwayCreditCore.CustomersKycTest do
       shared_id_number = valid_customer_id_number()
 
       assert {:ok, _} =
-               Customers.create_customer(%Scope{organisation_id: org_a.id}, valid_customer_attrs(%{id_number: shared_id_number}))
+               Customers.create_customer(
+                 %Scope{organisation_id: org_a.id},
+                 valid_customer_attrs(%{id_number: shared_id_number})
+               )
 
       assert {:ok, _} =
-               Customers.create_customer(%Scope{organisation_id: org_b.id}, valid_customer_attrs(%{id_number: shared_id_number}))
+               Customers.create_customer(
+                 %Scope{organisation_id: org_b.id},
+                 valid_customer_attrs(%{id_number: shared_id_number})
+               )
     end
 
     test "the same NRC is still blocked within one organisation" do
@@ -118,7 +128,11 @@ defmodule MiwayCreditCore.CustomersKycTest do
       scope = %Scope{organisation_id: customer.organisation_id}
 
       assert {:ok, nok} =
-               Customers.create_next_of_kin(customer, %{name: "Jane", relationship: "Sister", phone: "260971111111"})
+               Customers.create_next_of_kin(customer, %{
+                 name: "Jane",
+                 relationship: "Sister",
+                 phone: "260971111111"
+               })
 
       assert nok.organisation_id == customer.organisation_id
       assert nok.customer_id == customer.id
@@ -132,7 +146,13 @@ defmodule MiwayCreditCore.CustomersKycTest do
 
     test "another organisation cannot fetch it, even by a known id" do
       customer = customer_fixture()
-      {:ok, nok} = Customers.create_next_of_kin(customer, %{name: "Jane", relationship: "Sister", phone: "260971111111"})
+
+      {:ok, nok} =
+        Customers.create_next_of_kin(customer, %{
+          name: "Jane",
+          relationship: "Sister",
+          phone: "260971111111"
+        })
 
       other_scope = %Scope{organisation_id: organisation_fixture().id}
       assert_raise Ecto.NoResultsError, fn -> Customers.get_next_of_kin!(other_scope, nok.id) end
@@ -144,7 +164,14 @@ defmodule MiwayCreditCore.CustomersKycTest do
       customer = customer_fixture()
       scope = %Scope{organisation_id: customer.organisation_id}
 
-      attrs = %{name: "Peter", relationship: "Friend", phone: "260972222222", id_type: "nrc", id_number: "111111/11/1"}
+      attrs = %{
+        name: "Peter",
+        relationship: "Friend",
+        phone: "260972222222",
+        id_type: "nrc",
+        id_number: "111111/11/1"
+      }
+
       assert {:ok, guarantor} = Customers.create_guarantor(customer, attrs)
       assert guarantor.organisation_id == customer.organisation_id
 
@@ -158,18 +185,37 @@ defmodule MiwayCreditCore.CustomersKycTest do
 
     test "an invalid id_type is rejected" do
       customer = customer_fixture()
-      attrs = %{name: "Peter", relationship: "Friend", phone: "260972222222", id_type: "made_up", id_number: "1"}
+
+      attrs = %{
+        name: "Peter",
+        relationship: "Friend",
+        phone: "260972222222",
+        id_type: "made_up",
+        id_number: "1"
+      }
+
       assert {:error, changeset} = Customers.create_guarantor(customer, attrs)
       assert errors_on(changeset).id_type
     end
 
     test "another organisation cannot fetch it, even by a known id" do
       customer = customer_fixture()
-      attrs = %{name: "Peter", relationship: "Friend", phone: "260972222222", id_type: "nrc", id_number: "111111/11/1"}
+
+      attrs = %{
+        name: "Peter",
+        relationship: "Friend",
+        phone: "260972222222",
+        id_type: "nrc",
+        id_number: "111111/11/1"
+      }
+
       {:ok, guarantor} = Customers.create_guarantor(customer, attrs)
 
       other_scope = %Scope{organisation_id: organisation_fixture().id}
-      assert_raise Ecto.NoResultsError, fn -> Customers.get_guarantor!(other_scope, guarantor.id) end
+
+      assert_raise Ecto.NoResultsError, fn ->
+        Customers.get_guarantor!(other_scope, guarantor.id)
+      end
     end
   end
 
@@ -179,7 +225,9 @@ defmodule MiwayCreditCore.CustomersKycTest do
       admin = admin_fixture()
       upload = build_upload("hello world")
 
-      assert {:ok, document} = Customers.create_kyc_document(customer, upload, "nrc_copy", admin.id)
+      assert {:ok, document} =
+               Customers.create_kyc_document(customer, upload, "nrc_copy", admin.id)
+
       assert document.status == "active"
       assert document.organisation_id == customer.organisation_id
 
@@ -198,11 +246,17 @@ defmodule MiwayCreditCore.CustomersKycTest do
       admin = admin_fixture()
       upload = build_upload("data")
 
-      assert {:error, changeset} = Customers.create_kyc_document(customer, upload, "not_a_real_type", admin.id)
+      assert {:error, changeset} =
+               Customers.create_kyc_document(customer, upload, "not_a_real_type", admin.id)
+
       assert errors_on(changeset).document_type
 
       upload_dir =
-        MiwayCreditCore.Customers.DocumentStorage.read_path(customer.organisation_id, customer.id, "placeholder")
+        MiwayCreditCore.Customers.DocumentStorage.read_path(
+          customer.organisation_id,
+          customer.id,
+          "placeholder"
+        )
         |> Path.dirname()
 
       assert File.ls!(upload_dir) == []
@@ -215,19 +269,30 @@ defmodule MiwayCreditCore.CustomersKycTest do
       {:ok, document} = Customers.create_kyc_document(customer, upload, "nrc_copy", admin.id)
 
       other_scope = %Scope{organisation_id: organisation_fixture().id}
-      assert_raise Ecto.NoResultsError, fn -> Customers.get_kyc_document!(other_scope, document.id) end
+
+      assert_raise Ecto.NoResultsError, fn ->
+        Customers.get_kyc_document!(other_scope, document.id)
+      end
     end
 
     test "an unsupported content_type is rejected and the just-stored file is cleaned up" do
       customer = customer_fixture()
       admin = admin_fixture()
-      upload = build_upload("MZ...fake executable bytes", "malware.exe", "application/x-msdownload")
 
-      assert {:error, changeset} = Customers.create_kyc_document(customer, upload, "nrc_copy", admin.id)
+      upload =
+        build_upload("MZ...fake executable bytes", "malware.exe", "application/x-msdownload")
+
+      assert {:error, changeset} =
+               Customers.create_kyc_document(customer, upload, "nrc_copy", admin.id)
+
       assert errors_on(changeset).content_type
 
       upload_dir =
-        MiwayCreditCore.Customers.DocumentStorage.read_path(customer.organisation_id, customer.id, "placeholder")
+        MiwayCreditCore.Customers.DocumentStorage.read_path(
+          customer.organisation_id,
+          customer.id,
+          "placeholder"
+        )
         |> Path.dirname()
 
       assert File.ls!(upload_dir) == []
@@ -240,14 +305,23 @@ defmodule MiwayCreditCore.CustomersKycTest do
 
       MiwayCreditCore.Customers.MalwareScanner.Test.set_result({:infected, "Test.Signature"})
 
-      assert {:error, {:blocked, "Test.Signature"}} = Customers.create_kyc_document(customer, upload, "nrc_copy", admin.id)
+      assert {:error, {:blocked, "Test.Signature"}} =
+               Customers.create_kyc_document(customer, upload, "nrc_copy", admin.id)
 
       upload_dir =
-        MiwayCreditCore.Customers.DocumentStorage.read_path(customer.organisation_id, customer.id, "placeholder")
+        MiwayCreditCore.Customers.DocumentStorage.read_path(
+          customer.organisation_id,
+          customer.id,
+          "placeholder"
+        )
         |> Path.dirname()
 
       assert not File.exists?(upload_dir) or File.ls!(upload_dir) == []
-      assert Customers.list_kyc_documents_for_customer(%Scope{organisation_id: customer.organisation_id}, customer.id) == []
+
+      assert Customers.list_kyc_documents_for_customer(
+               %Scope{organisation_id: customer.organisation_id},
+               customer.id
+             ) == []
     end
 
     test "a scanner error also blocks the upload — fails closed, not open" do
@@ -260,7 +334,10 @@ defmodule MiwayCreditCore.CustomersKycTest do
       assert {:error, {:blocked, :scanner_unavailable}} =
                Customers.create_kyc_document(customer, upload, "nrc_copy", admin.id)
 
-      assert Customers.list_kyc_documents_for_customer(%Scope{organisation_id: customer.organisation_id}, customer.id) == []
+      assert Customers.list_kyc_documents_for_customer(
+               %Scope{organisation_id: customer.organisation_id},
+               customer.id
+             ) == []
     end
 
     test "a real PDF upload still succeeds" do
@@ -268,7 +345,9 @@ defmodule MiwayCreditCore.CustomersKycTest do
       admin = admin_fixture()
       upload = build_upload("%PDF-1.4 fake but whitelisted content", "id.pdf", "application/pdf")
 
-      assert {:ok, document} = Customers.create_kyc_document(customer, upload, "nrc_copy", admin.id)
+      assert {:ok, document} =
+               Customers.create_kyc_document(customer, upload, "nrc_copy", admin.id)
+
       assert document.content_type == "application/pdf"
     end
 
@@ -286,7 +365,12 @@ defmodule MiwayCreditCore.CustomersKycTest do
         uploaded_at: DateTime.utc_now() |> DateTime.truncate(:second)
       }
 
-      changeset = MiwayCreditCore.Customers.KycDocument.changeset(%MiwayCreditCore.Customers.KycDocument{}, attrs)
+      changeset =
+        MiwayCreditCore.Customers.KycDocument.changeset(
+          %MiwayCreditCore.Customers.KycDocument{},
+          attrs
+        )
+
       refute changeset.valid?
       assert changeset.errors[:size_bytes]
     end
@@ -296,7 +380,10 @@ defmodule MiwayCreditCore.CustomersKycTest do
     test "a removed document older than the retention window is purged — file gone, row kept as a tombstone" do
       customer = customer_fixture()
       admin = admin_fixture()
-      {:ok, document} = Customers.create_kyc_document(customer, build_upload("old content"), "nrc_copy", admin.id)
+
+      {:ok, document} =
+        Customers.create_kyc_document(customer, build_upload("old content"), "nrc_copy", admin.id)
+
       {:ok, removed} = Customers.remove_kyc_document(document)
       backdate_removed_at(removed, 2556)
 
@@ -312,7 +399,15 @@ defmodule MiwayCreditCore.CustomersKycTest do
     test "a removed document within the retention window is left alone" do
       customer = customer_fixture()
       admin = admin_fixture()
-      {:ok, document} = Customers.create_kyc_document(customer, build_upload("recent content"), "nrc_copy", admin.id)
+
+      {:ok, document} =
+        Customers.create_kyc_document(
+          customer,
+          build_upload("recent content"),
+          "nrc_copy",
+          admin.id
+        )
+
       {:ok, removed} = Customers.remove_kyc_document(document)
       backdate_removed_at(removed, 10)
 
@@ -323,14 +418,24 @@ defmodule MiwayCreditCore.CustomersKycTest do
     test "an active document is never purged regardless of age" do
       customer = customer_fixture()
       admin = admin_fixture()
-      {:ok, document} = Customers.create_kyc_document(customer, build_upload("active content"), "nrc_copy", admin.id)
+
+      {:ok, document} =
+        Customers.create_kyc_document(
+          customer,
+          build_upload("active content"),
+          "nrc_copy",
+          admin.id
+        )
 
       assert Customers.purge_expired_kyc_documents() == []
       assert File.exists?(Customers.kyc_document_path(document))
     end
 
     defp backdate_removed_at(document, days_ago) do
-      removed_at = DateTime.utc_now() |> DateTime.add(-days_ago * 24 * 60 * 60, :second) |> DateTime.truncate(:second)
+      removed_at =
+        DateTime.utc_now()
+        |> DateTime.add(-days_ago * 24 * 60 * 60, :second)
+        |> DateTime.truncate(:second)
 
       document
       |> Ecto.Changeset.change(removed_at: removed_at)
@@ -347,7 +452,11 @@ defmodule MiwayCreditCore.CustomersKycTest do
       refute Customers.has_active_consent?(scope, customer.id, "credit_check")
 
       assert {:ok, consent} =
-               Customers.create_consent(customer, %{"consent_type" => "credit_check", "method" => "digital"}, admin.id)
+               Customers.create_consent(
+                 customer,
+                 %{"consent_type" => "credit_check", "method" => "digital"},
+                 admin.id
+               )
 
       assert consent.organisation_id == customer.organisation_id
       assert Customers.has_active_consent?(scope, customer.id, "credit_check")

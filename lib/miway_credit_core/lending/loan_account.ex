@@ -61,8 +61,10 @@ defmodule MiwayCreditCore.Lending.LoanAccount do
     belongs_to :loan_product, MiwayCreditCore.Products.LoanProduct, type: :binary_id
     belongs_to :reversed_by, MiwayCreditCore.Accounts.User
 
-    has_many :repayment_schedule_installments, MiwayCreditCore.Lending.RepaymentScheduleInstallment,
-      preload_order: [asc: :due_date]
+    has_many :repayment_schedule_installments,
+             MiwayCreditCore.Lending.RepaymentScheduleInstallment,
+             preload_order: [asc: :due_date]
+
     has_many :payment_transactions, MiwayCreditCore.Payments.PaymentTransaction
     has_many :accounting_entries, MiwayCreditCore.Accounting.AccountingEntry
     has_many :collaterals, MiwayCreditCore.Applications.Collateral
@@ -85,13 +87,41 @@ defmodule MiwayCreditCore.Lending.LoanAccount do
 
   def changeset(loan_account, attrs) do
     loan_account
-    |> cast(attrs, [:organisation_id, :loan_application_id, :customer_id, :loan_product_id, :principal_amount,
-                   :interest_rate, :interest_method, :term_months, :contract_reference, :disbursement_method,
-                   :disbursement_reference, :opened_at, :status, :outstanding_balance, :closed_at,
-                   :reversed_at, :reversed_by_id, :reversal_reason])
-    |> validate_required([:organisation_id, :loan_application_id, :customer_id, :loan_product_id, :principal_amount,
-                          :interest_rate, :interest_method, :term_months, :contract_reference, :disbursement_method,
-                          :opened_at, :status, :outstanding_balance])
+    |> cast(attrs, [
+      :organisation_id,
+      :loan_application_id,
+      :customer_id,
+      :loan_product_id,
+      :principal_amount,
+      :interest_rate,
+      :interest_method,
+      :term_months,
+      :contract_reference,
+      :disbursement_method,
+      :disbursement_reference,
+      :opened_at,
+      :status,
+      :outstanding_balance,
+      :closed_at,
+      :reversed_at,
+      :reversed_by_id,
+      :reversal_reason
+    ])
+    |> validate_required([
+      :organisation_id,
+      :loan_application_id,
+      :customer_id,
+      :loan_product_id,
+      :principal_amount,
+      :interest_rate,
+      :interest_method,
+      :term_months,
+      :contract_reference,
+      :disbursement_method,
+      :opened_at,
+      :status,
+      :outstanding_balance
+    ])
     |> validate_inclusion(:status, @statuses)
     |> validate_inclusion(:disbursement_method, @disbursement_methods)
     |> validate_number(:principal_amount, greater_than: 0)

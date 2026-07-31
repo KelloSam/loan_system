@@ -76,7 +76,8 @@ defmodule MiwayCreditCoreWeb.TwoFactorController do
   # user experience should be indistinguishable regardless of whether
   # the password step or this TOTP step triggered the lock.
   defp locked_response(conn, user) do
-    remaining = max(1, div(NaiveDateTime.diff(user.locked_until, NaiveDateTime.utc_now(), :second), 60))
+    remaining =
+      max(1, div(NaiveDateTime.diff(user.locked_until, NaiveDateTime.utc_now(), :second), 60))
 
     AuditLogs.log("2fa_blocked_lockout",
       actor_id: user.id,
@@ -86,7 +87,10 @@ defmodule MiwayCreditCoreWeb.TwoFactorController do
 
     conn
     |> put_layout(html: false)
-    |> put_flash(:error, "Account locked after too many failed attempts. Try again in #{remaining} minute(s).")
+    |> put_flash(
+      :error,
+      "Account locked after too many failed attempts. Try again in #{remaining} minute(s)."
+    )
     |> render(:verify)
   end
 
@@ -133,7 +137,10 @@ defmodule MiwayCreditCoreWeb.TwoFactorController do
         |> redirect(to: ~p"/admin/settings/2fa")
       else
         conn
-        |> put_flash(:error, "Invalid code — make sure your authenticator clock is in sync and try again.")
+        |> put_flash(
+          :error,
+          "Invalid code — make sure your authenticator clock is in sync and try again."
+        )
         |> redirect(to: ~p"/admin/settings/2fa")
       end
     end

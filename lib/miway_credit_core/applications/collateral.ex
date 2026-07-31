@@ -29,7 +29,13 @@ defmodule MiwayCreditCore.Applications.Collateral do
   def changeset(collateral, attrs) do
     collateral
     |> cast(attrs, [:organisation_id, :type, :description, :estimated_value, :loan_account_id])
-    |> validate_required([:organisation_id, :type, :description, :estimated_value, :loan_account_id])
+    |> validate_required([
+      :organisation_id,
+      :type,
+      :description,
+      :estimated_value,
+      :loan_account_id
+    ])
     |> validate_inclusion(:type, @types)
     |> validate_number(:estimated_value, greater_than: 0)
     |> foreign_key_constraint(:organisation_id)

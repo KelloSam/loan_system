@@ -10,7 +10,9 @@ defmodule MiwayCreditCore.OrganisationsTest do
 
   describe "create_organisation/1" do
     test "creates an Organisation and its default OrganisationSettings" do
-      assert {:ok, %Organisation{} = organisation} = Organisations.create_organisation(%{name: "Acme Lending"})
+      assert {:ok, %Organisation{} = organisation} =
+               Organisations.create_organisation(%{name: "Acme Lending"})
+
       assert organisation.status == "active"
 
       settings = Repo.get_by(OrganisationSettings, organisation_id: organisation.id)
@@ -35,7 +37,9 @@ defmodule MiwayCreditCore.OrganisationsTest do
       organisation = organisation_fixture()
       scope = %Scope{organisation_id: organisation.id}
 
-      assert {:ok, branch} = Organisations.create_branch(scope, %{"name" => "HQ", "code" => "HQ1"})
+      assert {:ok, branch} =
+               Organisations.create_branch(scope, %{"name" => "HQ", "code" => "HQ1"})
+
       assert branch.organisation_id == organisation.id
     end
 
@@ -44,13 +48,18 @@ defmodule MiwayCreditCore.OrganisationsTest do
       scope = %Scope{organisation_id: organisation.id}
       branch_fixture(organisation, %{code: "DUP"})
 
-      assert {:error, changeset} = Organisations.create_branch(scope, %{"name" => "Other", "code" => "DUP"})
+      assert {:error, changeset} =
+               Organisations.create_branch(scope, %{"name" => "Other", "code" => "DUP"})
+
       assert errors_on(changeset).organisation_id
     end
 
     test "requires a concrete organisation scope, not :all" do
       assert_raise ArgumentError, ~r/not :all/, fn ->
-        Organisations.create_branch(%Scope{organisation_id: :all}, %{"name" => "HQ", "code" => "HQ1"})
+        Organisations.create_branch(%Scope{organisation_id: :all}, %{
+          "name" => "HQ",
+          "code" => "HQ1"
+        })
       end
     end
   end
@@ -85,13 +94,18 @@ defmodule MiwayCreditCore.OrganisationsTest do
       branch = branch_fixture(org_a)
       other_scope = %Scope{organisation_id: org_b.id}
 
-      assert_raise Ecto.NoResultsError, fn -> Organisations.get_branch!(other_scope, branch.id) end
+      assert_raise Ecto.NoResultsError, fn ->
+        Organisations.get_branch!(other_scope, branch.id)
+      end
     end
   end
 
   test "create_department/1 creates a department under an organisation" do
     organisation = organisation_fixture()
-    assert {:ok, department} = Organisations.create_department(%{organisation_id: organisation.id, name: "Credit"})
+
+    assert {:ok, department} =
+             Organisations.create_department(%{organisation_id: organisation.id, name: "Credit"})
+
     assert department.organisation_id == organisation.id
   end
 
@@ -100,7 +114,9 @@ defmodule MiwayCreditCore.OrganisationsTest do
       organisation = organisation_fixture()
       staff_member = bare_staff_member_fixture()
 
-      assert {:ok, membership} = Organisations.add_staff_to_organisation(staff_member.id, organisation.id)
+      assert {:ok, membership} =
+               Organisations.add_staff_to_organisation(staff_member.id, organisation.id)
+
       assert membership.status == "active"
 
       found = Organisations.get_active_membership_for_staff_member(staff_member.id)
@@ -129,7 +145,9 @@ defmodule MiwayCreditCore.OrganisationsTest do
   # StaffMember with precisely zero (or exactly one, caller-added)
   # memberships to make assertions on membership state meaningful.
   defp bare_staff_member_fixture do
-    {:ok, _user, staff_member} = valid_user_attrs() |> Accounts.register_staff_member("loan_officer")
+    {:ok, _user, staff_member} =
+      valid_user_attrs() |> Accounts.register_staff_member("loan_officer")
+
     staff_member
   end
 end

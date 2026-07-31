@@ -53,11 +53,13 @@ defmodule MiwayCreditCore.Risk.AffordabilityCalculator do
 
   # Business customers' KYC data never captured a monthly income figure
   # directly (Step 7) — annual_turnover / 12 is the only proxy on file.
-  defp gross_monthly_income(%Customer{customer_type: "individual", monthly_income: income}) when not is_nil(income),
-    do: {:ok, income}
+  defp gross_monthly_income(%Customer{customer_type: "individual", monthly_income: income})
+       when not is_nil(income),
+       do: {:ok, income}
 
-  defp gross_monthly_income(%Customer{customer_type: "business", annual_turnover: turnover}) when not is_nil(turnover),
-    do: {:ok, Decimal.div(turnover, 12)}
+  defp gross_monthly_income(%Customer{customer_type: "business", annual_turnover: turnover})
+       when not is_nil(turnover),
+       do: {:ok, Decimal.div(turnover, 12)}
 
   defp gross_monthly_income(%Customer{}), do: {:error, :income_data_missing}
 
@@ -70,6 +72,8 @@ defmodule MiwayCreditCore.Risk.AffordabilityCalculator do
     scope
     |> Lending.get_upcoming_installments(customer_id)
     |> Enum.uniq_by(& &1.loan_account_id)
-    |> Enum.reduce(Decimal.new("0"), fn installment, acc -> Decimal.add(acc, installment.scheduled_amount) end)
+    |> Enum.reduce(Decimal.new("0"), fn installment, acc ->
+      Decimal.add(acc, installment.scheduled_amount)
+    end)
   end
 end

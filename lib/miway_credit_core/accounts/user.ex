@@ -66,12 +66,18 @@ defmodule MiwayCreditCore.Accounts.User do
   defp validate_password(changeset) do
     changeset
     |> validate_length(:password, min: 12, max: 72, message: "must be at least 12 characters")
-    |> validate_format(:password, ~r/[A-Z]/, message: "must contain at least one uppercase letter")
-    |> validate_format(:password, ~r/[a-z]/, message: "must contain at least one lowercase letter")
+    |> validate_format(:password, ~r/[A-Z]/,
+      message: "must contain at least one uppercase letter"
+    )
+    |> validate_format(:password, ~r/[a-z]/,
+      message: "must contain at least one lowercase letter"
+    )
     |> validate_format(:password, ~r/[0-9]/, message: "must contain at least one number")
   end
 
-  defp put_password_hash(%Ecto.Changeset{valid?: true, changes: %{password: password}} = changeset) do
+  defp put_password_hash(
+         %Ecto.Changeset{valid?: true, changes: %{password: password}} = changeset
+       ) do
     change(changeset, %{password_hash: Bcrypt.hash_pwd_salt(password)})
   end
 

@@ -27,7 +27,10 @@ defmodule Mix.Tasks.MiwayCreditCore.EncryptExistingKycFiles do
   def run(_args) do
     Mix.Task.run("app.start")
 
-    documents = Repo.all(from d in KycDocument, select: {d.organisation_id, d.customer_id, d.stored_filename})
+    documents =
+      Repo.all(
+        from d in KycDocument, select: {d.organisation_id, d.customer_id, d.stored_filename}
+      )
 
     Enum.each(documents, fn {organisation_id, customer_id, stored_filename} ->
       path = DocumentStorage.read_path(organisation_id, customer_id, stored_filename)

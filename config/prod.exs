@@ -24,4 +24,3 @@ config :miway_credit_core, MiwayCreditCoreWeb.Endpoint,
 
 # Do not log debug messages in production
 config :logger, level: :info
-

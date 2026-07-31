@@ -33,10 +33,23 @@ defmodule MiwayCreditCore.Collections.CollectionActivity do
   def changeset(activity, attrs) do
     activity
     |> cast(attrs, [
-      :organisation_id, :collection_case_id, :activity_type, :outcome, :notes,
-      :occurred_at, :follow_up_date, :recorded_by_id
+      :organisation_id,
+      :collection_case_id,
+      :activity_type,
+      :outcome,
+      :notes,
+      :occurred_at,
+      :follow_up_date,
+      :recorded_by_id
     ])
-    |> validate_required([:organisation_id, :collection_case_id, :activity_type, :outcome, :occurred_at, :recorded_by_id])
+    |> validate_required([
+      :organisation_id,
+      :collection_case_id,
+      :activity_type,
+      :outcome,
+      :occurred_at,
+      :recorded_by_id
+    ])
     |> validate_inclusion(:activity_type, @activity_types)
     |> validate_inclusion(:outcome, @outcomes)
     |> foreign_key_constraint(:organisation_id)

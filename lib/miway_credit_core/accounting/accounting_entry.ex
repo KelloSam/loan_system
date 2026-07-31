@@ -39,10 +39,27 @@ defmodule MiwayCreditCore.Accounting.AccountingEntry do
 
   def changeset(entry, attrs) do
     entry
-    |> cast(attrs, [:organisation_id, :loan_account_id, :entry_type, :amount, :running_balance, :source_type,
-                   :source_id, :description, :recorded_by_id, :occurred_at])
-    |> validate_required([:organisation_id, :loan_account_id, :entry_type, :amount, :running_balance, :source_type,
-                          :occurred_at])
+    |> cast(attrs, [
+      :organisation_id,
+      :loan_account_id,
+      :entry_type,
+      :amount,
+      :running_balance,
+      :source_type,
+      :source_id,
+      :description,
+      :recorded_by_id,
+      :occurred_at
+    ])
+    |> validate_required([
+      :organisation_id,
+      :loan_account_id,
+      :entry_type,
+      :amount,
+      :running_balance,
+      :source_type,
+      :occurred_at
+    ])
     |> validate_inclusion(:entry_type, @entry_types)
     |> validate_inclusion(:source_type, @source_types)
     |> foreign_key_constraint(:organisation_id)

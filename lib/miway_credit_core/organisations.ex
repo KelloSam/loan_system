@@ -59,7 +59,8 @@ defmodule MiwayCreditCore.Organisations do
     |> Repo.get!(id)
   end
 
-  def create_branch(%Scope{organisation_id: organisation_id}, _attrs) when organisation_id == :all do
+  def create_branch(%Scope{organisation_id: organisation_id}, _attrs)
+      when organisation_id == :all do
     raise ArgumentError, "create_branch/2 requires a concrete organisation scope, not :all"
   end
 
@@ -89,7 +90,10 @@ defmodule MiwayCreditCore.Organisations do
   @doc "Adds a StaffMember to an Organisation. A StaffMember may belong to more than one."
   def add_staff_to_organisation(staff_member_id, organisation_id) do
     %OrganisationMembership{}
-    |> OrganisationMembership.changeset(%{staff_member_id: staff_member_id, organisation_id: organisation_id})
+    |> OrganisationMembership.changeset(%{
+      staff_member_id: staff_member_id,
+      organisation_id: organisation_id
+    })
     |> Repo.insert()
   end
 
@@ -113,6 +117,7 @@ defmodule MiwayCreditCore.Organisations do
   end
 
   defp scope_organisation(query, %Scope{organisation_id: :all}), do: query
+
   defp scope_organisation(query, %Scope{organisation_id: organisation_id}) do
     where(query, organisation_id: ^organisation_id)
   end

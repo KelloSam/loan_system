@@ -14,7 +14,9 @@ defmodule MiwayCreditCore.Customers.DocumentStorageTest do
     customer_id = Ecto.UUID.generate()
     plaintext = "this is real KYC content, not to be stored in the clear"
 
-    {stored_filename, size_bytes} = DocumentStorage.store(upload(plaintext), organisation_id, customer_id)
+    {stored_filename, size_bytes} =
+      DocumentStorage.store(upload(plaintext), organisation_id, customer_id)
+
     assert size_bytes == byte_size(plaintext)
 
     assert DocumentStorage.read(organisation_id, customer_id, stored_filename) == plaintext
@@ -25,8 +27,11 @@ defmodule MiwayCreditCore.Customers.DocumentStorageTest do
     customer_id = Ecto.UUID.generate()
     plaintext = "sensitive NRC photo bytes go here"
 
-    {stored_filename, _size} = DocumentStorage.store(upload(plaintext), organisation_id, customer_id)
-    on_disk = organisation_id |> DocumentStorage.read_path(customer_id, stored_filename) |> File.read!()
+    {stored_filename, _size} =
+      DocumentStorage.store(upload(plaintext), organisation_id, customer_id)
+
+    on_disk =
+      organisation_id |> DocumentStorage.read_path(customer_id, stored_filename) |> File.read!()
 
     refute on_disk == plaintext
     assert byte_size(on_disk) > byte_size(plaintext)
@@ -35,7 +40,10 @@ defmodule MiwayCreditCore.Customers.DocumentStorageTest do
   test "a tampered file fails to decrypt instead of silently returning corrupted content" do
     organisation_id = Ecto.UUID.generate()
     customer_id = Ecto.UUID.generate()
-    {stored_filename, _size} = DocumentStorage.store(upload("original content"), organisation_id, customer_id)
+
+    {stored_filename, _size} =
+      DocumentStorage.store(upload("original content"), organisation_id, customer_id)
+
     path = DocumentStorage.read_path(organisation_id, customer_id, stored_filename)
 
     tampered = path |> File.read!() |> flip_last_byte()

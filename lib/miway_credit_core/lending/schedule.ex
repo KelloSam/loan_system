@@ -78,12 +78,17 @@ defmodule MiwayCreditCore.Lending.Schedule do
     penalty = penalty_owed(installment, account.loan_product)
 
     Ecto.Multi.new()
-    |> Ecto.Multi.update(:installment, RepaymentScheduleInstallment.changeset(installment, %{
-      status: "overdue",
-      penalty_amount: Decimal.add(installment.penalty_amount, penalty)
-    }))
+    |> Ecto.Multi.update(
+      :installment,
+      RepaymentScheduleInstallment.changeset(installment, %{
+        status: "overdue",
+        penalty_amount: Decimal.add(installment.penalty_amount, penalty)
+      })
+    )
     |> maybe_accrue_penalty_ledger(account, penalty, now)
-    |> Ecto.Multi.run(:collection_case, fn repo, _changes -> Collections.ensure_case_opened(repo, account) end)
+    |> Ecto.Multi.run(:collection_case, fn repo, _changes ->
+      Collections.ensure_case_opened(repo, account)
+    end)
     |> Repo.transaction()
   end
 
@@ -101,9 +106,12 @@ defmodule MiwayCreditCore.Lending.Schedule do
   defp maybe_accrue_penalty_ledger(multi, account, penalty, now) do
     if Decimal.compare(penalty, Decimal.new("0")) == :gt do
       multi
-      |> Ecto.Multi.update(:account, LoanAccount.changeset(account, %{
-        outstanding_balance: Decimal.add(account.outstanding_balance, penalty)
-      }))
+      |> Ecto.Multi.update(
+        :account,
+        LoanAccount.changeset(account, %{
+          outstanding_balance: Decimal.add(account.outstanding_balance, penalty)
+        })
+      )
       |> Ecto.Multi.insert(:penalty_entry, fn %{account: account} ->
         AccountingEntry.changeset(%AccountingEntry{}, %{
           organisation_id: account.organisation_id,
@@ -186,13 +194,18 @@ defmodule MiwayCreditCore.Lending.Schedule do
 
     RepaymentScheduleInstallment
     |> scope_organisation(scope)
-    |> where([i], i.status in ["upcoming", "partially_paid"] and i.due_date >= ^today and i.due_date <= ^cutoff)
+    |> where(
+      [i],
+      i.status in ["upcoming", "partially_paid"] and i.due_date >= ^today and
+        i.due_date <= ^cutoff
+    )
     |> order_by([i], asc: i.due_date)
     |> preload(loan_account: :customer)
     |> Repo.all()
   end
 
   defp scope_organisation(query, %Scope{organisation_id: :all}), do: query
+
   defp scope_organisation(query, %Scope{organisation_id: organisation_id}) do
     where(query, organisation_id: ^organisation_id)
   end

@@ -37,10 +37,24 @@ defmodule MiwayCreditCore.Applications.ApprovalDecision do
   def changeset(approval_decision, attrs) do
     approval_decision
     |> cast(attrs, [
-      :organisation_id, :loan_application_id, :decided_by_id,
-      :level, :decision, :notes, :decline_reason_category, :conditions, :decided_at
+      :organisation_id,
+      :loan_application_id,
+      :decided_by_id,
+      :level,
+      :decision,
+      :notes,
+      :decline_reason_category,
+      :conditions,
+      :decided_at
     ])
-    |> validate_required([:organisation_id, :loan_application_id, :decided_by_id, :level, :decision, :decided_at])
+    |> validate_required([
+      :organisation_id,
+      :loan_application_id,
+      :decided_by_id,
+      :level,
+      :decision,
+      :decided_at
+    ])
     |> validate_inclusion(:decision, @decisions)
     |> validate_number(:level, greater_than: 0)
     |> validate_decline_reason_category()

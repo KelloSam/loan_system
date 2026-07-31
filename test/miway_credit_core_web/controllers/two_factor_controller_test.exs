@@ -18,7 +18,9 @@ defmodule MiwayCreditCoreWeb.TwoFactorControllerTest do
     :ok
   end
 
-  test "confirming a correct code logs a staff member in and redirects to /admin/dashboard", %{conn: conn} do
+  test "confirming a correct code logs a staff member in and redirects to /admin/dashboard", %{
+    conn: conn
+  } do
     user = staff_member_fixture("loan_officer", %{password: @password})
     secret = Accounts.generate_totp_secret()
     {:ok, user} = Accounts.enable_totp(user, secret)
@@ -31,7 +33,9 @@ defmodule MiwayCreditCoreWeb.TwoFactorControllerTest do
     assert get_session(conn, :user_id) == user.id
   end
 
-  test "confirming a correct code logs a customer in and redirects to /client/dashboard", %{conn: conn} do
+  test "confirming a correct code logs a customer in and redirects to /client/dashboard", %{
+    conn: conn
+  } do
     customer = customer_fixture()
     user = customer_user_fixture(customer, %{password: @password})
     secret = Accounts.generate_totp_secret()
@@ -65,7 +69,9 @@ defmodule MiwayCreditCoreWeb.TwoFactorControllerTest do
       :ok
     end
 
-    test "5 wrong TOTP codes lock the account; a 6th attempt with the correct code is refused", %{conn: conn} do
+    test "5 wrong TOTP codes lock the account; a 6th attempt with the correct code is refused", %{
+      conn: conn
+    } do
       user = staff_member_fixture("loan_officer", %{password: @password})
       secret = Accounts.generate_totp_secret()
       {:ok, user} = Accounts.enable_totp(user, secret)
@@ -85,7 +91,9 @@ defmodule MiwayCreditCoreWeb.TwoFactorControllerTest do
       refute get_session(locked, :user_id)
     end
 
-    test "a pre-locked account is refused at /login/verify even with the correct code", %{conn: conn} do
+    test "a pre-locked account is refused at /login/verify even with the correct code", %{
+      conn: conn
+    } do
       user = staff_member_fixture("loan_officer", %{password: @password})
       secret = Accounts.generate_totp_secret()
       {:ok, user} = Accounts.enable_totp(user, secret)
