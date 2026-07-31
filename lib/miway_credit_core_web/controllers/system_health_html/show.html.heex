@@ -35,7 +35,7 @@
           <%= @scanner_failure_count %>
         </span>
       </div>
-      <div class="text-xs text-gray-400"><%= format_scanner_last_failure(@scanner_last_failure_at) %></div>
+      <div class="text-xs text-gray-400"><%= format_last_failure(@scanner_last_failure_at) %></div>
       <p class="text-xs text-gray-400">
         A rising count is the earliest signal of a broken ClamAV install — see the deployment runbook §8.
       </p>
@@ -78,6 +78,27 @@
       <p class="text-xs text-gray-400">
         The Postgres host's own disk space is a separate machine in most real deployments and isn't observable from
         this app — monitor it directly at the host level.
+      </p>
+    </div>
+  </div>
+
+  <div class="card p-5">
+    <h2 class="section-title mb-3">Backups</h2>
+    <div class="space-y-2 text-sm">
+      <div class="flex items-center justify-between">
+        <span class="text-gray-500">Latest</span>
+        <span class="font-medium text-navy-900"><%= format_backup_summary(@latest_backup) %></span>
+      </div>
+      <div class="flex items-center justify-between">
+        <span class="text-gray-500">Failures (last 24h)</span>
+        <span class={status_badge_class(@backup_failure_count > 0)}>
+          <%= @backup_failure_count %>
+        </span>
+      </div>
+      <div class="text-xs text-gray-400"><%= format_last_failure(@backup_last_failure_at) %></div>
+      <p class="text-xs text-gray-400">
+        Scheduler heartbeat above covers "did it run recently" — this covers "did it actually succeed." See the
+        deployment runbook §10.
       </p>
     </div>
   </div>

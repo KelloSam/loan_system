@@ -36,6 +36,7 @@ config :miway_credit_core, MiwayCreditCoreWeb.Endpoint,
 # MiwayCreditCore.Loans.mark_overdue_payments/0 is unit-tested directly.
 config :miway_credit_core, MiwayCreditCore.ArrearsScheduler, enabled: false
 config :miway_credit_core, MiwayCreditCore.KycRetentionScheduler, enabled: false
+config :miway_credit_core, MiwayCreditCore.BackupScheduler, enabled: false
 
 # Keep KYC document uploads out of priv/ during tests — a throwaway
 # tmp dir instead, so the test suite never leaves files behind in the repo.

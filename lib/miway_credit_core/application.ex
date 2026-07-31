@@ -25,7 +25,8 @@ defmodule MiwayCreditCore.Application do
 
         # Start the Endpoint (HTTP server)
         MiwayCreditCoreWeb.Endpoint
-      ] ++ arrears_scheduler_child() ++ kyc_retention_scheduler_child()
+      ] ++
+        arrears_scheduler_child() ++ kyc_retention_scheduler_child() ++ backup_scheduler_child()
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
@@ -63,5 +64,15 @@ defmodule MiwayCreditCore.Application do
       |> Keyword.get(:enabled, true)
 
     if enabled?, do: [MiwayCreditCore.KycRetentionScheduler], else: []
+  end
+
+  # Disabled in test (config/test.exs sets enabled: false) — same
+  # reasoning as arrears_scheduler_child/0.
+  defp backup_scheduler_child do
+    enabled? =
+      Application.get_env(:miway_credit_core, MiwayCreditCore.BackupScheduler, [])
+      |> Keyword.get(:enabled, true)
+
+    if enabled?, do: [MiwayCreditCore.BackupScheduler], else: []
   end
 end

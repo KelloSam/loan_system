@@ -23,6 +23,7 @@ defmodule MiwayCreditCore.Monitoring.Store do
   @table __MODULE__
   @clean_period :timer.minutes(5)
   @scanner_failure_retention_seconds 7 * 24 * 60 * 60
+  @backup_failure_retention_seconds 7 * 24 * 60 * 60
 
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, :ok, Keyword.put_new(opts, :name, __MODULE__))
@@ -54,6 +55,7 @@ defmodule MiwayCreditCore.Monitoring.Store do
   @impl true
   def handle_info(:clean, state) do
     prune_stale_scanner_failures()
+    prune_stale_backup_failures()
     reset_pool_max_window()
     schedule_clean()
     {:noreply, state}
@@ -64,6 +66,16 @@ defmodule MiwayCreditCore.Monitoring.Store do
 
     ms = [
       {{{:scanner_failure, :_}, :"$1", :_}, [{:<, :"$1", {:const, cutoff}}], [true]}
+    ]
+
+    :ets.select_delete(@table, ms)
+  end
+
+  defp prune_stale_backup_failures do
+    cutoff = System.system_time(:second) - @backup_failure_retention_seconds
+
+    ms = [
+      {{{:backup_failure, :_}, :"$1", :_}, [{:<, :"$1", {:const, cutoff}}], [true]}
     ]
 
     :ets.select_delete(@table, ms)

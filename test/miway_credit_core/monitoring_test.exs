@@ -64,6 +64,27 @@ defmodule MiwayCreditCore.MonitoringTest do
     end
   end
 
+  describe "backup failure counter" do
+    test "recent_backup_failure_count/1 increases by exactly one per recorded failure" do
+      before = Monitoring.recent_backup_failure_count()
+      Monitoring.record_backup_failure(:pg_dump_failed)
+      assert Monitoring.recent_backup_failure_count() == before + 1
+    end
+
+    test "recent_backup_failure_count/1 excludes failures older than the window" do
+      before = Monitoring.recent_backup_failure_count(60)
+      key = {:backup_failure, System.unique_integer([:positive, :monotonic])}
+      :ets.insert(Store.table(), {key, System.system_time(:second) - 120, :pg_dump_failed})
+      assert Monitoring.recent_backup_failure_count(60) == before
+    end
+
+    test "last_backup_failure_at/0 is :never before any failure, then the most recent failure's time" do
+      assert Monitoring.last_backup_failure_at() == :never
+      Monitoring.record_backup_failure(:pg_dump_failed)
+      assert {:ok, %DateTime{}} = Monitoring.last_backup_failure_at()
+    end
+  end
+
   describe "pool_stats/0 and record_query_sample/1" do
     test "starts empty after a reset" do
       assert %{

@@ -35,7 +35,7 @@ defmodule MiwayCreditCore.Monitoring do
   alias MiwayCreditCore.Monitoring.ErrorReporter
   alias MiwayCreditCore.Monitoring.Store
 
-  @scheduler_names [:arrears_scheduler, :kyc_retention_scheduler]
+  @scheduler_names [:arrears_scheduler, :kyc_retention_scheduler, :backup_scheduler]
   @repo_query_event [:miway_credit_core, :repo, :query]
   @error_rendered_event [:phoenix, :error_rendered]
 
@@ -100,6 +100,38 @@ defmodule MiwayCreditCore.Monitoring do
   @doc "The most recent scanner failure's timestamp, regardless of window — a count alone can't distinguish 'failed once an hour ago' from 'still failing right now'."
   def last_scanner_failure_at do
     case :ets.lookup(Store.table(), :scanner_failure_last_at) do
+      [{_key, timestamp}] -> {:ok, DateTime.from_unix!(timestamp)}
+      [] -> :never
+    end
+  end
+
+  @doc "Records a backup run failure — called from BackupScheduler on any failure mode of Backup.run/1, unlike ArrearsScheduler/KycRetentionScheduler this scheduler wraps its work in rescue/catch specifically so this always fires. Never raises, same reasoning as record_scanner_failure/1."
+  def record_backup_failure(reason) do
+    now = System.system_time(:second)
+    key = {:backup_failure, System.unique_integer([:positive, :monotonic])}
+    :ets.insert(Store.table(), {key, now, reason})
+    :ets.insert(Store.table(), {:backup_failure_last_at, now})
+    :ok
+  rescue
+    error -> log_write_failure("record_backup_failure", error)
+  catch
+    kind, reason -> log_write_failure("record_backup_failure", {kind, reason})
+  end
+
+  @doc "Count of backup failures recorded within the last `window_seconds` (default 24 hours — backups run daily, so a 1-hour window like the scanner's would almost always read zero)."
+  def recent_backup_failure_count(window_seconds \\ 86_400) do
+    cutoff = System.system_time(:second) - window_seconds
+
+    ms = [
+      {{{:backup_failure, :_}, :"$1", :_}, [{:>, :"$1", {:const, cutoff}}], [true]}
+    ]
+
+    :ets.select_count(Store.table(), ms)
+  end
+
+  @doc "The most recent backup failure's timestamp, regardless of window."
+  def last_backup_failure_at do
+    case :ets.lookup(Store.table(), :backup_failure_last_at) do
       [{_key, timestamp}] -> {:ok, DateTime.from_unix!(timestamp)}
       [] -> :never
     end

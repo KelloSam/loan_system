@@ -45,6 +45,19 @@ defmodule MiwayCreditCore.Backup do
     end
   end
 
+  @doc "Summary of the most recent backup (backup_id, created_at, total size), or :unavailable if none exists or it can't be read. Never raises — called from SystemHealthController."
+  def latest_backup_info do
+    case list_backups() do
+      {:ok, [latest | _]} -> fetch_manifest_summary(latest)
+      {:ok, []} -> :unavailable
+      {:error, _reason} -> :unavailable
+    end
+  rescue
+    _ -> :unavailable
+  catch
+    _, _ -> :unavailable
+  end
+
   @doc "Deletes every backup beyond the newest `keep` (default: config :miway_credit_core, :backup_retention_count, or 14)."
   def prune_old_backups(keep \\ retention_count()) do
     case list_backups() do
@@ -62,6 +75,33 @@ defmodule MiwayCreditCore.Backup do
 
   defp retention_count do
     Application.get_env(:miway_credit_core, :backup_retention_count, @default_retention_count)
+  end
+
+  defp fetch_manifest_summary(backup_id) do
+    tmp_dir =
+      Path.join(
+        System.tmp_dir!(),
+        "miway_credit_core_manifest_fetch_#{System.unique_integer([:positive])}"
+      )
+
+    File.mkdir_p!(tmp_dir)
+    tmp_path = Path.join(tmp_dir, "manifest.json")
+
+    try do
+      with :ok <- Destination.fetch(backup_id, "manifest.json", tmp_path),
+           {:ok, content} <- File.read(tmp_path),
+           {:ok, manifest} <- Jason.decode(content, keys: :atoms) do
+        %{
+          backup_id: manifest.backup_id,
+          created_at: manifest.created_at,
+          size_bytes: manifest.postgres.size_bytes + manifest.kyc_archive.size_bytes
+        }
+      else
+        _ -> :unavailable
+      end
+    after
+      File.rm_rf(tmp_dir)
+    end
   end
 
   defp do_run do

@@ -75,5 +75,29 @@ defmodule MiwayCreditCore.BackupTest do
 
       assert Backup.run() == {:error, :backup_in_progress}
     end
+
+    test "latest_backup_info/0 reflects the most recent successful run" do
+      assert {:ok, backup_id} = Backup.run()
+      on_exit(fn -> Destination.delete(backup_id) end)
+
+      assert %{backup_id: ^backup_id, size_bytes: size_bytes, created_at: created_at} =
+               Backup.latest_backup_info()
+
+      assert size_bytes > 0
+      assert {:ok, %DateTime{}, _} = DateTime.from_iso8601(created_at)
+    end
+  end
+
+  describe "latest_backup_info/0 when the newest backup_id has no manifest" do
+    test "returns :unavailable instead of raising" do
+      # A "9..." prefix sorts after any realistic UTC-timestamp backup_id
+      # (which all start with "2..."), guaranteeing this is the newest
+      # entry regardless of what other real backups exist concurrently.
+      backup_id = "99999999T999999Z"
+      put_fake_backup(backup_id)
+      on_exit(fn -> Destination.delete(backup_id) end)
+
+      assert Backup.latest_backup_info() == :unavailable
+    end
   end
 end

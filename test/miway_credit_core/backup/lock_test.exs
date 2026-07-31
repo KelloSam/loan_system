@@ -1,13 +1,21 @@
 defmodule MiwayCreditCore.Backup.LockTest do
   # The lock is a single file shared by the whole app (not per-backup-id)
-  # — async: false, with a release in setup so no test leaks a held
-  # lock into the next one.
+  # — async: false. Releases both before AND after every test (via
+  # on_exit): a release-only-in-setup convention isn't enough on its
+  # own — a test whose lock file was written directly (bypassing
+  # Lock.acquire/0, as the staleness tests below do) or that happens
+  # to run last in this module leaks a held lock into whichever
+  # DIFFERENT test module runs next in the suite's async:false
+  # sequence, not just the next test in this file. Reproduced live:
+  # this exact gap caused two unrelated BackupTest failures elsewhere
+  # in the suite before this fix.
   use ExUnit.Case, async: false
 
   alias MiwayCreditCore.Backup.{Destination, Lock}
 
   setup do
     Lock.release()
+    on_exit(fn -> Lock.release() end)
     :ok
   end
 
