@@ -88,6 +88,66 @@ defmodule MiwayCreditCore.BackupTest do
     end
   end
 
+  describe "run_restore_drill/1 (real CREATE/DROP DATABASE + pg_restore against a scratch DB)" do
+    test "restores a real backup and verifies it, cleaning up the scratch DB and dir on success" do
+      assert {:ok, backup_id} = Backup.run()
+      on_exit(fn -> Destination.delete(backup_id) end)
+
+      assert {:ok, report} = Backup.run_restore_drill(backup_id)
+
+      assert report.overall_status == "ok"
+      assert report.backup_id_restored == backup_id
+      assert report.postgres_restore.status == "ok"
+      assert report.postgres_restore.canary_found? == true
+      assert report.kyc_restore.status == "ok"
+      assert report.kyc_restore.files_mismatched == 0
+
+      {:ok, scratch_db} = Backup.scratch_database_name()
+      refute scratch_db in list_real_databases()
+    end
+
+    test "a backup_id that doesn't exist fails cleanly with a diagnostic report, not a raise" do
+      assert {:error, report} = Backup.run_restore_drill("this-backup-id-does-not-exist")
+
+      assert report.overall_status == "failed"
+      assert report.backup_id_restored == "this-backup-id-does-not-exist"
+      assert is_binary(report.reason)
+    end
+  end
+
+  # Deliberately doesn't test the ":latest, no backups at all" path
+  # automatically — the only way to exercise it would be mutating the
+  # shared :backup_root_dir Application config mid-suite, the exact
+  # class of shared-global-state risk this project's own tests already
+  # avoid elsewhere (config-swapping is verified live via mix run
+  # instead — confirmed manually working, see the commit message).
+
+  defp list_real_databases do
+    params = MiwayCreditCore.Backup.RepoConfig.connection_params()
+
+    {output, 0} =
+      System.cmd(
+        "psql",
+        [
+          "-h",
+          params.hostname,
+          "-p",
+          to_string(params.port),
+          "-U",
+          params.username,
+          "--no-password",
+          "-d",
+          "postgres",
+          "-t",
+          "-c",
+          "SELECT datname FROM pg_database;"
+        ],
+        env: [{"PGPASSWORD", params.password}]
+      )
+
+    output |> String.split("\n") |> Enum.map(&String.trim/1) |> Enum.reject(&(&1 == ""))
+  end
+
   describe "latest_backup_info/0 when the newest backup_id has no manifest" do
     test "returns :unavailable instead of raising" do
       # A "9..." prefix sorts after any realistic UTC-timestamp backup_id

@@ -49,6 +49,52 @@ defmodule MiwayCreditCore.Release do
     end
   end
 
+  @doc """
+  Runs a backup now — the release-safe equivalent of
+  `mix miway_credit_core.backup`.
+
+      bin/miway_credit_core eval "MiwayCreditCore.Release.run_backup"
+  """
+  def run_backup do
+    load_app()
+    {:ok, _} = Application.ensure_all_started(@app)
+
+    case MiwayCreditCore.Backup.run() do
+      {:ok, backup_id} ->
+        IO.puts("Backup complete: #{backup_id}")
+
+      {:error, reason} ->
+        IO.puts(:stderr, "Backup failed: #{inspect(reason)}")
+        System.halt(1)
+    end
+  end
+
+  @doc """
+  Runs a restore drill against the latest backup and prints a
+  sanitized report — the release-safe equivalent of
+  `mix miway_credit_core.restore_drill`. Never touches the real
+  database or KYC directory.
+
+      bin/miway_credit_core eval "MiwayCreditCore.Release.run_restore_drill"
+  """
+  def run_restore_drill do
+    load_app()
+    {:ok, _} = Application.ensure_all_started(@app)
+
+    case MiwayCreditCore.Backup.run_restore_drill() do
+      {:ok, %{overall_status: "ok"} = report} ->
+        IO.puts(Jason.encode!(report, pretty: true))
+
+      {:ok, report} ->
+        IO.puts(:stderr, Jason.encode!(report, pretty: true))
+        System.halt(1)
+
+      {:error, report} ->
+        IO.puts(:stderr, Jason.encode!(report, pretty: true))
+        System.halt(1)
+    end
+  end
+
   defp repos, do: Application.fetch_env!(@app, :ecto_repos)
 
   defp load_app, do: Application.load(@app)
