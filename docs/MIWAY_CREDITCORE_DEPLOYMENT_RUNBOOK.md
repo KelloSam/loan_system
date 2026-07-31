@@ -18,6 +18,7 @@ All read by `config/runtime.exs`, nothing here is invented:
 | `PHX_SERVER` | yes | must be `true` for the release to actually listen |
 | `KYC_ENCRYPTION_KEY` | yes | base64, 32 raw bytes — generate with `:crypto.strong_rand_bytes(32) \| Base.encode64()`. Encrypts KYC document bytes at rest (AES-256-GCM). Losing this key makes every stored KYC document permanently unreadable — back it up like a secret, separately from the database. |
 | `KYC_UPLOAD_DIR` | yes | absolute path to a **persistent volume outside the release directory** — see §9. The release refuses to boot without it, specifically so this can't be silently forgotten and only discovered after the first deploy wipes uploaded documents. |
+| `BACKUP_ROOT_DIR` | yes | absolute path to a **persistent volume outside the release directory** — same reasoning as `KYC_UPLOAD_DIR`. See §10. |
 | `SMTP_HOST` | no | see §12. Password-reset email stays disabled (fails closed, logged server-side) until this is set — safe to boot and pilot without it, then turn delivery on later with no redeploy. |
 | `SMTP_USERNAME`, `SMTP_PASSWORD` | only if `SMTP_HOST` is set | provider SMTP credentials. |
 | `MAIL_FROM_ADDRESS` | only if `SMTP_HOST` is set | the `From:` address on outgoing mail — most providers require this to be a verified sender/domain. |
@@ -205,31 +206,199 @@ matter.)
 
 ## 10. Backups and recovery
 
-Not yet operationally defined — this section is a checklist to work
-through before a pilot, not a description of something already running.
+Built: an automated daily backup pipeline (`MiwayCreditCore.Backup`,
+`BackupScheduler`), a verified restore drill against scratch
+resources, and monitoring integration (§11) — not a checklist anymore,
+a real system, exercised live against the actual dev database as part
+of building it (evidence at the end of this section). What's still a
+genuine deployment decision, not built here, is called out explicitly
+in its own subsection below.
 
-- **PostgreSQL**: define a real backup schedule (managed Postgres
-  providers typically offer automated daily backups plus point-in-time
-  recovery — confirm what your chosen provider gives you by default
-  vs. what you must configure).
-- **KYC file backup**: separate from the database backup (§9) — the
-  encrypted files on disk need their own backup schedule.
-- **Encryption key backup**: `KYC_ENCRYPTION_KEY` and `SECRET_KEY_BASE`
-  both need a durable backup independent of the database and app
-  servers — losing either is unrecoverable (KYC documents; all active
-  sessions, respectively).
-- **Off-site copies**: backups stored only on the same host/provider as
-  production don't protect against a provider-level incident.
-- **Restore procedure**: write down the actual steps (which backup,
-  which order — database before or after KYC files, how the app is
-  taken down/up around a restore) rather than improvising during a
-  real incident.
-- **Recovery objectives**: agree on an RPO (how much data loss is
-  acceptable — since last backup?) and RTO (how long restoration is
-  allowed to take) before a pilot, not after an incident.
-- **Restore drills**: schedule periodic real restores to a scratch
-  environment. A backup is not proven until it has been restored
-  successfully — an untested backup is a hope, not a guarantee.
+### What runs, and what it produces
+
+`BackupScheduler` runs `Backup.run/1` daily (first tick 1 minute after
+boot, then every 24h — `config :miway_credit_core, MiwayCreditCore.BackupScheduler, interval_ms: ...`
+to change it). Guarded by a local lock file (`Backup.Lock`, atomic
+`O_EXCL`, self-heals after 6h in case a prior run crashed mid-way) so
+a scheduled tick and a manual `mix miway_credit_core.backup` can never
+clobber each other.
+
+Each run produces one `backup_id` (a sortable UTC timestamp,
+`YYYYMMDDTHHMMSSZ`) containing four files, written through the
+configured `Backup.Destination` adapter:
+
+- `db.dump` — `pg_dump --format=custom` (supports selective restore,
+  built-in compression).
+- `kyc.tar.gz` — a tar of the entire `KYC_UPLOAD_DIR`. These files are
+  already AES-256-GCM-encrypted at rest by the app itself before this
+  pipeline ever touches them (§9) — archiving them doesn't add a
+  second layer, it preserves the existing one byte-for-byte.
+- `manifest.json` — row counts for a curated set of key tables, a
+  canary record (the most recently inserted KYC document, so a drill
+  can assert a *specific* record survived, not just a count), a
+  per-file sha256 for every KYC file, and an optional non-reversible
+  sha256 **fingerprint** of the KYC encryption key (never the key
+  itself — same trust model as a password hash; lets you match a
+  backup to the key generation it was encrypted under without ever
+  exposing that key).
+- `SHA256SUMS` — real `sha256sum` output format, covering all three
+  files above. Independently re-verifiable with no dependency on this
+  app: `sha256sum -c SHA256SUMS`.
+
+Retention keeps the newest 14 backups by default
+(`config :miway_credit_core, :backup_retention_count`), pruned right
+after each successful run.
+
+**Required config**: `BACKUP_ROOT_DIR` (§1) — the `Local` destination
+adapter's root. A real off-site destination (S3, rsync to a second
+host, ...) is a deploy-time addition (see below); `Local` is the only
+adapter built, same treatment SMTP/ClamAV got before it.
+
+### Restoring for real
+
+```
+mix miway_credit_core.backup            # or wait for the daily tick
+mix miway_credit_core.restore_drill      # defaults to the latest backup
+mix miway_credit_core.restore_drill --backup-id=20260731T055733Z
+```
+
+In a real deployed release (no Mix available), the equivalents are:
+
+```
+bin/miway_credit_core eval "MiwayCreditCore.Release.run_backup"
+bin/miway_credit_core eval "MiwayCreditCore.Release.run_restore_drill"
+```
+
+The drill restores into a **scratch database** (`<real database>_restore_drill`
+— a fixed suffix, not a parameter; there is no way to point it at an
+arbitrary or the real database) and a **scratch KYC directory** (under
+the OS tmp dir, categorically separate from the real persistent
+volume), verifies row counts + the canary record against the
+manifest, and verifies every KYC file's checksum against the
+manifest — never against a live query of the real database, and
+**never by decrypting anything** (checksum comparison is a stronger
+byte-fidelity guarantee than decrypt-and-inspect, and keeping
+`KYC_ENCRYPTION_KEY` out of this automated path is itself part of
+keeping it genuinely separate — see below). On success, the scratch
+database is dropped and the scratch directory removed; on any failure
+(including an unexpected crash, not just an expected error) both are
+left in place for inspection, and the printed report always names
+them.
+
+**An actual restoration in an incident**, in order: (1) stop the app
+(or at least writes to it), (2) `pg_restore` the chosen `db.dump` into
+the real database — `--clean` if restoring over existing data, a
+fresh `CREATE DATABASE` if starting clean, (3) extract `kyc.tar.gz`
+into the real `KYC_UPLOAD_DIR`, (4) confirm `KYC_ENCRYPTION_KEY` in
+the environment matches the backup's manifest fingerprint before
+starting the app (a mismatched key means every KYC document decrypts
+to garbage — check *before* traffic resumes, not after), (5) start the
+app, (6) smoke-test (§7) before considering the incident resolved.
+
+**Recovery objectives (proposed, needs a real business decision before
+a pilot)**: RPO ~24h (matches the daily backup cadence — a shorter RPO
+needs Postgres point-in-time recovery from your hosting provider, not
+just this pipeline). RTO: restoring a database this size took well
+under a minute in every live test during development; a real
+incident's actual RTO also depends on provisioning a replacement host,
+which this document can't estimate for you.
+
+### Encryption key recovery — a separate, human-gated procedure
+
+`KYC_ENCRYPTION_KEY` (and `SECRET_KEY_BASE`) are **never** written to
+the same destination as the Postgres/KYC backups above, and there is
+no automated backup of them in this codebase — deliberately. Store
+them in a real secrets vault (a shared password-manager vault, a cloud
+secrets manager, or at minimum a sealed physical copy in a safe for an
+early pilot), with access restricted to people who are **not** the
+same people who control the backup destination — a single compromise
+must never be able to take out both the ciphertext and the key that
+opens it.
+
+Two distinct checks, on different cadences, testing different things:
+
+- `mix miway_credit_core.verify_kyc_key` — decrypts a sample of real
+  stored documents using the key the *running app* currently has
+  loaded. Cheap, automatable, safe to run in prod. Confirms the app's
+  own configuration is internally consistent — it does **not** prove
+  the vaulted copy is recoverable.
+- A separate, human, quarterly exercise: actually retrieve the
+  *vaulted* copy of the key and confirm that specific copy decrypts a
+  real file. This is the only genuine disaster-recovery test of the
+  backed-up key — skipping it and only ever running the tool above
+  would mean discovering a bad vault entry during a real incident,
+  not before one.
+
+Record the key's sha256 fingerprint (the same value a backup manifest
+optionally records) next to the vault entry — it lets you confirm a
+recovered key candidate matches what a given backup expects without
+ever decrypting anything to check.
+
+### Still needs real infrastructure or a deployment decision — not built, not faked
+
+- **A real off-site destination.** `Backup.Destination.Local` is the
+  only adapter built; backups today live on the same host as the
+  database they're backing up. A real deployment needs an S3 (or
+  equivalent) or second-host adapter — the `Destination` behaviour
+  is the seam to build it against, same pattern `PasswordResetNotifier`/
+  `MalwareScanner` already established for SMTP/ClamAV.
+- **Encryption of the Postgres dump itself at rest.** `db.dump`
+  contains full plaintext customer/financial data (unlike the KYC
+  archive, which is already ciphertext) — if the backup destination
+  itself isn't encrypted at rest (an encrypted disk/bucket), that's a
+  real gap. Worth solving at the destination layer (an encrypting S3
+  adapter, or the storage provider's own at-rest encryption) rather
+  than adding a second application-level encryption step here.
+- **Alerting.** `BackupScheduler` failures are recorded
+  (`Monitoring.record_backup_failure/1`, visible on
+  `/admin/system-health` — see §11) but nothing pages anyone yet;
+  wiring that up is the same deployment-specific decision §11 already
+  defers for its own findings.
+- **A managed-Postgres provider's own backup/PITR offering**, if you
+  have one — this pipeline doesn't replace point-in-time recovery from
+  your hosting provider, it's a portable, provider-independent
+  baseline underneath whatever else you have.
+- **A committed schedule of restore drills.** The mechanism is built
+  and proven; running it periodically (monthly, quarterly — pick a
+  real cadence) and recording results is an operational habit, not
+  code.
+
+### Evidence — an actual live drill (2026-07-31, against the real dev database)
+
+Sanitized output of `mix miway_credit_core.restore_drill`, run for
+real during development, not a hypothetical:
+
+```json
+{
+  "overall_status": "ok",
+  "backup_id_restored": "20260731T055733Z",
+  "drill_id": "20260731T055733Z_35",
+  "ran_at": "2026-07-31T05:57:37.149262Z",
+  "kyc_restore": {
+    "status": "ok",
+    "files_checked": 3,
+    "files_matched": 3,
+    "files_mismatched": 0
+  },
+  "postgres_restore": {
+    "status": "ok",
+    "canary_found?": true,
+    "table_row_counts": {
+      "customers": { "matches": true, "actual": 17, "expected": 17 },
+      "kyc_documents": { "matches": true, "actual": 3, "expected": 3 },
+      "loan_accounts": { "matches": true, "actual": 11, "expected": 11 },
+      "loan_applications": { "matches": true, "actual": 22, "expected": 22 },
+      "payment_transactions": { "matches": true, "actual": 9, "expected": 9 },
+      "staff_members": { "matches": true, "actual": 8, "expected": 8 },
+      "users": { "matches": true, "actual": 10, "expected": 10 }
+    }
+  }
+}
+```
+
+Confirmed via `psql -l` and `find /tmp` immediately afterward that no
+scratch database or directory was left behind, and that the real dev
+database and KYC directory were untouched throughout.
 
 ## 11. Monitoring
 
