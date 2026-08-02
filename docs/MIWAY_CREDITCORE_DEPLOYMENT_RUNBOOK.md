@@ -17,6 +17,7 @@ All read by `config/runtime.exs`, nothing here is invented:
 | `POOL_SIZE` | no | default `10` |
 | `PHX_SERVER` | yes | must be `true` for the release to actually listen |
 | `KYC_ENCRYPTION_KEY` | yes | base64, 32 raw bytes — generate with `:crypto.strong_rand_bytes(32) \| Base.encode64()`. Encrypts KYC document bytes at rest (AES-256-GCM). Losing this key makes every stored KYC document permanently unreadable — back it up like a secret, separately from the database. |
+| `MFA_ENCRYPTION_KEY` | yes | base64, 32 raw bytes — generate with `:crypto.strong_rand_bytes(32) \| Base.encode64()`. Encrypts every user's TOTP secret at rest (AES-256-GCM). **Must be a different value from `KYC_ENCRYPTION_KEY`** — never reuse it, so a compromise of one key never exposes the other secret domain. Losing this key makes every enrolled user's MFA unusable (they'd need to disable and re-enroll TOTP) — back it up like a secret, separately from the database and separately from `KYC_ENCRYPTION_KEY`. See §9a. |
 | `KYC_UPLOAD_DIR` | yes | absolute path to a **persistent volume outside the release directory** — see §9. The release refuses to boot without it, specifically so this can't be silently forgotten and only discovered after the first deploy wipes uploaded documents. |
 | `BACKUP_ROOT_DIR` | yes | absolute path to a **persistent volume outside the release directory** — same reasoning as `KYC_UPLOAD_DIR`. See §10. |
 | `SMTP_HOST` | no | see §12. Password-reset email stays disabled (fails closed, logged server-side) until this is set — safe to boot and pilot without it, then turn delivery on later with no redeploy. |
@@ -203,6 +204,55 @@ matter.)
   than one app instance. `DocumentStorage`'s own moduledoc already
   scopes it this way ("swap this module's internals for S3 later
   without touching the context or controller").
+
+## 9a. TOTP (MFA) secret encryption key — `MFA_ENCRYPTION_KEY`
+
+`MiwayCreditCore.Accounts.TotpCrypto` encrypts every user's TOTP
+secret at rest (AES-256-GCM, same mechanism and code shape as
+`DocumentStorage`'s KYC encryption in §9, but its own key —
+`users.totp_secret` holds a Base64-encoded `nonce <> tag <>
+ciphertext` blob, not the plaintext-Base64 secret older versions of
+this app stored). This closes a real gap: a database copy alone used
+to be enough to decode every user's MFA seed and generate valid codes,
+defeating the point of two-factor authentication.
+
+- **Never reuse `KYC_ENCRYPTION_KEY` for this.** They protect
+  different things (KYC documents vs. MFA seeds) and a shared key
+  means compromising one exposes both. `config/runtime.exs` requires
+  both, as two independently-generated values.
+- **Custody, backup, and recovery follow the exact same model as
+  `KYC_ENCRYPTION_KEY` in §10's "Encryption key recovery" subsection**
+  — a real secrets vault, access restricted to people distinct from
+  whoever controls the backup destination, never written to the same
+  destination as the database/KYC backups, and never included in the
+  automated backup pipeline. Losing this key doesn't lose customer
+  money or documents, but it does lock every enrolled user out of MFA
+  login until they re-enroll — treat it with the same care.
+- **Key-version metadata is built in, for a future rotation.**
+  `users.totp_secret_version` records which format/key generation
+  encrypted a given row (`0` = legacy pre-encryption plaintext-Base64,
+  `1` = the current `MFA_ENCRYPTION_KEY`). A future key rotation would
+  introduce version `2`, re-encrypt existing rows under the new key,
+  and bump their version — the version column already exists so that
+  migration doesn't need a schema change when it happens. Rotation
+  itself (re-encrypting every row under a new key) is not yet built,
+  matching where `KYC_ENCRYPTION_KEY` rotation stands today.
+- **Existing (pre-encryption) users were migrated automatically, not
+  forced to re-enroll.** `mix miway_credit_core.encrypt_existing_totp_secrets`
+  re-encrypts every `totp_secret_version: 0` row in place —
+  the underlying secret never changes, only how it's stored, so no
+  user's authenticator app needs a new QR scan because of this change.
+  Safe to re-run; it's a no-op for any row already on the current
+  format. Run this once, after `MFA_ENCRYPTION_KEY` is configured and
+  the app is deployed with this change.
+- **Two distinct verification checks**, same two-cadence model as
+  `KYC_ENCRYPTION_KEY`: `mix miway_credit_core.verify_mfa_key`
+  (decrypts a sample of real users' encrypted secrets with the
+  *running app's* currently loaded key — cheap, automatable, safe in
+  prod, never prints the key or a decrypted secret) vs. a separate
+  human quarterly exercise of retrieving the *vaulted* copy of the key
+  and confirming it decrypts a real record — the only genuine
+  disaster-recovery test of the backed-up key itself.
 
 ## 10. Backups and recovery
 
