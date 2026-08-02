@@ -78,3 +78,11 @@ a pilot.
 This system handles customer PII, KYC documents, and financial records.
 If you find a security issue, do not open a public GitHub issue — contact
 the project maintainer directly.
+
+## Licence
+
+Proprietary — see [`LICENSE`](LICENSE). This is Miway Technology Limited's
+confidential source code, not open source; the repository must remain
+private. A customer/lending organisation's right to *use* a hosted
+deployment is governed by a separate commercial licence agreement, not by
+this repository or its contents.
