@@ -32,7 +32,10 @@ users touch it:
   delivery, templates, queues) is a reserved, unbuilt boundary.
 
 See [`docs/MIWAY_CREDITCORE_DEPLOYMENT_RUNBOOK.md`](docs/MIWAY_CREDITCORE_DEPLOYMENT_RUNBOOK.md)
-for what's required to close these before a real pilot.
+for what's required to close these before a real pilot, and
+[`docs/MIWAY_CREDITCORE_PILOT_READINESS_CHECKLIST.md`](docs/MIWAY_CREDITCORE_PILOT_READINESS_CHECKLIST.md)
+for the full pilot acceptance pack (readiness checklist, test execution
+register, defect register, formal acceptance form).
 
 ## Development setup
 
