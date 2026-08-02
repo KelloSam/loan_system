@@ -11,6 +11,7 @@ defmodule MiwayCreditCore.Accounts.User do
     field :status, :string, default: "active"
     field :sessions_invalidated_at, :naive_datetime
     field :totp_secret, :string
+    field :totp_secret_version, :integer, default: 0
     field :totp_enabled, :boolean, default: false
     field :failed_attempts, :integer, default: 0
     field :locked_until, :naive_datetime
@@ -54,7 +55,7 @@ defmodule MiwayCreditCore.Accounts.User do
   # Used to enable / disable TOTP — only touches 2FA fields.
   def totp_changeset(user, attrs) do
     user
-    |> cast(attrs, [:totp_secret, :totp_enabled])
+    |> cast(attrs, [:totp_secret, :totp_secret_version, :totp_enabled])
   end
 
   @doc "Stamps sessions_invalidated_at — used to force-logout every existing session after a password reset."

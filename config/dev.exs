@@ -23,6 +23,12 @@ config :miway_credit_core, :malware_scanner, MiwayCreditCore.Customers.MalwareSc
 # in prod; config/runtime.exs requires a real KYC_ENCRYPTION_KEY there.
 config :miway_credit_core, :kyc_encryption_key, "e4bafnT8b29F3Nl3cozlz0haxa9xagBbhK57Y5eafGE="
 
+# Fixed, checked-in key for TOTP secret encryption at rest — safe
+# because dev data is never real customer data. Deliberately a
+# different value from :kyc_encryption_key above; config/runtime.exs
+# requires a real, distinct MFA_ENCRYPTION_KEY in prod.
+config :miway_credit_core, :mfa_encryption_key, "8Dijr4Trk8lWhn5SdanSKf6MF0cgD6s+06RYbg6JZrE="
+
 # Configure loan system database
 config :miway_credit_core, MiwayCreditCore.Repo,
   username: "think",

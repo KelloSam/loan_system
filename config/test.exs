@@ -47,3 +47,6 @@ config :miway_credit_core, :backup_root_dir, Path.join(System.tmp_dir!(), "miway
 
 # Fixed, checked-in key — test data is never real customer data.
 config :miway_credit_core, :kyc_encryption_key, "u6lPIl6jo+XwIdtkkHejcYC1qoAWI3icozx+JyKY4Jo="
+
+# Fixed, checked-in key — deliberately different from :kyc_encryption_key.
+config :miway_credit_core, :mfa_encryption_key, "T8Mm6SIS8B7pR4eYAMY4IlsKZgKaf7UQPWT6J5Er66g="

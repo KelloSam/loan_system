@@ -7,8 +7,11 @@ defmodule MiwayCreditCore.Accounts do
     StaffMember,
     CustomerUser,
     PasswordResetToken,
-    PasswordResetNotifier
+    PasswordResetNotifier,
+    TotpCrypto
   }
+
+  @current_totp_secret_version 1
 
   def create_user(attrs \\ %{}) do
     %User{}
@@ -169,34 +172,87 @@ defmodule MiwayCreditCore.Accounts do
 
   @doc """
   Returns true if the 6-digit TOTP code matches the user's stored secret.
-  The secret is stored base64-encoded in the DB; this function decodes it
-  before passing to NimbleTOTP.
+
+  `totp_secret_version >= 1` means the stored value is a Base64-encoded
+  `TotpCrypto` blob (nonce<>tag<>ciphertext) — the current, encrypted
+  format. `0` (or unset) means a pre-encryption legacy row where the
+  stored value is nothing more than `Base.encode64(raw_secret)`; those
+  still validate correctly (no user is locked out by this change), but
+  every legacy row should be moved to the current format via
+  `migrate_legacy_totp_secret/1` — see
+  `mix miway_credit_core.encrypt_existing_totp_secrets`.
   """
-  def valid_totp?(%User{totp_secret: encoded}, code) when is_binary(encoded) do
-    secret = Base.decode64!(encoded)
+  def valid_totp?(%User{totp_secret: encoded} = user, code) when is_binary(encoded) do
+    secret = decode_totp_secret(user)
     NimbleTOTP.valid?(secret, code)
   end
 
   def valid_totp?(_, _), do: false
+
+  @doc """
+  Decrypts/decodes a user's raw TOTP secret. Exists only for
+  `mix miway_credit_core.verify_mfa_key`'s read-only key sanity check
+  — every real authentication path uses `valid_totp?/2`, never this.
+  """
+  def decode_totp_secret_for_check(%User{} = user), do: decode_totp_secret(user)
 
   @doc "Validates a raw binary secret against a code (used during the enable flow)."
   def valid_totp_for_secret?(secret, code) when is_binary(secret) do
     NimbleTOTP.valid?(secret, code)
   end
 
-  @doc "Enables TOTP for a user, persisting the base64-encoded secret."
+  @doc "Enables TOTP for a user, encrypting the secret at rest before persisting it."
   def enable_totp(%User{} = user, secret) when is_binary(secret) do
+    encoded = secret |> TotpCrypto.encrypt() |> Base.encode64()
+
     user
-    |> User.totp_changeset(%{totp_secret: Base.encode64(secret), totp_enabled: true})
+    |> User.totp_changeset(%{
+      totp_secret: encoded,
+      totp_secret_version: @current_totp_secret_version,
+      totp_enabled: true
+    })
     |> Repo.update()
   end
 
   @doc "Disables TOTP and clears the stored secret."
   def disable_totp(%User{} = user) do
     user
-    |> User.totp_changeset(%{totp_secret: nil, totp_enabled: false})
+    |> User.totp_changeset(%{totp_secret: nil, totp_secret_version: 0, totp_enabled: false})
     |> Repo.update()
   end
+
+  @doc """
+  Re-encrypts a single user's legacy (`totp_secret_version: 0`) TOTP
+  secret into the current encrypted format, without changing the
+  underlying secret or requiring re-enrollment. A no-op (returns
+  `{:ok, user}` unchanged) for a user already on the current format or
+  with no secret at all. See `mix miway_credit_core.encrypt_existing_totp_secrets`,
+  the one-time migration that calls this for every legacy row.
+  """
+  def migrate_legacy_totp_secret(%User{totp_secret: nil} = user), do: {:ok, user}
+
+  def migrate_legacy_totp_secret(%User{totp_secret_version: v} = user)
+      when v >= @current_totp_secret_version,
+      do: {:ok, user}
+
+  def migrate_legacy_totp_secret(%User{} = user) do
+    raw_secret = Base.decode64!(user.totp_secret)
+    encoded = raw_secret |> TotpCrypto.encrypt() |> Base.encode64()
+
+    user
+    |> User.totp_changeset(%{
+      totp_secret: encoded,
+      totp_secret_version: @current_totp_secret_version
+    })
+    |> Repo.update()
+  end
+
+  defp decode_totp_secret(%User{totp_secret: encoded, totp_secret_version: version})
+       when version >= @current_totp_secret_version do
+    encoded |> Base.decode64!() |> TotpCrypto.decrypt()
+  end
+
+  defp decode_totp_secret(%User{totp_secret: encoded}), do: Base.decode64!(encoded)
 
   # ---------------------------------------------------------------------------
   # Password reset

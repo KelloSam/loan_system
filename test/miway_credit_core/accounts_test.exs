@@ -210,12 +210,28 @@ defmodule MiwayCreditCore.AccountsTest do
       assert uri =~ "MiwayCreditCore"
     end
 
-    test "enable_totp/2 stores a base64-encoded secret and flips totp_enabled" do
+    test "enable_totp/2 stores the secret encrypted (current version), not plain base64, and flips totp_enabled" do
       user = user_fixture()
       secret = Accounts.generate_totp_secret()
       assert {:ok, updated} = Accounts.enable_totp(user, secret)
       assert updated.totp_enabled
-      assert updated.totp_secret == Base.encode64(secret)
+      assert updated.totp_secret_version == 1
+      # The stored value is not the raw base64-encoded secret anymore —
+      # decoding it does not yield a 20-byte NimbleTOTP secret directly,
+      # it yields the nonce<>tag<>ciphertext blob (12 + 16 + 20 = 48 bytes).
+      refute updated.totp_secret == Base.encode64(secret)
+      decoded_blob = Base.decode64!(updated.totp_secret)
+      assert byte_size(decoded_blob) == 48
+      assert byte_size(decoded_blob) != byte_size(secret)
+    end
+
+    test "enable_totp/2's stored secret round-trips correctly through valid_totp?/2" do
+      user = user_fixture()
+      secret = Accounts.generate_totp_secret()
+      {:ok, updated} = Accounts.enable_totp(user, secret)
+
+      code = NimbleTOTP.verification_code(secret)
+      assert Accounts.valid_totp?(updated, code)
     end
 
     test "disable_totp/1 clears the secret" do
@@ -248,6 +264,61 @@ defmodule MiwayCreditCore.AccountsTest do
       code = NimbleTOTP.verification_code(secret)
       assert Accounts.valid_totp_for_secret?(secret, code)
       refute Accounts.valid_totp_for_secret?(secret, "000000")
+    end
+  end
+
+  describe "TOTP legacy (pre-encryption, totp_secret_version: 0) record handling" do
+    defp legacy_totp_user_fixture(secret) do
+      user = user_fixture()
+
+      {:ok, legacy_user} =
+        user
+        |> MiwayCreditCore.Accounts.User.totp_changeset(%{
+          totp_secret: Base.encode64(secret),
+          totp_secret_version: 0,
+          totp_enabled: true
+        })
+        |> MiwayCreditCore.Repo.update()
+
+      legacy_user
+    end
+
+    test "valid_totp?/2 still authenticates a legacy plain-base64 secret" do
+      secret = Accounts.generate_totp_secret()
+      legacy_user = legacy_totp_user_fixture(secret)
+
+      code = NimbleTOTP.verification_code(secret)
+      assert Accounts.valid_totp?(legacy_user, code)
+      refute Accounts.valid_totp?(legacy_user, "000000")
+    end
+
+    test "migrate_legacy_totp_secret/1 re-encrypts a legacy row without changing the underlying secret" do
+      secret = Accounts.generate_totp_secret()
+      legacy_user = legacy_totp_user_fixture(secret)
+      code = NimbleTOTP.verification_code(secret)
+
+      assert {:ok, migrated} = Accounts.migrate_legacy_totp_secret(legacy_user)
+      assert migrated.totp_secret_version == 1
+      refute migrated.totp_secret == legacy_user.totp_secret
+
+      # The same code still works after migration — no re-enrollment needed.
+      assert Accounts.valid_totp?(migrated, code)
+    end
+
+    test "migrate_legacy_totp_secret/1 is a no-op for an already-current-version row" do
+      user = user_fixture()
+      secret = Accounts.generate_totp_secret()
+      {:ok, enabled} = Accounts.enable_totp(user, secret)
+
+      assert {:ok, unchanged} = Accounts.migrate_legacy_totp_secret(enabled)
+      assert unchanged.totp_secret == enabled.totp_secret
+      assert unchanged.totp_secret_version == enabled.totp_secret_version
+    end
+
+    test "migrate_legacy_totp_secret/1 is a no-op for a user with no secret at all" do
+      user = user_fixture()
+      assert {:ok, unchanged} = Accounts.migrate_legacy_totp_secret(user)
+      assert unchanged.totp_secret == nil
     end
   end
 

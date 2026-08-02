@@ -35,6 +35,18 @@ if config_env() == :prod do
 
   config :miway_credit_core, :kyc_encryption_key, kyc_encryption_key
 
+  mfa_encryption_key =
+    System.get_env("MFA_ENCRYPTION_KEY") ||
+      raise """
+      environment variable MFA_ENCRYPTION_KEY is missing.
+      Generate one with: :crypto.strong_rand_bytes(32) |> Base.encode64()
+      Must be different from KYC_ENCRYPTION_KEY — never reuse it. See
+      docs/MIWAY_CREDITCORE_DEPLOYMENT_RUNBOOK.md for key custody and
+      rotation guidance.
+      """
+
+  config :miway_credit_core, :mfa_encryption_key, mfa_encryption_key
+
   kyc_upload_dir =
     System.get_env("KYC_UPLOAD_DIR") ||
       raise """
