@@ -65,6 +65,14 @@ mix compile --warnings-as-errors      # clean compile check
 mix format --check-formatted
 ```
 
+SQL query logging is quieted to `:warning` in `config/test.exs` — real
+failures and errors still print, but per-query noise doesn't. To see
+full SQL debug output while diagnosing a specific test:
+
+```bash
+LOG_LEVEL=debug mix test test/path/to/some_test.exs
+```
+
 ## Production deployment
 
 See [`docs/MIWAY_CREDITCORE_DEPLOYMENT_RUNBOOK.md`](docs/MIWAY_CREDITCORE_DEPLOYMENT_RUNBOOK.md)

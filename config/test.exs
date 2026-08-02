@@ -1,5 +1,19 @@
 import Config
 
+# Ecto logs every query at :debug by default — under the sandbox pool
+# that's thousands of "QUERY OK ..." lines per `mix test` run, drowning
+# out genuine failures and making the full suite impractical to read
+# (flagged in external review of ba4d5ba). Real test failures (ExUnit's
+# own output) and Ecto/Postgrex errors still surface — errors log well
+# above :warning, so nothing that actually matters is hidden.
+#
+# To temporarily see full SQL debug output while diagnosing a specific
+# test, override this without editing the file:
+#
+#     LOG_LEVEL=debug mix test test/path/to/some_test.exs
+#
+config :logger, level: System.get_env("LOG_LEVEL", "warning") |> String.to_existing_atom()
+
 # Delivers to the calling test process instead of sending anything real.
 config :miway_credit_core,
        :password_reset_notifier,
